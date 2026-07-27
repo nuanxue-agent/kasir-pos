@@ -6,7 +6,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Tag, Receipt,
   Users, Percent, Boxes, BarChart3, UserCog, Store,
   Building2, Settings, LogOut, X, ShoppingBag,
-  TrendingDown, Clock, GitFork, FileText, Truck, Cog,
+  TrendingDown, Clock, GitFork, FileText, Truck, Cog, Heart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
