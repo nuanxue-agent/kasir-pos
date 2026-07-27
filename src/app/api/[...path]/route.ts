@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, queryOne, exec, batchExec, newId, nowISO } from '@/lib/db'
+import { postJournalEntry } from '@/lib/accounting'
 
 function ok(data: any, status = 200) { return NextResponse.json(data, { status }) }
 function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
@@ -176,6 +177,14 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
               params: [newId(), oid, pay.method, Number(pay.amount), pay.reference||null, Number(pay.change)||0, t] })
           }
           await batchExec(stmts)
+          // ── Auto-post journal entry for the sale ─────────────────────────
+          // Determine debit account: Cash (1100) for CASH payments, AR (1200) otherwise
+          const primaryPayment = (b.payments as any[])[0]
+          const debitCode = primaryPayment?.method === 'CASH' ? '1100' : '1200'
+          await postJournalEntry(storeId, `Sale #${number}`, [
+            { accountCode: debitCode, debit: Number(b.total) || 0, credit: 0 },
+            { accountCode: '4100',    debit: 0, credit: Number(b.total) || 0 },
+          ])
           // ── Points: award earned, subtract redeemed ──────────────────────
           let pointsEarned = 0
           if (b.customerId) {
@@ -450,6 +459,11 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           `INSERT INTO Expense (id,storeId,userId,category,description,amount,date,note,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
           [id, storeId, user.id, b.category ?? 'Lain-lain', b.description, Number(b.amount), b.date, b.note ?? null, t, t]
         )
+        // ── Auto-post journal entry for the expense ───────────────────────
+        await postJournalEntry(storeId, `Expense: ${b.description}`, [
+          { accountCode: '5200', debit: Number(b.amount) || 0, credit: 0 },
+          { accountCode: '1100', debit: 0, credit: Number(b.amount) || 0 },
+        ])
         return ok({ id }, 201)
       }
       if (segs[1] && method === 'PATCH') {

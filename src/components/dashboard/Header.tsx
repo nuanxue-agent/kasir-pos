@@ -86,8 +86,8 @@ export function Header({ userName, userEmail, userImage, userRole, stores, curre
       ? fetch(`/api/inventory?storeId=${storeId}&lowStockOnly=true`).then(r => r.json())
       : Promise.resolve([]),
     enabled: !!storeId,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: 5 * 60_000,
+    staleTime: 4 * 60_000,
   })
   const alertCount = lowStockItems.length
 
@@ -140,11 +140,11 @@ export function Header({ userName, userEmail, userImage, userRole, stores, curre
           >
             <Bell style={{ width: 18, height: 18 }} />
             {alertCount > 0 ? (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-amber-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none">
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none">
                 {alertCount > 9 ? '9+' : alertCount}
               </span>
             ) : (
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full" />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-stone-300 rounded-full" />
             )}
           </button>
 

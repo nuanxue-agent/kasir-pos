@@ -6,6 +6,7 @@ import {
   ShoppingCart, DollarSign, TrendingUp, Users, Plus, Package,
   BarChart3, AlertTriangle, ArrowRight, CheckCircle2, Clock,
   XCircle, Boxes, Sparkles, ShoppingBag, Star, ChevronRight,
+  UserCheck, TrendingDown, Minus,
 } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -66,6 +67,14 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
   const hasPOS = enabledModules.includes('pos')
   const hasInventory = enabledModules.includes('inventory')
   const hasCustomers = enabledModules.includes('customers')
+
+  // Active shift
+  const { data: shiftData, isLoading: shiftLoading, refetch: refetchShift } = useQuery({
+    queryKey: ['shift-current', storeId],
+    queryFn: () => fetch(`/api/shifts?storeId=${storeId}&active=true`).then(r => r.json()),
+    refetchInterval: 30_000,
+  })
+  const activeShift = (shiftData as any) ?? null
 
   // Today's summary
   const { data, isLoading } = useQuery({
@@ -147,6 +156,70 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
           <span className="hidden sm:inline">Catat Penjualan</span>
           <span className="sm:hidden">Jual</span>
         </Link>
+      </div>
+
+      {/* ── Shift status widget ── */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+        {shiftLoading ? (
+          <div className="h-10 bg-amber-100 animate-pulse rounded-xl" />
+        ) : activeShift ? (
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
+                <UserCheck className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">Shift Aktif</p>
+                <p className="text-sm font-bold text-stone-800 mt-0.5">{activeShift.userName ?? 'Kasir'}</p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-6 text-center">
+              <div>
+                <p className="text-[10px] text-stone-400 uppercase tracking-widest">Dibuka</p>
+                <p className="text-xs font-semibold text-stone-700 mt-0.5">
+                  {new Date(activeShift.openedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-stone-400 uppercase tracking-widest">Kas Awal</p>
+                <p className="text-xs font-semibold text-stone-700 mt-0.5">
+                  {formatCurrency(activeShift.openingCash ?? 0, currency)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-stone-400 uppercase tracking-widest">Omzet Shift</p>
+                <p className="text-xs font-semibold text-amber-700 mt-0.5">
+                  {formatCurrency(stats.totalRevenue ?? 0, currency)}
+                </p>
+              </div>
+            </div>
+            <a
+              href="/dashboard/shifts"
+              className="shrink-0 text-xs font-medium text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Detail
+            </a>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-stone-200 flex items-center justify-center shrink-0">
+                <Clock className="h-4 w-4 text-stone-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest">Tidak ada shift aktif</p>
+                <p className="text-sm text-stone-400 mt-0.5">Buka shift untuk mulai mencatat penjualan</p>
+              </div>
+            </div>
+            <a
+              href="/dashboard/shifts"
+              className="shrink-0 flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl font-semibold text-xs transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Buka Shift
+            </a>
+          </div>
+        )}
       </div>
 
       {/* ── Stats grid ── */}
