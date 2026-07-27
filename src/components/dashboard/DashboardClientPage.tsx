@@ -2,7 +2,22 @@
 
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { ShoppingCart, DollarSign, TrendingUp, Users, Plus, Package, BarChart3, AlertTriangle, ArrowRight } from 'lucide-react'
+import {
+  ShoppingCart,
+  DollarSign,
+  TrendingUp,
+  Users,
+  Plus,
+  Package,
+  BarChart3,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Boxes,
+  Sparkles,
+} from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -11,35 +26,81 @@ interface DashboardClientPageProps {
   session: any
 }
 
+function getGreeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function todayStart() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+function todayEnd() {
+  const d = new Date()
+  d.setHours(23, 59, 59, 999)
+  return d.toISOString()
+}
+
+const STATUS_STYLES: Record<string, { icon: React.ReactNode; pill: string }> = {
+  PAID:    { icon: <CheckCircle2 className="h-3 w-3" />, pill: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' },
+  PENDING: { icon: <Clock        className="h-3 w-3" />, pill: 'bg-amber-500/15   text-amber-400   border border-amber-500/20' },
+  VOIDED:  { icon: <XCircle      className="h-3 w-3" />, pill: 'bg-red-500/15     text-red-400     border border-red-500/20' },
+}
+
 export default function DashboardClientPage({ storeId, session }: DashboardClientPageProps) {
   const currency = session?.user?.stores?.[0]?.currency ?? 'IDR'
+  const userName = session?.user?.name ?? ''
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', storeId],
-    queryFn: () => fetch(`/api/reports/summary?storeId=${storeId}&from=${todayStart()}&to=${todayEnd()}`).then(r => r.json()),
+    queryKey: ['dashboard-summary', storeId],
+    queryFn: () =>
+      fetch(`/api/reports/summary?storeId=${storeId}&from=${todayStart()}&to=${todayEnd()}`)
+        .then((r) => r.json()),
   })
 
   const { data: recentOrders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders-recent', storeId],
-    queryFn: () => fetch(`/api/orders?storeId=${storeId}&limit=10`).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/orders?storeId=${storeId}&limit=10`).then((r) => r.json()),
   })
 
   const { data: lowStock = [], isLoading: stockLoading } = useQuery({
     queryKey: ['inventory-low', storeId],
-    queryFn: () => fetch(`/api/inventory?storeId=${storeId}&lowStockOnly=true`).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/inventory?storeId=${storeId}&lowStockOnly=true`).then((r) => r.json()),
   })
 
-  const stats = data ?? {}
+  const stats: {
+    totalRevenue?: number
+    totalOrders?: number
+    avgOrderValue?: number
+    newCustomers?: number
+  } = data ?? {}
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-slate-400 mt-1 text-sm">Welcome back, {session?.user?.name}</p>
+    <div className="p-6 space-y-8 max-w-screen-2xl mx-auto">
+
+      {/* Greeting */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-4 w-4 text-indigo-400" />
+            <span className="text-xs font-medium text-indigo-400 uppercase tracking-widest">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-white">
+            {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''} 👋
+          </h1>
+          <p className="text-white/40 mt-1 text-sm">Here's what's happening at your store today.</p>
+        </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           icon={DollarSign}
@@ -57,7 +118,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
         />
         <StatsCard
           icon={TrendingUp}
-          label="Avg Order"
+          label="Avg Order Value"
           value={formatCurrency(stats.avgOrderValue ?? 0, currency)}
           color="purple"
           loading={isLoading}
@@ -71,92 +132,141 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
         />
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-3 gap-3">
-        <Link href="/dashboard/pos" className="flex items-center gap-3 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-3 rounded-xl font-medium text-sm transition-colors">
-          <Plus size={18} /> New Sale
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/dashboard/pos"
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-indigo-500/20 transition-all duration-150 active:scale-95"
+        >
+          <Plus size={16} />
+          New Sale
         </Link>
-        <Link href="/dashboard/products" className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-white px-4 py-3 rounded-xl font-medium text-sm transition-colors border border-slate-700">
-          <Package size={18} /> Add Product
+        <Link
+          href="/dashboard/products"
+          className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
+        >
+          <Package size={16} />
+          Add Product
         </Link>
-        <Link href="/dashboard/reports" className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-white px-4 py-3 rounded-xl font-medium text-sm transition-colors border border-slate-700">
-          <BarChart3 size={18} /> View Reports
+        <Link
+          href="/dashboard/reports"
+          className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
+        >
+          <BarChart3 size={16} />
+          View Reports
         </Link>
       </div>
 
+      {/* Two-column: orders + stock */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-            <h2 className="font-semibold text-white">Recent Orders</h2>
-            <Link href="/dashboard/orders" className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1">
+
+        {/* Recent orders */}
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <h2 className="font-semibold text-white text-sm">Recent Orders</h2>
+            <Link
+              href="/dashboard/orders"
+              className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors"
+            >
               View all <ArrowRight size={12} />
             </Link>
           </div>
-          <div className="divide-y divide-slate-700">
-            {ordersLoading ? (
-              [...Array(5)].map((_, i) => <div key={i} className="h-12 bg-slate-700/50 animate-pulse m-3 rounded-lg" />)
-            ) : recentOrders.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-8">No orders yet</p>
-            ) : recentOrders.slice(0, 8).map((order: any) => (
-              <div key={order.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-700/50 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-white">#{order.number}</p>
-                  <p className="text-xs text-slate-400">{formatDate(order.createdAt)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-white">{formatCurrency(order.total, currency)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    order.status === 'PAID' ? 'bg-green-900/50 text-green-400' :
-                    order.status === 'VOIDED' ? 'bg-red-900/50 text-red-400' :
-                    'bg-slate-700 text-slate-400'
-                  }`}>{order.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+
+          {ordersLoading ? (
+            <div className="p-4 space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-white/5 animate-pulse rounded-xl" />
+              ))}
+            </div>
+          ) : (recentOrders as any[]).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <ShoppingCart className="h-8 w-8 text-white/10" />
+              <p className="text-sm text-white/30">No orders yet today</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {(recentOrders as any[]).slice(0, 8).map((order: any) => {
+                const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.PENDING
+                return (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-colors"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white">#{order.number}</p>
+                      <p className="text-xs text-white/30 mt-0.5">{formatDate(order.createdAt)}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-semibold text-white">
+                        {formatCurrency(order.total, currency)}
+                      </p>
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${style.pill}`}>
+                        {style.icon}
+                        {order.status}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Low Stock */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-            <h2 className="font-semibold text-white flex items-center gap-2">
-              <AlertTriangle size={16} className="text-amber-400" /> Low Stock
+        {/* Low stock alerts */}
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <h2 className="font-semibold text-white text-sm flex items-center gap-2">
+              <AlertTriangle size={15} className="text-amber-400" />
+              Low Stock
             </h2>
-            <Link href="/dashboard/inventory" className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1">
+            <Link
+              href="/dashboard/inventory"
+              className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors"
+            >
               View all <ArrowRight size={12} />
             </Link>
           </div>
-          <div className="divide-y divide-slate-700">
-            {stockLoading ? (
-              [...Array(5)].map((_, i) => <div key={i} className="h-12 bg-slate-700/50 animate-pulse m-3 rounded-lg" />)
-            ) : lowStock.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-8">All products well stocked ✓</p>
-            ) : lowStock.slice(0, 8).map((p: any) => (
-              <div key={p.id} className="flex items-center justify-between px-5 py-3">
-                <p className="text-sm text-white">{p.name}</p>
-                <span className={`text-xs font-mono px-2 py-1 rounded-lg ${
-                  p.stock === 0 ? 'bg-red-900/50 text-red-400' : 'bg-amber-900/50 text-amber-400'
-                }`}>
-                  {p.stock} left
-                </span>
-              </div>
-            ))}
-          </div>
+
+          {stockLoading ? (
+            <div className="p-4 space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-white/5 animate-pulse rounded-xl" />
+              ))}
+            </div>
+          ) : (lowStock as any[]).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <Boxes className="h-8 w-8 text-white/10" />
+              <p className="text-sm text-white/30">All products well stocked ✓</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {(lowStock as any[]).slice(0, 8).map((p: any) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                      <Package className="h-3.5 w-3.5 text-white/30" />
+                    </div>
+                    <p className="text-sm text-white truncate">{p.name}</p>
+                  </div>
+                  <span
+                    className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-lg shrink-0 ${
+                      p.stock === 0
+                        ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                    }`}
+                  >
+                    {p.stock === 0 ? 'Out of stock' : `${p.stock} left`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   )
-}
-
-function todayStart() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
-}
-
-function todayEnd() {
-  const d = new Date()
-  d.setHours(23, 59, 59, 999)
-  return d.toISOString()
 }

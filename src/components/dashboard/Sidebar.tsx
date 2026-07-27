@@ -163,10 +163,9 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
                     >
                       <item.icon
                         className={cn(
-                          'shrink-0 transition-colors',
+                          'h-[18px] w-[18px] shrink-0 transition-colors',
                           active ? 'text-indigo-400' : 'text-white/30'
                         )}
-                        style={{ width: 18, height: 18 }}
                       />
                       <span className="truncate">{item.label}</span>
                       {active && (
@@ -195,10 +194,9 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
         >
           <Settings
             className={cn(
-              'shrink-0',
+              'h-[18px] w-[18px] shrink-0',
               pathname.startsWith('/dashboard/settings') ? 'text-indigo-400' : 'text-white/30'
             )}
-            style={{ width: 18, height: 18 }}
           />
           Settings
         </Link>
@@ -222,7 +220,7 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
             aria-label="Log out"
             title="Log out"
           >
-            <LogOut style={{ width: 15, height: 15 }} />
+            <LogOut className="h-[15px] w-[15px]" />
           </button>
         </div>
       </div>

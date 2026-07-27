@@ -11,7 +11,7 @@ import {
   Shield,
   Globe,
   ArrowRight,
-  Github,
+  GitFork,
 } from 'lucide-react'
 
 export default function HomePage() {
@@ -49,12 +49,12 @@ export default function HomePage() {
               Pricing
             </Link>
             <Link
-              href="https://github.com"
-              className="flex items-center gap-1.5 text-sm text-slate-400 transition-colors hover:text-white"
-            >
-              <Github className="h-4 w-4" />
-              GitHub
-            </Link>
+                href="https://github.com"
+                className="flex items-center gap-1.5 text-sm text-slate-400 transition-colors hover:text-white"
+              >
+                <GitFork className="h-4 w-4" />
+                GitHub
+              </Link>
           </div>
 
           {/* CTA buttons */}
