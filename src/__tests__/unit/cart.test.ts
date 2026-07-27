@@ -266,3 +266,37 @@ describe('Cart edge cases', () => {
     expect(cart[0].subtotal).toBe(1500000)
   })
 })
+
+// ── Additional edge cases ─────────────────────────────────────────────────────
+
+describe('Cart additional edge cases', () => {
+  const p1 = { id: 'p1', name: 'Nasi Goreng', price: 15000 }
+  const p2 = { id: 'p2', name: 'Es Teh', price: 5000 }
+
+  it('calcTotal with zero subtotal and zero discount is 0', () => {
+    expect(calcTotal(0, 0, 0)).toBe(0)
+  })
+
+  it('calcTax rounds down fractional result', () => {
+    // 10000 * 0.11 = 1100.0 exactly — should be 1100
+    expect(calcTax(10000, 0.11)).toBe(1100)
+  })
+
+  it('addToCart preserves order: new product appended at end', () => {
+    const cart = addToCart(addToCart([], p1), p2)
+    expect(cart[0].productId).toBe('p1')
+    expect(cart[1].productId).toBe('p2')
+  })
+
+  it('updateQty to 1 restores single-item subtotal', () => {
+    let cart = addToCart([], p1)
+    cart = updateQty(cart, 'p1', 5)
+    cart = updateQty(cart, 'p1', 1)
+    expect(cart[0].qty).toBe(1)
+    expect(cart[0].subtotal).toBe(15000)
+  })
+
+  it('calcChange with zero payment and zero total is 0', () => {
+    expect(calcChange(0, 0)).toBe(0)
+  })
+})

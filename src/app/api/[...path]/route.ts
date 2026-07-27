@@ -1804,16 +1804,66 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ── Suppliers ────────────────────────────────────────────────────────────
     if (segs[0] === 'suppliers') {
+      // Lazy-init SupplierProduct and SupplierRating tables
+      await exec(
+        `CREATE TABLE IF NOT EXISTS SupplierProduct (
+          id            TEXT PRIMARY KEY,
+          storeId       TEXT NOT NULL,
+          supplierId    TEXT NOT NULL,
+          productId     TEXT NOT NULL,
+          supplierPrice REAL NOT NULL DEFAULT 0,
+          minOrderQty   INTEGER NOT NULL DEFAULT 1,
+          leadTimeDays  INTEGER NOT NULL DEFAULT 0,
+          createdAt     TEXT NOT NULL,
+          updatedAt     TEXT NOT NULL
+        )`,
+        [],
+      )
+      await exec(
+        `CREATE TABLE IF NOT EXISTS SupplierRating (
+          id         TEXT PRIMARY KEY,
+          storeId    TEXT NOT NULL,
+          supplierId TEXT NOT NULL,
+          orderId    TEXT,
+          rating     INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+          notes      TEXT,
+          createdAt  TEXT NOT NULL
+        )`,
+        [],
+      )
+
+      // GET /api/suppliers — list with purchase aggregates
       if (!segs[1] && method === 'GET') {
         const search = url.searchParams.get('search') ?? ''
         const rows = search
           ? await query(
-              `SELECT * FROM Supplier WHERE storeId=? AND active=1 AND name LIKE ? ORDER BY name`,
+              `SELECT s.*,
+                 COALESCE(SUM(po.total),0)   AS totalPurchases,
+                 COUNT(po.id)                AS totalOrders,
+                 MAX(po.createdAt)           AS lastOrderDate,
+                 ROUND(AVG(sr.rating),1)     AS avgRating,
+                 COUNT(DISTINCT sr.id)       AS ratingCount
+               FROM Supplier s
+               LEFT JOIN PurchaseOrder po ON po.supplierId=s.id AND po.storeId=s.storeId
+               LEFT JOIN SupplierRating sr ON sr.supplierId=s.id AND sr.storeId=s.storeId
+               WHERE s.storeId=? AND s.active=1 AND s.name LIKE ?
+               GROUP BY s.id ORDER BY s.name`,
               [storeId, `%${search}%`],
             )
-          : await query(`SELECT * FROM Supplier WHERE storeId=? AND active=1 ORDER BY name`, [
-              storeId,
-            ])
+          : await query(
+              `SELECT s.*,
+                 COALESCE(SUM(po.total),0)   AS totalPurchases,
+                 COUNT(po.id)                AS totalOrders,
+                 MAX(po.createdAt)           AS lastOrderDate,
+                 ROUND(AVG(sr.rating),1)     AS avgRating,
+                 COUNT(DISTINCT sr.id)       AS ratingCount
+               FROM Supplier s
+               LEFT JOIN PurchaseOrder po ON po.supplierId=s.id AND po.storeId=s.storeId
+               LEFT JOIN SupplierRating sr ON sr.supplierId=s.id AND sr.storeId=s.storeId
+               WHERE s.storeId=? AND s.active=1
+               GROUP BY s.id ORDER BY s.name`,
+              [storeId],
+            )
         return ok(rows)
       }
       if (!segs[1] && method === 'POST') {
@@ -1838,9 +1888,103 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         )
         return ok({ id }, 201)
       }
-      if (segs[1] && method === 'PATCH') {
+
+      // GET /api/suppliers/:id/products — supplier price list
+      if (segs[1] && segs[2] === 'products' && method === 'GET') {
+        const rows = await query(
+          `SELECT sp.*, p.name as productName, p.sku, p.price as retailPrice
+           FROM SupplierProduct sp
+           JOIN Product p ON sp.productId = p.id
+           WHERE sp.supplierId=? AND sp.storeId=?
+           ORDER BY p.name`,
+          [segs[1], storeId],
+        )
+        return ok(rows)
+      }
+      // POST /api/suppliers/:id/products — upsert a product in price list
+      if (segs[1] && segs[2] === 'products' && method === 'POST') {
         const b = (await req.json()) as any
-        const allowed = new Set(['name', 'email', 'phone', 'address', 'taxId', 'notes', 'active'])
+        if (!b.productId) return err('productId harus diisi')
+        if (b.supplierPrice === undefined || Number(b.supplierPrice) < 0)
+          return err('supplierPrice harus >= 0')
+        const existing = await queryOne<any>(
+          `SELECT id FROM SupplierProduct WHERE supplierId=? AND productId=? AND storeId=?`,
+          [segs[1], b.productId, storeId],
+        )
+        const t = nowISO()
+        if (existing) {
+          await exec(
+            `UPDATE SupplierProduct SET supplierPrice=?,minOrderQty=?,leadTimeDays=?,updatedAt=? WHERE id=?`,
+            [
+              Number(b.supplierPrice),
+              Number(b.minOrderQty ?? 1),
+              Number(b.leadTimeDays ?? 0),
+              t,
+              existing.id,
+            ],
+          )
+          return ok({ id: existing.id })
+        }
+        const id = newId()
+        await exec(
+          `INSERT INTO SupplierProduct (id,storeId,supplierId,productId,supplierPrice,minOrderQty,leadTimeDays,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            segs[1],
+            b.productId,
+            Number(b.supplierPrice),
+            Number(b.minOrderQty ?? 1),
+            Number(b.leadTimeDays ?? 0),
+            t,
+            t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+      // DELETE /api/suppliers/:id/products/:productId
+      if (segs[1] && segs[2] === 'products' && segs[3] && method === 'DELETE') {
+        await exec(
+          `DELETE FROM SupplierProduct WHERE supplierId=? AND productId=? AND storeId=?`,
+          [segs[1], segs[3], storeId],
+        )
+        return ok({ success: true })
+      }
+
+      // GET /api/suppliers/:id/ratings
+      if (segs[1] && segs[2] === 'ratings' && method === 'GET') {
+        const rows = await query(
+          `SELECT sr.*, po.number as orderNumber
+           FROM SupplierRating sr
+           LEFT JOIN PurchaseOrder po ON sr.orderId = po.id
+           WHERE sr.supplierId=? AND sr.storeId=?
+           ORDER BY sr.createdAt DESC`,
+          [segs[1], storeId],
+        )
+        const agg = await queryOne<any>(
+          `SELECT ROUND(AVG(rating),2) as avg, COUNT(*) as count FROM SupplierRating WHERE supplierId=? AND storeId=?`,
+          [segs[1], storeId],
+        )
+        return ok({ ratings: rows, avg: agg?.avg ?? null, count: agg?.count ?? 0 })
+      }
+      // POST /api/suppliers/:id/ratings
+      if (segs[1] && segs[2] === 'ratings' && method === 'POST') {
+        const b = (await req.json()) as any
+        const rating = Number(b.rating)
+        if (!rating || rating < 1 || rating > 5) return err('Rating harus antara 1-5')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO SupplierRating (id,storeId,supplierId,orderId,rating,notes,createdAt) VALUES (?,?,?,?,?,?,?)`,
+          [id, storeId, segs[1], b.orderId ?? null, rating, b.notes ?? null, t],
+        )
+        return ok({ id }, 201)
+      }
+
+      if (segs[1] && !segs[2] && method === 'PATCH') {
+        const b = (await req.json()) as any
+        const allowed = new Set(['name', 'email', 'phone', 'address', 'taxId', 'notes', 'active',
+          'contactPerson', 'city'])
         const cols = filterCols(b, allowed)
         if (Object.keys(cols).length === 0) return err('No valid fields')
         const { setClauses, values } = buildUpdate(cols)
@@ -1852,7 +1996,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         ])
         return ok({ success: true })
       }
-      if (segs[1] && method === 'DELETE') {
+      if (segs[1] && !segs[2] && method === 'DELETE') {
         await exec(`UPDATE Supplier SET active=0, updatedAt=? WHERE id=? AND storeId=?`, [
           nowISO(),
           segs[1],
@@ -1866,19 +2010,25 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'purchase-orders') {
       if (!segs[1] && method === 'GET') {
         const status = url.searchParams.get('status') ?? ''
+        const supplierId = url.searchParams.get('supplierId') ?? ''
         const limit = parseInt(url.searchParams.get('limit') ?? '50')
         const offset = parseInt(url.searchParams.get('offset') ?? '0')
+        const conditions: string[] = ['po.storeId=?']
+        const params: any[] = [storeId]
+        if (status) { conditions.push('po.status=?'); params.push(status) }
+        if (supplierId) { conditions.push('po.supplierId=?'); params.push(supplierId) }
+        const where = conditions.join(' AND ')
         const rows = await query(
           `SELECT po.*, s.name as supplierName
            FROM PurchaseOrder po
            JOIN Supplier s ON po.supplierId = s.id
-           WHERE po.storeId=? ${status ? 'AND po.status=?' : ''}
+           WHERE ${where}
            ORDER BY po.createdAt DESC LIMIT ? OFFSET ?`,
-          status ? [storeId, status, limit, offset] : [storeId, limit, offset],
+          [...params, limit, offset],
         )
         const total = await queryOne<any>(
-          `SELECT COUNT(*) as count FROM PurchaseOrder WHERE storeId=? ${status ? 'AND status=?' : ''}`,
-          status ? [storeId, status] : [storeId],
+          `SELECT COUNT(*) as count FROM PurchaseOrder po WHERE ${where}`,
+          params,
         )
         return ok({ orders: rows, total: total?.count ?? 0 })
       }
