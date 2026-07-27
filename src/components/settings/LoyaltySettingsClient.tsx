@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Loader2, Save, Award } from 'lucide-react'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
 
@@ -206,27 +207,43 @@ export function LoyaltySettingsClient({ storeId }: LoyaltySettingsClientProps) {
 
               {/* Min Points */}
               <TierField label="Min Points">
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={tier.minPoints}
-                  onChange={e => handleChange(i, 'minPoints', parseInt(e.target.value) || 0)}
-                  className={inputCls}
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={tier.minPoints}
+                    onChange={e => handleChange(i, 'minPoints', parseInt(e.target.value) || 0)}
+                    className={inputCls}
+                  />
+                  <span className="absolute top-1/2 right-2 -translate-y-1/2">
+                    <HelpTooltip
+                      text="Jumlah poin minimum yang harus dimiliki pelanggan untuk mencapai tier ini. Poin diperoleh dari setiap transaksi berdasarkan rasio poin yang dikonfigurasi."
+                      side="left"
+                    />
+                  </span>
+                </div>
               </TierField>
 
               {/* Discount */}
               <TierField label="Discount (%)">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  value={tier.discount}
-                  onChange={e => handleChange(i, 'discount', parseFloat(e.target.value) || 0)}
-                  className={inputCls}
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={tier.discount}
+                    onChange={e => handleChange(i, 'discount', parseFloat(e.target.value) || 0)}
+                    className={inputCls}
+                  />
+                  <span className="absolute top-1/2 right-2 -translate-y-1/2">
+                    <HelpTooltip
+                      text="Persentase diskon yang diberikan otomatis saat checkout kepada pelanggan di tier ini. Contoh: 10 berarti diskon 10% untuk semua pembelian."
+                      side="left"
+                    />
+                  </span>
+                </div>
               </TierField>
             </div>
 
