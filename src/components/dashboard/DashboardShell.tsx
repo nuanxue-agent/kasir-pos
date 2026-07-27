@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
+import { BottomNav } from '@/components/dashboard/BottomNav'
 import type { UserRole } from '@/lib/permissions'
 
 interface DashboardShellProps {
@@ -51,10 +52,14 @@ export function DashboardShell({
           onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
 
-        <main className="flex-1 overflow-y-auto bg-[#fffdf7]">
+        {/* Main scroll area — add pb-20 on mobile so content clears bottom nav */}
+        <main className="flex-1 overflow-y-auto bg-[#fffdf7] pb-20 lg:pb-0">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <BottomNav />
     </div>
   )
 }
