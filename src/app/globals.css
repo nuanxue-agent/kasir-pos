@@ -1,5 +1,51 @@
 @import "tailwindcss";
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
+
+  /* Lakoo light mode */
+  --bg-base:    #fffdf7;
+  --bg-card:    #ffffff;
+  --bg-subtle:  #fef9ee;
+  --border:     #fde68a;
+  --border-mid: #fcd34d;
+  --text-1:     #1c1917;
+  --text-2:     #78716c;
+  --text-3:     #a8a29e;
+  --primary:    #f59e0b;
+  --primary-fg: #ffffff;
+  --accent:     #f97316;
 }
+
+.dark {
+  --bg-base:    #1a1612;
+  --bg-card:    #211e19;
+  --bg-subtle:  #2a2420;
+  --border:     #3d3530;
+  --border-mid: #57504a;
+  --text-1:     #fafaf9;
+  --text-2:     #a8a29e;
+  --text-3:     #78716c;
+  --primary:    #f59e0b;
+  --primary-fg: #1c1917;
+  --accent:     #f97316;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

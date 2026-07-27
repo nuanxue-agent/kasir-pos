@@ -28,7 +28,7 @@ export function DashboardShell({
   const [currentStoreId, setCurrentStoreId] = useState(stores[0]?.id)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
+    <div className="flex h-screen overflow-hidden bg-[#fffdf7]">
       <Sidebar
         userRole={userRole}
         isSuperAdmin={isSuperAdmin}
@@ -51,7 +51,7 @@ export function DashboardShell({
           onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-[#fffdf7]">
           {children}
         </main>
       </div>
