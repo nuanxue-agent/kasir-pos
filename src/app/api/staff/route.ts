@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import * as bcrypt from 'bcryptjs'
 
+export const runtime = 'edge'
+
+
 // GET /api/staff?storeId=xxx
 export async function GET(req: NextRequest) {
   const session = await auth()

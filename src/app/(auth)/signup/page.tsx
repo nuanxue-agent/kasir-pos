@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2 } from 'lucide-react'
 
+export const runtime = 'edge'
+
 const signupSchema = z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
   name: z.string().min(2, 'Your name must be at least 2 characters'),

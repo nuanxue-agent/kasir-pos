@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import POSPageClient from '@/components/pos/POSPageClient'
 
+export const runtime = 'edge'
+
 export const dynamic = 'force-dynamic'
 
 export default async function POSPage() {

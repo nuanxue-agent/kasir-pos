@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+export const runtime = 'edge'
+
+
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   address: z.string().optional(),

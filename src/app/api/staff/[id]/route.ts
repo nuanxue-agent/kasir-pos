@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import * as bcrypt from 'bcryptjs'
 
+export const runtime = 'edge'
+
+
 // PATCH /api/staff/[id]
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

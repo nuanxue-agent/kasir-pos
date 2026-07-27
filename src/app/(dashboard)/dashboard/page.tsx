@@ -18,6 +18,9 @@ import {
   ArrowRight,
 } from 'lucide-react'
 
+export const runtime = 'edge'
+
+
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
 async function getDashboardData(storeIds: string[]) {

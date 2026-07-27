@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CustomersPageClient } from '@/components/customers/CustomersPageClient'
 
+export const runtime = 'edge'
+
 export const metadata = { title: 'Customers' }
 
 export default async function CustomersPage() {

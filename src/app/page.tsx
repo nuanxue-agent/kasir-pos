@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { Store, Users, BarChart3, ShoppingCart, CreditCard, Database, Check } from 'lucide-react'
 
+export const runtime = 'edge'
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white">

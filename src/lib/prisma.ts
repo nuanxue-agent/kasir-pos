@@ -1,9 +1,26 @@
 import { PrismaClient } from '@prisma/client'
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
+// Lazy singleton — never instantiates at module load time
+// This prevents Prisma from trying to connect during Next.js build
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({ log: process.env.NODE_ENV === 'development' ? ['error'] : [] })
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+function createClient(): PrismaClient {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  } as any)
+}
+
+// Export a proxy that lazily initialises on first property access
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (!global.__prisma) {
+      global.__prisma = createClient()
+    }
+    const value = (global.__prisma as any)[prop]
+    return typeof value === 'function' ? value.bind(global.__prisma) : value
+  },
+})

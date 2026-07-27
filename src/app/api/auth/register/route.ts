@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import * as bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
+export const runtime = 'edge'
+
+
 const registerSchema = z.object({
   businessName: z.string().min(2),
   name: z.string().min(2),

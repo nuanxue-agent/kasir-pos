@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+export const runtime = 'edge'
+
+
 const adjustSchema = z.object({
   type: z.enum(['ADJUSTMENT', 'RESTOCK']),
   qty: z.number().int().refine(val => val !== 0, 'Qty cannot be 0'),

@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+export const runtime = 'edge'
+
+
 // GET /api/customers/:id — single customer + last 10 orders
 export async function GET(
   _req: NextRequest,

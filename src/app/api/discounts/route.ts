@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+export const runtime = 'edge'
+
+
 // GET /api/discounts?storeId=xxx
 export async function GET(req: NextRequest) {
   const session = await auth()

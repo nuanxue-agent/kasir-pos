@@ -2,6 +2,9 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+
+
 // GET /api/reports/summary?storeId=xxx&from=2024-01-01&to=2024-01-31
 export async function GET(req: NextRequest) {
   const session = await auth()

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import SettingsPageClient from '@/components/settings/SettingsPageClient'
 
+export const runtime = 'edge'
+
 export default async function SettingsPage() {
   const session = await auth()
   if (!session) redirect('/login')

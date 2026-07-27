@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import ProductsPageClient from '@/components/products/ProductsPageClient'
 
+export const runtime = 'edge'
+
 export default async function ProductsPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')

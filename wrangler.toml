@@ -1,0 +1,10 @@
+name = "kasir-app"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kasir-db"
+database_id = "5ac8c796-3a0b-44eb-95f6-adf63244e1cd"
+migrations_dir = "prisma/migrations/d1"

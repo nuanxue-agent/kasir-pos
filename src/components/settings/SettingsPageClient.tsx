@@ -12,7 +12,7 @@ const schema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
-  taxRate: z.coerce.number().min(0).max(100),
+  taxRate: z.preprocess((v) => parseFloat(String(v)), z.number().min(0).max(100)),
   currency: z.string().min(1),
   receiptNote: z.string().optional(),
   timezone: z.string().optional(),

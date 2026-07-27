@@ -2,6 +2,8 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import InventoryPageClient from '@/components/inventory/InventoryPageClient'
 
+export const runtime = 'edge'
+
 export const dynamic = 'force-dynamic'
 
 export default async function InventoryPage() {

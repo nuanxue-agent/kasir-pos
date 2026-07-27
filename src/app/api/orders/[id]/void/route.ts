@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+export const runtime = 'edge'
+
+
 // POST /api/orders/:id/void
 // Void a paid order and restore stock
 export async function POST(

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import StaffPageClient from '@/components/staff/StaffPageClient'
 import { isManagerOrAbove } from '@/lib/permissions'
 
+export const runtime = 'edge'
+
 export default async function StaffPage() {
   const session = await auth()
   if (!session) redirect('/login')

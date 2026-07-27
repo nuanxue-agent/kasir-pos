@@ -2,6 +2,9 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+
+
 // GET /api/inventory?storeId=xxx&lowStockOnly=true&page=1
 export async function GET(req: NextRequest) {
   const session = await auth()
