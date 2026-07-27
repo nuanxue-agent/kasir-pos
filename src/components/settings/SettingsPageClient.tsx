@@ -8,6 +8,7 @@ import {
   Save, Store, Receipt, Globe, LayoutGrid,
   ShoppingCart, Boxes, Users, Percent, BarChart3, CheckCircle2,
 } from 'lucide-react'
+import { toast } from '@/components/ui/Toaster'
 
 const schema = z.object({
   name: z.string().min(1, 'Wajib diisi'),

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -148,9 +149,12 @@ export default function ProductFormModal({
       }
 
       const savedProduct = await res.json()
+      toast.success('Produk disimpan')
       onSuccess(savedProduct)
     } catch (err: any) {
-      setError(err.message || 'Something went wrong')
+      const msg = err.message || 'Something went wrong'
+      setError(msg)
+      toast.error('Gagal menyimpan', msg)
     } finally {
       setIsSubmitting(false)
     }

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X, UserPlus, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -78,6 +79,7 @@ export function CustomerFormModal({
     })
 
     if (res.ok) {
+      toast.success('Pelanggan disimpan')
       onSuccess()
       return
     }
@@ -88,8 +90,11 @@ export function CustomerFormModal({
       for (const [field, msgs] of Object.entries(fieldErrors)) {
         setError(field as keyof FormValues, { message: msgs[0] })
       }
+      toast.error('Gagal menyimpan', 'Periksa kembali isian form')
     } else {
-      setError('root', { message: data.error ?? 'Something went wrong' })
+      const msg = data.error ?? 'Something went wrong'
+      setError('root', { message: msg })
+      toast.error('Gagal menyimpan', msg)
     }
   }
 

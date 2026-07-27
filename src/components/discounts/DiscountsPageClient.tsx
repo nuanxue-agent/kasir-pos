@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, Tag, Copy, Check } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
 interface Discount {
   id: string
@@ -38,7 +39,11 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => fetch(`/api/discounts/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['discounts', storeId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['discounts', storeId] })
+      toast.success('Diskon dihapus')
+    },
+    onError: () => toast.error('Gagal menghapus diskon'),
   })
 
   const copyCode = (code: string, id: string) => {
@@ -177,7 +182,8 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storeId, ...form, maxUses: form.maxUses ? Number(form.maxUses) : null }),
       })
-      if (!res.ok) { setError('Failed to save'); return }
+      if (!res.ok) { setError('Failed to save'); toast.error('Gagal menyimpan diskon'); return }
+      toast.success('Diskon disimpan')
       onSuccess()
     } finally {
       setLoading(false)

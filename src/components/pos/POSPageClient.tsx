@@ -310,6 +310,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
     setSelectedCustomer(null)
     setRedeemPoints(false)
     setShowCustomerSearch(false)
+    setDiscountValue('')
     setReceiptData(order)
   }
 
@@ -727,6 +728,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
             customerId={selectedCustomer?.id}
             pointsRedeemed={pointsRedeemed}
             pointsDiscount={pointsDiscount}
+            manualDiscountAmt={manualDiscountAmt()}
             onClose={() => setShowCheckout(false)}
             onSuccess={handleOrderSuccess}
           />
@@ -917,10 +919,10 @@ const PAYMENT_METHODS = [
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]
 
-function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, pointsDiscount, onClose, onSuccess }: {
+function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, pointsDiscount, manualDiscountAmt, onClose, onSuccess }: {
   storeId: string; taxRate: number; currency: string; staffId: string
   cart: CartItem[]; subtotal: number; taxAmt: number; total: number
-  customerId?: string; pointsRedeemed?: number; pointsDiscount?: number
+  customerId?: string; pointsRedeemed?: number; pointsDiscount?: number; manualDiscountAmt?: number
   onClose: () => void; onSuccess: (order: ReceiptData) => void
 }) {
     const [method, setMethod] = useState<PaymentMethod>('CASH')
@@ -955,7 +957,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
               subtotal: i.subtotal,
             })),
             payments: [{ method, amount: method === 'CASH' ? cashAmount : total, change }],
-            subtotal, taxAmt, total, discountAmt: pointsDiscount ?? 0,
+            subtotal, taxAmt, total, discountAmt: (pointsDiscount ?? 0) + (manualDiscountAmt ?? 0),
           }),
         })
         const data = await res.json() as any
@@ -985,6 +987,12 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
               <div className="flex justify-between text-sm text-amber-400">
                 <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400" />Points ({pointsRedeemed} pts)</span>
                 <span>-{fmt(pointsRedeemed * 100, currency)}</span>
+              </div>
+            )}
+            {!!manualDiscountAmt && manualDiscountAmt > 0 && (
+              <div className="flex justify-between text-sm text-emerald-500">
+                <span>Diskon manual</span>
+                <span>-{fmt(manualDiscountAmt, currency)}</span>
               </div>
             )}
             <div className="flex justify-between text-base font-bold text-stone-800 pt-1.5 border-t border-stone-200"><span>Total</span><span>{fmt(total, currency)}</span></div>
