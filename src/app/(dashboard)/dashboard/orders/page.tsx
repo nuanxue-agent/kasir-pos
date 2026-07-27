@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { OrdersPageClient } from '@/components/orders/OrdersPageClient'
+import { OrderManagementClient } from '@/components/orders/OrderManagementClient'
 
 export default async function OrdersPage() {
   const session = await auth()
@@ -10,5 +10,11 @@ export default async function OrdersPage() {
   const currency = user.stores?.[0]?.currency ?? 'IDR'
   const taxRate = user.stores?.[0]?.taxRate ?? 0
 
-  return <OrdersPageClient storeId={storeId} currency={currency} taxRate={taxRate} />
+  return (
+    <OrderManagementClient
+      storeId={storeId}
+      currency={currency}
+      taxRate={taxRate}
+    />
+  )
 }

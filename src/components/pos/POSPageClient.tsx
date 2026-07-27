@@ -669,6 +669,20 @@ export default function POSPageClient({
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products')
+
+  // ── Mobile cart bottom-sheet swipe-up ─────────────────────────────────────
+  // Track touch on the cart panel handle — swipe up opens cart tab, swipe down closes
+  const cartSwipeTouchStartY = useRef<number | null>(null)
+  const onCartHandleTouchStart = (e: React.TouchEvent) => {
+    cartSwipeTouchStartY.current = e.touches[0].clientY
+  }
+  const onCartHandleTouchEnd = (e: React.TouchEvent) => {
+    if (cartSwipeTouchStartY.current === null) return
+    const deltaY = e.changedTouches[0].clientY - cartSwipeTouchStartY.current
+    if (deltaY < -40) setMobileTab('cart')    // swipe up → show cart
+    if (deltaY > 40)  setMobileTab('products') // swipe down → back to products
+    cartSwipeTouchStartY.current = null
+  }
   const [cartBadgeBump, setCartBadgeBump] = useState(false)
   const prevCartCount = useRef(cartCount)
 
@@ -1041,6 +1055,15 @@ export default function POSPageClient({
           mobileTab === 'cart' ? 'max-lg:flex' : 'max-lg:hidden',
         )}
       >
+        {/* Mobile swipe handle — drag up to open, drag down to close */}
+        <div
+          className="lg:hidden flex justify-center py-2 cursor-grab active:cursor-grabbing touch-none"
+          onTouchStart={onCartHandleTouchStart}
+          onTouchEnd={onCartHandleTouchEnd}
+          aria-hidden="true"
+        >
+          <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
           <div className="flex items-center gap-2">
@@ -1733,14 +1756,19 @@ function ProductCard({
     onAdd(product)
     setFlashing(true)
     setTimeout(() => setFlashing(false), 350)
+    // Haptic feedback on supported mobile browsers
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10)
+    }
   }
 
   return (
     <button
       onClick={handleAdd}
       disabled={outOfStock}
+      // min-h-[100px] ensures 44px+ touch target height on all screen sizes
       className={cn(
-        'flex flex-col rounded-xl border p-3.5 text-left transition-all duration-150 active:scale-[0.97]',
+        'flex flex-col rounded-xl border p-3.5 text-left transition-all duration-150 active:scale-[0.97] min-h-[100px]',
         outOfStock
           ? 'cursor-not-allowed border-[var(--border)] bg-[var(--bg-card)]/[0.02] opacity-40'
           : flashing
@@ -1780,7 +1808,7 @@ function ProductCard({
         </p>
       )}
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-sm font-bold text-amber-600">
+        <span className="text-sm font-bold text-amber-600 sm:text-sm md:text-sm text-base">
           {new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency,
