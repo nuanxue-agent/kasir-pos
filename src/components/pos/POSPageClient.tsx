@@ -82,7 +82,6 @@ interface Customer {
   name: string
   phone: string | null
   points: number
-  tier?: { name: string; color: string; icon: string } | null
 }
 
 interface POSPageClientProps {
@@ -176,10 +175,6 @@ export default function POSPageClient({
 
   // Notes state
   const [orderNote, setOrderNote] = useState('')
-  const [variantProduct, setVariantProduct] = useState<Product | null>(null)
-  const [variantOptions, setVariantOptions] = useState<
-    Array<{ id: string; name: string; priceAdj: number; stock: number }>
-  >([])
 
   // Manual discount state
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
@@ -218,7 +213,7 @@ export default function POSPageClient({
             if (product.trackStock && product.stock <= 0) {
               setSuccessMsg(`⚠ ${product.name} is out of stock`)
             } else {
-              handleAddToCart(product)
+              addToCart(product)
               setSuccessMsg(`✓ Added: ${product.name}`)
             }
           } else {
@@ -259,9 +254,7 @@ export default function POSPageClient({
         setShowBarcodeScanner(true)
       } else if (e.key === 'Escape') {
         // Close any open modal / panel
-        if (variantProduct) {
-          setVariantProduct(null)
-        } else if (showBarcodeScanner) {
+        if (showBarcodeScanner) {
           setShowBarcodeScanner(false)
         } else if (showCheckout) {
           setShowCheckout(false)
@@ -397,40 +390,6 @@ export default function POSPageClient({
     // On mobile, briefly flash cart count — don't auto-switch tab so user can keep adding
   }, [])
 
-  // Wrapper: check for variants before adding to cart
-  const handleAddToCart = useCallback(
-    (product: Product) => {
-      // Check if product has variants
-      fetch(`/api/products/${product.id}/variants?storeId=${storeId}`)
-        .then(r => (r.ok ? r.json() : []))
-        .then((variants: unknown) => {
-          const v = Array.isArray(variants)
-            ? (variants as Array<{
-                id: string
-                label: string
-                priceAdjustment: number
-                stock: number
-              }>)
-            : []
-          if (v.length > 0) {
-            setVariantOptions(
-              v.map(x => ({
-                id: x.id,
-                name: x.label,
-                priceAdj: x.priceAdjustment ?? 0,
-                stock: x.stock,
-              })),
-            )
-            setVariantProduct(product)
-          } else {
-            addToCart(product)
-          }
-        })
-        .catch(() => addToCart(product))
-    },
-    [addToCart],
-  )
-
   const addBundleToCart = useCallback((bundle: Bundle) => {
     setCart(prev => {
       let updated = [...prev]
@@ -467,7 +426,7 @@ export default function POSPageClient({
         if (product.trackStock && product.stock <= 0) {
           setSuccessMsg(`⚠ ${product.name} habis stok`)
         } else {
-          handleAddToCart(product)
+          addToCart(product)
           setSuccessMsg(`✓ Ditambahkan: ${product.name}`)
         }
       } else {
@@ -475,7 +434,7 @@ export default function POSPageClient({
       }
       setTimeout(() => setSuccessMsg(''), 2500)
     },
-    [products, handleAddToCart],
+    [products, addToCart],
   )
 
   const updateQty = useCallback((id: string, qty: number) => {
@@ -657,7 +616,7 @@ export default function POSPageClient({
               {recentProducts.map(p => (
                 <button
                   key={p.id}
-                  onClick={() => handleAddToCart(p)}
+                  onClick={() => addToCart(p)}
                   disabled={p.trackStock && p.stock <= 0}
                   className={cn(
                     'flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
@@ -701,7 +660,7 @@ export default function POSPageClient({
                 <BundleCard key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />
               ))}
               {filtered.map(p => (
-                <ProductCard key={p.id} product={p} currency={currency} onAdd={handleAddToCart} />
+                <ProductCard key={p.id} product={p} currency={currency} onAdd={addToCart} />
               ))}
             </div>
           ) : (
@@ -710,7 +669,7 @@ export default function POSPageClient({
                 <BundleRow key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />
               ))}
               {filtered.map(p => (
-                <ProductRow key={p.id} product={p} currency={currency} onAdd={handleAddToCart} />
+                <ProductRow key={p.id} product={p} currency={currency} onAdd={addToCart} />
               ))}
             </div>
           )}
@@ -944,19 +903,9 @@ export default function POSPageClient({
                 <div className="flex items-center gap-2">
                   <User className="h-3.5 w-3.5 shrink-0 text-amber-600" />
                   <div>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-medium text-[var(--text-1)]">
-                        {selectedCustomer.name}
-                      </p>
-                      {selectedCustomer.tier && (
-                        <span
-                          className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] leading-none font-semibold text-white"
-                          style={{ backgroundColor: selectedCustomer.tier.color }}
-                        >
-                          {selectedCustomer.tier.icon} {selectedCustomer.tier.name}
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-xs font-medium text-[var(--text-1)]">
+                      {selectedCustomer.name}
+                    </p>
                     <p className="flex items-center gap-0.5 text-[10px] text-[var(--text-3)]">
                       <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
                       {selectedCustomer.points} poin
@@ -1126,50 +1075,6 @@ export default function POSPageClient({
         />
       )}
 
-      {/* ── Variant Selector Modal ── */}
-      {variantProduct && (
-        <VariantSelectorModal
-          product={variantProduct}
-          variants={variantOptions}
-          currency={currency}
-          onSelect={(variantId, variantLabel, priceAdj) => {
-            if (variantProduct) {
-              const finalPrice = variantProduct.price + (priceAdj ?? 0)
-              setCart(prev => {
-                const existing = prev.find(
-                  i =>
-                    i.productId === variantProduct.id &&
-                    (i as { variantId?: string }).variantId === variantId,
-                )
-                if (existing) {
-                  return prev.map(i =>
-                    i.productId === variantProduct.id &&
-                    (i as { variantId?: string }).variantId === variantId
-                      ? { ...i, qty: i.qty + 1, subtotal: (i.qty + 1) * finalPrice }
-                      : i,
-                  )
-                }
-                return [
-                  ...prev,
-                  {
-                    id: `${variantProduct.id}-${variantId}-${Date.now()}`,
-                    productId: variantProduct.id,
-                    variantId,
-                    name: `${variantProduct.name} (${variantLabel})`,
-                    price: finalPrice,
-                    qty: 1,
-                    subtotal: finalPrice,
-                    image: variantProduct.image ?? null,
-                  },
-                ]
-              })
-            }
-            setVariantProduct(null)
-          }}
-          onClose={() => setVariantProduct(null)}
-        />
-      )}
-
       {/* ── Receipt Modal ── */}
       {receiptData && (
         <ReceiptModal
@@ -1216,31 +1121,11 @@ function CustomerSearch({
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Customer[]>([])
   const [loading, setLoading] = useState(false)
-  const [tiers, setTiers] = useState<
-    Array<{ name: string; minPoints: number; color: string; icon: string }>
-  >([])
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
-    // Load tiers for badge display (best-effort)
-    fetch(`/api/loyalty/tiers?storeId=${storeId}`)
-      .then(r => (r.ok ? r.json() : []))
-      .then((rows: unknown) => {
-        if (Array.isArray(rows))
-          setTiers(rows as Array<{ name: string; minPoints: number; color: string; icon: string }>)
-      })
-      .catch(() => {})
-  }, [storeId])
-
-  function getTierForPoints(points: number) {
-    if (!tiers.length) return null
-    let matched = null
-    for (const t of tiers) {
-      if (points >= t.minPoints) matched = t
-    }
-    return matched
-  }
+  }, [])
 
   useEffect(() => {
     if (!q.trim()) {
@@ -1290,35 +1175,22 @@ function CustomerSearch({
       {!loading && q.trim() && results.length === 0 && (
         <p className="py-3 text-center text-xs text-[var(--text-3)]">No customers found</p>
       )}
-      {results.map(c => {
-        const tier = getTierForPoints(c.points)
-        return (
-          <button
-            key={c.id}
-            onClick={() => onSelect({ ...c, tier })}
-            className="flex w-full items-center justify-between border-t border-[var(--border)] px-3 py-2 text-left transition-colors first:border-t-0 hover:bg-[var(--bg-muted)]"
-          >
-            <div>
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs font-medium text-[var(--text-1)]">{c.name}</p>
-                {tier && (
-                  <span
-                    className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] leading-none font-semibold text-white"
-                    style={{ backgroundColor: tier.color }}
-                  >
-                    {tier.icon} {tier.name}
-                  </span>
-                )}
-              </div>
-              {c.phone && <p className="text-[10px] text-[var(--text-3)]">{c.phone}</p>}
-            </div>
-            <span className="flex shrink-0 items-center gap-1 text-[10px] text-amber-400">
-              <Star className="h-2.5 w-2.5 fill-amber-400" />
-              {c.points} pts
-            </span>
-          </button>
-        )
-      })}
+      {results.map(c => (
+        <button
+          key={c.id}
+          onClick={() => onSelect(c)}
+          className="flex w-full items-center justify-between border-t border-[var(--border)] px-3 py-2 text-left transition-colors first:border-t-0 hover:bg-[var(--bg-muted)]"
+        >
+          <div>
+            <p className="text-xs font-medium text-[var(--text-1)]">{c.name}</p>
+            {c.phone && <p className="text-[10px] text-[var(--text-3)]">{c.phone}</p>}
+          </div>
+          <span className="flex shrink-0 items-center gap-1 text-[10px] text-amber-400">
+            <Star className="h-2.5 w-2.5 fill-amber-400" />
+            {c.points} pts
+          </span>
+        </button>
+      ))}
     </div>
   )
 }
@@ -1556,96 +1428,6 @@ function ProductRow({
         )}
       </div>
     </button>
-  )
-}
-
-// ─── Variant Selector Modal ───────────────────────────────────────────────────
-
-function VariantSelectorModal({
-  product,
-  variants,
-  currency,
-  onSelect,
-  onClose,
-}: {
-  product: Product
-  variants: Array<{ id: string; name: string; priceAdj: number; stock: number }>
-  currency: string
-  onSelect: (variantId: string, variantLabel: string, priceAdj: number) => void
-  onClose: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
-      <div className="w-full max-w-sm overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
-          <div>
-            <p className="text-sm font-semibold text-stone-800">{product.name}</p>
-            <p className="text-xs text-stone-400">Pilih varian</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1.5 text-stone-400 transition-colors hover:bg-stone-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="max-h-80 overflow-y-auto p-5">
-          <div className="flex flex-wrap gap-2">
-            {variants.map(v => {
-              const outOfStock = product.trackStock && v.stock <= 0
-              const finalPrice = product.price + v.priceAdj
-              return (
-                <button
-                  key={v.id}
-                  disabled={outOfStock}
-                  onClick={() => onSelect(v.id, v.name, v.priceAdj)}
-                  className={cn(
-                    'flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all',
-                    outOfStock
-                      ? 'cursor-not-allowed border-stone-100 bg-stone-50 opacity-40'
-                      : 'border-stone-200 hover:border-amber-400 hover:bg-amber-50 active:scale-95',
-                  )}
-                >
-                  <span className="text-sm font-medium text-stone-800">{v.name}</span>
-                  <span className="mt-0.5 text-xs font-bold text-amber-600">
-                    {new Intl.NumberFormat('id-ID', {
-                      style: 'currency',
-                      currency,
-                      minimumFractionDigits: 0,
-                    }).format(finalPrice)}
-                    {v.priceAdj !== 0 && (
-                      <span className="ml-1 font-normal text-stone-400">
-                        ({v.priceAdj > 0 ? '+' : ''}
-                        {new Intl.NumberFormat('id-ID', {
-                          style: 'currency',
-                          currency,
-                          minimumFractionDigits: 0,
-                        }).format(v.priceAdj)}
-                        )
-                      </span>
-                    )}
-                  </span>
-                  {product.trackStock && (
-                    <span
-                      className={cn(
-                        'mt-1 text-[10px]',
-                        outOfStock
-                          ? 'text-red-400'
-                          : v.stock <= 5
-                            ? 'text-amber-400'
-                            : 'text-stone-400',
-                      )}
-                    >
-                      {outOfStock ? 'Habis' : `Stok: ${v.stock}`}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
 

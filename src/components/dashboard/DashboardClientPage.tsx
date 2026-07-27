@@ -116,12 +116,7 @@ export default function DashboardClientPage({
   session,
   modules,
 }: DashboardClientPageProps) {
-  // Use the active store's currency — find it by storeId first, fall back to first store
-  const sessionStores: Array<{ id: string; name?: string; currency?: string }> =
-    session?.user?.stores ?? []
-  const activeSessionStore = sessionStores.find((s: any) => s.id === storeId) ?? sessionStores[0]
-  const currency = activeSessionStore?.currency ?? 'IDR'
-  const activeStoreName = activeSessionStore?.name ?? null
+  const currency = session?.user?.stores?.[0]?.currency ?? 'IDR'
   const userName = session?.user?.name ?? ''
   const enabledModules = modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
   const hasPOS = enabledModules.includes('pos')
@@ -226,13 +221,7 @@ export default function DashboardClientPage({
             {getGreeting()}
             {userName ? `, ${userName.split(' ')[0]}` : ''} 👋
           </h1>
-          {activeStoreName && (
-            <p className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-              {activeStoreName}
-            </p>
-          )}
-          <p className="mt-1 text-sm text-[var(--text-3)]">Ini ringkasan tokomu hari ini.</p>
+          <p className="mt-0.5 text-sm text-[var(--text-3)]">Ini ringkasan tokomu hari ini.</p>
         </div>
         <Link
           href="/dashboard/pos"
