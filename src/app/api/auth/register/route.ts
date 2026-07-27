@@ -1,117 +1,77 @@
-import { getRequestContext } from '@cloudflare/next-on-pages'
 import { NextRequest, NextResponse } from 'next/server'
-import * as bcrypt from 'bcryptjs'
+import { getRequestContext } from '@cloudflare/next-on-pages'
 import { z } from 'zod'
-import { queryOne, batch, newId, toSQLiteDate } from '@/lib/db'
 
 export const runtime = 'edge'
 
-
-const registerSchema = z.object({
+const schema = z.object({
   businessName: z.string().min(2),
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(8),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
+  password: z.string().min(6),
 })
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
+function id() {
+  return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}${Math.random().toString(36).slice(2, 8)}`
+}
 
-    // Validate input
-    const validatedData = registerSchema.parse(body)
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const parsed = schema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
+    }
+    const { businessName, name, email, password } = parsed.data
 
     const { env } = getRequestContext()
-    const db = env.DB
+    const db = (env as any).DB as D1Database
 
-    // Check if email already exists
-    const existingUser = await queryOne(db,
-      `SELECT id FROM User WHERE email = ?`,
-      [validatedData.email]
-    )
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'Email already registered' },
-        { status: 400 }
-      )
+    // Check email not taken
+    const existing = await db.prepare('SELECT id FROM User WHERE email = ?').bind(email).first()
+    if (existing) {
+      return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
     }
 
-    // Find FREE plan
-    const freePlan = await queryOne<{ id: string }>(db,
-      `SELECT id FROM Plan WHERE name = 'FREE' LIMIT 1`,
-      []
-    )
-    if (!freePlan) {
-      return NextResponse.json(
-        { error: 'Free plan not found. Please contact support.' },
-        { status: 500 }
-      )
-    }
-
-    // Generate slug from business name
-    const baseSlug = validatedData.businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-
-    // Ensure slug uniqueness
-    const slugConflict = await queryOne(db, `SELECT id FROM Tenant WHERE slug = ?`, [baseSlug])
-    const slug = slugConflict ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug
+    // Get FREE plan
+    const plan = await db.prepare("SELECT id FROM Plan WHERE name = 'FREE' LIMIT 1").first<{ id: string }>()
+    const planId = plan?.id ?? 'plan_free'
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(validatedData.password, 10)
+    const bcrypt = await import('bcryptjs')
+    const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Generate IDs up front
-    const tenantId = newId()
-    const userId   = newId()
-    const storeId  = newId()
-    const suId     = newId()
-    const now      = toSQLiteDate(new Date())
+    const now = new Date().toISOString()
+    const tenantId = id()
+    const userId = id()
+    const storeId = id()
+    const slug = businessName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') + '-' + Date.now().toString(36)
 
-    // Create tenant, user, store, and store-user access in a single batch
-    await batch(db, [
-      {
-        sql: `INSERT INTO Tenant (id, name, slug, email, planId, createdAt, updatedAt)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        params: [tenantId, validatedData.businessName, slug, validatedData.email, freePlan.id, now, now],
-      },
-      {
-        sql: `INSERT INTO User (id, name, email, password, role, tenantId, active, createdAt, updatedAt)
-              VALUES (?, ?, ?, ?, 'OWNER', ?, 1, ?, ?)`,
-        params: [userId, validatedData.name, validatedData.email, hashedPassword, tenantId, now, now],
-      },
-      {
-        sql: `INSERT INTO Store (id, name, tenantId, active, createdAt, updatedAt)
-              VALUES (?, ?, ?, 1, ?, ?)`,
-        params: [storeId, `${validatedData.businessName} - Main Store`, tenantId, now, now],
-      },
-      {
-        sql: `INSERT INTO StoreUser (id, userId, storeId, role, createdAt, updatedAt)
-              VALUES (?, ?, ?, 'OWNER', ?, ?)`,
-        params: [suId, userId, storeId, now, now],
-      },
+    // Create tenant, user, store, store user in a batch
+    await db.batch([
+      db.prepare(
+        `INSERT INTO Tenant (id, name, slug, email, planId, status, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, 'TRIAL', ?, ?)`
+      ).bind(tenantId, businessName, slug, email, planId, now, now),
+
+      db.prepare(
+        `INSERT INTO User (id, tenantId, name, email, password, role, active, isSuperAdmin, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, 'OWNER', 1, 0, ?, ?)`
+      ).bind(userId, tenantId, name, email, hashedPassword, now, now),
+
+      db.prepare(
+        `INSERT INTO Store (id, tenantId, name, taxRate, currency, timezone, active, createdAt, updatedAt)
+         VALUES (?, ?, ?, 0, 'IDR', 'Asia/Jakarta', 1, ?, ?)`
+      ).bind(storeId, tenantId, businessName, now, now),
+
+      db.prepare(
+        `INSERT INTO StoreUser (id, storeId, userId, role) VALUES (?, ?, ?, 'OWNER')`
+      ).bind(id(), storeId, userId),
     ])
 
-    return NextResponse.json({
-      success: true,
-      email: validatedData.email,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.issues },
-        { status: 400 }
-      )
-    }
-
-    console.error('Registration error:', error)
-    return NextResponse.json(
-      { error: 'An error occurred during registration' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: true, email }, { status: 201 })
+  } catch (error: any) {
+    console.error('Register error:', error)
+    return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
   }
 }
