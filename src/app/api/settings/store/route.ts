@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const store = await queryOne(db, `SELECT * FROM Store WHERE id = ?`, [storeId])
   if (!store) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -40,17 +40,19 @@ export async function PATCH(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body: any = await req.json()
-  const storeId: string | undefined = body.storeId
-  const { storeId: _sid, ...rest } = body as Record<string, any>
+  const raw: any = await req.json()
+  const storeId: string | undefined = raw.storeId
 
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
+
+  // Strip storeId before validation
+  const { storeId: _sid, ...rest } = raw as { storeId: string; [k: string]: unknown }
 
   const parsed = updateSchema.safeParse(rest)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const data = parsed.data
   const fields: string[] = []

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const discounts = await query(db,
     `SELECT * FROM Discount WHERE storeId = ? ORDER BY createdAt DESC`,
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const d = parsed.data
   const id = newId()

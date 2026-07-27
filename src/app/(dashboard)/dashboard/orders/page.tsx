@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { OrdersPageClient } from '@/components/orders/OrdersPageClient'
 
 export const runtime = 'edge'

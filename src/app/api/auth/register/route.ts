@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const validatedData = registerSchema.parse(body)
 
     const { env } = getRequestContext()
-    const db = env.DB as D1Database
+    const db = env.DB
 
     // Check if email already exists
     const existingUser = await queryOne(db,

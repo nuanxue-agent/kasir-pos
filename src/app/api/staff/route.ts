@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const staff = await query(db, `
     SELECT
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const { storeId, name, email, password, pin, role } = parsed.data
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   // Check store exists and get tenantId
   const store = await queryOne<{ id: string; tenantId: string }>(db,

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
-import type { UserRole } from '@prisma/client'
+import type { UserRole } from '@/lib/permissions'
 
 interface DashboardShellProps {
   children: React.ReactNode

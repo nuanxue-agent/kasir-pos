@@ -1,4 +1,5 @@
-import { UserRole } from '@prisma/client'
+// UserRole as plain string constants (replaces @prisma/client enum)
+export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'CASHIER'
 
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   SUPER_ADMIN: 4,
@@ -7,22 +8,20 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   CASHIER: 1,
 }
 
-export function canAccess(userRole: UserRole, requiredRole: UserRole): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole]
+export function canAccess(userRole: string, requiredRole: string): boolean {
+  const a = ROLE_HIERARCHY[userRole as UserRole] ?? 0
+  const b = ROLE_HIERARCHY[requiredRole as UserRole] ?? 0
+  return a >= b
 }
 
-export function isAtLeast(userRole: UserRole, role: UserRole): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[role]
+export function isAtLeast(userRole: string, role: UserRole): boolean {
+  return canAccess(userRole, role)
 }
 
-export function isOwnerOrAbove(role: UserRole) {
-  return isAtLeast(role, UserRole.OWNER)
+export function isManagerOrAbove(role: string): boolean {
+  return isAtLeast(role, 'MANAGER')
 }
 
-export function isManagerOrAbove(role: UserRole) {
-  return isAtLeast(role, UserRole.MANAGER)
-}
-
-export function isSuperAdmin(role: UserRole) {
-  return role === UserRole.SUPER_ADMIN
+export function isOwnerOrAbove(role: string): boolean {
+  return isAtLeast(role, 'OWNER')
 }

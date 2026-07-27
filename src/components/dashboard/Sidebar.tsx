@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
-import type { UserRole } from '@prisma/client'
+import type { UserRole } from '@/lib/permissions'
 
 interface NavItem {
   label: string

@@ -32,7 +32,7 @@ export async function POST(
   const { type, qty, note } = parsed.data
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   // Get product
   const product = await queryOne<{

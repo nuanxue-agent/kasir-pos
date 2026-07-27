@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body: any = await req.json()
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const fields: string[] = []
   const values: any[] = []
@@ -57,7 +57,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const result = await exec(db,
     `UPDATE Discount SET active = 0, updatedAt = ? WHERE id = ?`,

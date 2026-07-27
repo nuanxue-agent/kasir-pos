@@ -17,7 +17,7 @@ export async function GET(
 
   const { id } = await params
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const customer = await queryOne(db, `SELECT * FROM Customer WHERE id = ?`, [id])
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -74,7 +74,7 @@ export async function PATCH(
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const data = parsed.data
   const fields: string[] = []
@@ -118,7 +118,7 @@ export async function DELETE(
 
   const { id } = await params
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const orderCount = await queryOne<{ total: number }>(db,
     `SELECT COUNT(*) as total FROM \`Order\` WHERE customerId = ?`, [id]

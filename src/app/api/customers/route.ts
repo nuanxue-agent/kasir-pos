@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const search = q ? `%${q}%` : '%'
 
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const { storeId, name, phone, email, address } = parsed.data
   const id = newId()

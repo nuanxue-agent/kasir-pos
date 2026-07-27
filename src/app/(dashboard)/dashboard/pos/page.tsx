@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import POSPageClient from '@/components/pos/POSPageClient'

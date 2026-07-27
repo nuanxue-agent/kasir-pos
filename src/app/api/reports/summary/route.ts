@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const toISO = to.toISOString()
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const [summaryRow, topProducts, dailySales, paymentBreakdown, newCustomersRow] = await Promise.all([
     // Total revenue + counts

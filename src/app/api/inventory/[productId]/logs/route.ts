@@ -21,7 +21,7 @@ export async function GET(
   const offset = (page - 1) * limit
 
   const { env } = getRequestContext()
-  const db = env.DB as D1Database
+  const db = env.DB
 
   const [logs, countRow] = await Promise.all([
     query(db, `
