@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import StaffPageClient from '@/components/staff/StaffPageClient'
 
-export const runtime = 'edge'
 
 export default async function StaffPage() {
   const session = await auth()

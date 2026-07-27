@@ -9,7 +9,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2 } from 'lucide-react'
 
-export const runtime = 'edge'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),

@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import POSPageClient from '@/components/pos/POSPageClient'
 
-export const runtime = 'edge'
 
 export default async function POSPage() {
   const session = await auth()

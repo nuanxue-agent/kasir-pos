@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import OrdersPageClient from '@/components/orders/OrdersPageClient'
 
-export const runtime = 'edge'
 
 export default async function OrdersPage() {
   const session = await auth()

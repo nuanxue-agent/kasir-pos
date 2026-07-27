@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import CustomersPageClient from '@/components/customers/CustomersPageClient'
 
-export const runtime = 'edge'
 
 export default async function CustomersPage() {
   const session = await auth()

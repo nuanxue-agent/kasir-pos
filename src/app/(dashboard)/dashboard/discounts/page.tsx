@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import DiscountsPageClient from '@/components/discounts/DiscountsPageClient'
 
-export const runtime = 'edge'
 
 export default async function DiscountsPage() {
   const session = await auth()

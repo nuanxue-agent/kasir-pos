@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import InventoryPageClient from '@/components/inventory/InventoryPageClient'
 
-export const runtime = 'edge'
 
 export default async function InventoryPage() {
   const session = await auth()
