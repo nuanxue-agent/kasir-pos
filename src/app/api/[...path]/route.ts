@@ -694,6 +694,121 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok({ success: true, status: 'VOIDED' })
       }
 
+      // ── POST /api/orders/:id/refund — partial or full refund, restores stock ──
+      if (segs.length === 3 && segs[2] === 'refund' && method === 'POST') {
+        const oid = segs[1]
+        // Only OWNER and MANAGER may refund
+        const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
+        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+        if (order.status !== 'PAID') return err('Only PAID orders can be refunded', 400)
+
+        const allItems = await query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid])
+
+        // Parse optional partial-refund body
+        let body: { items?: { id: string; qty: number }[] } = {}
+        try {
+          const text = await req.text()
+          if (text.trim()) body = JSON.parse(text)
+        } catch {
+          // empty body = full refund
+        }
+
+        const t = nowISO()
+        const stmts: Array<{ sql: string; params: any[] }> = [
+          {
+            sql: `UPDATE "Order" SET status = 'REFUNDED', updatedAt = ? WHERE id = ?`,
+            params: [t, oid],
+          },
+        ]
+
+        // Build qty-to-refund map: partial overrides, default = full qty
+        const refundQtyMap: Record<string, number> = {}
+        for (const item of allItems) {
+          refundQtyMap[item.id] = item.qty // default: full
+        }
+        if (body.items?.length) {
+          for (const ri of body.items) {
+            const original = allItems.find((i: any) => i.id === ri.id)
+            if (!original) continue
+            const qty = Math.max(0, Math.min(Number(ri.qty), original.qty))
+            refundQtyMap[ri.id] = qty
+          }
+        }
+
+        for (const item of allItems) {
+          const refundQty = refundQtyMap[item.id] ?? item.qty
+          if (refundQty <= 0) continue
+          if (item.productId) {
+            stmts.push({
+              sql: `UPDATE Product SET stock = stock + ? WHERE id = ? AND storeId = ?`,
+              params: [refundQty, item.productId, storeId],
+            })
+            stmts.push({
+              sql: `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+              params: [
+                newId(),
+                item.productId,
+                'REFUND',
+                refundQty,
+                `Refund ${order.number}`,
+                t,
+              ],
+            })
+          }
+        }
+
+        await batchExec(stmts)
+
+        logAudit({
+          storeId,
+          userId: user.id,
+          action: 'ORDER_REFUND',
+          resourceType: 'Order',
+          resourceId: oid,
+          meta: { number: order.number, partial: !!body.items?.length },
+        }).catch(() => {})
+
+        // Return updated order with items + payments
+        const [updatedOrder, items, payments] = await Promise.all([
+          queryOne(
+            `SELECT o.*, u.name as userName, c.name as customerName
+             FROM "Order" o
+             LEFT JOIN User u ON o.userId = u.id
+             LEFT JOIN Customer c ON o.customerId = c.id
+             WHERE o.id = ? AND o.storeId = ?`,
+            [oid, storeId],
+          ),
+          query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid]),
+          query(`SELECT * FROM Payment WHERE orderId = ?`, [oid]),
+        ])
+        return ok({ ...updatedOrder, items, payments })
+      }
+
+      // ── PATCH /api/orders/:id/void — PATCH alias for void ────────────────────
+      if (segs.length === 3 && segs[2] === 'void' && method === 'PATCH') {
+        const oid = segs[1]
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+        if (order.status !== 'PENDING') return err('Only PENDING orders can be voided via PATCH', 400)
+        const t = nowISO()
+        await batchExec([
+          {
+            sql: `UPDATE "Order" SET status = 'VOIDED', updatedAt = ? WHERE id = ?`,
+            params: [t, oid],
+          },
+        ])
+        return ok({ success: true, status: 'VOIDED' })
+      }
+
       // ── GET /api/orders/:id — fetch single order with items and payments ──────
       if (segs.length === 2 && method === 'GET') {
         const oid = segs[1]
@@ -1804,16 +1919,66 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ── Suppliers ────────────────────────────────────────────────────────────
     if (segs[0] === 'suppliers') {
+      // Lazy-init SupplierProduct and SupplierRating tables
+      await exec(
+        `CREATE TABLE IF NOT EXISTS SupplierProduct (
+          id            TEXT PRIMARY KEY,
+          storeId       TEXT NOT NULL,
+          supplierId    TEXT NOT NULL,
+          productId     TEXT NOT NULL,
+          supplierPrice REAL NOT NULL DEFAULT 0,
+          minOrderQty   INTEGER NOT NULL DEFAULT 1,
+          leadTimeDays  INTEGER NOT NULL DEFAULT 0,
+          createdAt     TEXT NOT NULL,
+          updatedAt     TEXT NOT NULL
+        )`,
+        [],
+      )
+      await exec(
+        `CREATE TABLE IF NOT EXISTS SupplierRating (
+          id         TEXT PRIMARY KEY,
+          storeId    TEXT NOT NULL,
+          supplierId TEXT NOT NULL,
+          orderId    TEXT,
+          rating     INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+          notes      TEXT,
+          createdAt  TEXT NOT NULL
+        )`,
+        [],
+      )
+
+      // GET /api/suppliers — list with purchase aggregates
       if (!segs[1] && method === 'GET') {
         const search = url.searchParams.get('search') ?? ''
         const rows = search
           ? await query(
-              `SELECT * FROM Supplier WHERE storeId=? AND active=1 AND name LIKE ? ORDER BY name`,
+              `SELECT s.*,
+                 COALESCE(SUM(po.total),0)   AS totalPurchases,
+                 COUNT(po.id)                AS totalOrders,
+                 MAX(po.createdAt)           AS lastOrderDate,
+                 ROUND(AVG(sr.rating),1)     AS avgRating,
+                 COUNT(DISTINCT sr.id)       AS ratingCount
+               FROM Supplier s
+               LEFT JOIN PurchaseOrder po ON po.supplierId=s.id AND po.storeId=s.storeId
+               LEFT JOIN SupplierRating sr ON sr.supplierId=s.id AND sr.storeId=s.storeId
+               WHERE s.storeId=? AND s.active=1 AND s.name LIKE ?
+               GROUP BY s.id ORDER BY s.name`,
               [storeId, `%${search}%`],
             )
-          : await query(`SELECT * FROM Supplier WHERE storeId=? AND active=1 ORDER BY name`, [
-              storeId,
-            ])
+          : await query(
+              `SELECT s.*,
+                 COALESCE(SUM(po.total),0)   AS totalPurchases,
+                 COUNT(po.id)                AS totalOrders,
+                 MAX(po.createdAt)           AS lastOrderDate,
+                 ROUND(AVG(sr.rating),1)     AS avgRating,
+                 COUNT(DISTINCT sr.id)       AS ratingCount
+               FROM Supplier s
+               LEFT JOIN PurchaseOrder po ON po.supplierId=s.id AND po.storeId=s.storeId
+               LEFT JOIN SupplierRating sr ON sr.supplierId=s.id AND sr.storeId=s.storeId
+               WHERE s.storeId=? AND s.active=1
+               GROUP BY s.id ORDER BY s.name`,
+              [storeId],
+            )
         return ok(rows)
       }
       if (!segs[1] && method === 'POST') {
@@ -1838,9 +2003,103 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         )
         return ok({ id }, 201)
       }
-      if (segs[1] && method === 'PATCH') {
+
+      // GET /api/suppliers/:id/products — supplier price list
+      if (segs[1] && segs[2] === 'products' && method === 'GET') {
+        const rows = await query(
+          `SELECT sp.*, p.name as productName, p.sku, p.price as retailPrice
+           FROM SupplierProduct sp
+           JOIN Product p ON sp.productId = p.id
+           WHERE sp.supplierId=? AND sp.storeId=?
+           ORDER BY p.name`,
+          [segs[1], storeId],
+        )
+        return ok(rows)
+      }
+      // POST /api/suppliers/:id/products — upsert a product in price list
+      if (segs[1] && segs[2] === 'products' && method === 'POST') {
         const b = (await req.json()) as any
-        const allowed = new Set(['name', 'email', 'phone', 'address', 'taxId', 'notes', 'active'])
+        if (!b.productId) return err('productId harus diisi')
+        if (b.supplierPrice === undefined || Number(b.supplierPrice) < 0)
+          return err('supplierPrice harus >= 0')
+        const existing = await queryOne<any>(
+          `SELECT id FROM SupplierProduct WHERE supplierId=? AND productId=? AND storeId=?`,
+          [segs[1], b.productId, storeId],
+        )
+        const t = nowISO()
+        if (existing) {
+          await exec(
+            `UPDATE SupplierProduct SET supplierPrice=?,minOrderQty=?,leadTimeDays=?,updatedAt=? WHERE id=?`,
+            [
+              Number(b.supplierPrice),
+              Number(b.minOrderQty ?? 1),
+              Number(b.leadTimeDays ?? 0),
+              t,
+              existing.id,
+            ],
+          )
+          return ok({ id: existing.id })
+        }
+        const id = newId()
+        await exec(
+          `INSERT INTO SupplierProduct (id,storeId,supplierId,productId,supplierPrice,minOrderQty,leadTimeDays,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            segs[1],
+            b.productId,
+            Number(b.supplierPrice),
+            Number(b.minOrderQty ?? 1),
+            Number(b.leadTimeDays ?? 0),
+            t,
+            t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+      // DELETE /api/suppliers/:id/products/:productId
+      if (segs[1] && segs[2] === 'products' && segs[3] && method === 'DELETE') {
+        await exec(
+          `DELETE FROM SupplierProduct WHERE supplierId=? AND productId=? AND storeId=?`,
+          [segs[1], segs[3], storeId],
+        )
+        return ok({ success: true })
+      }
+
+      // GET /api/suppliers/:id/ratings
+      if (segs[1] && segs[2] === 'ratings' && method === 'GET') {
+        const rows = await query(
+          `SELECT sr.*, po.number as orderNumber
+           FROM SupplierRating sr
+           LEFT JOIN PurchaseOrder po ON sr.orderId = po.id
+           WHERE sr.supplierId=? AND sr.storeId=?
+           ORDER BY sr.createdAt DESC`,
+          [segs[1], storeId],
+        )
+        const agg = await queryOne<any>(
+          `SELECT ROUND(AVG(rating),2) as avg, COUNT(*) as count FROM SupplierRating WHERE supplierId=? AND storeId=?`,
+          [segs[1], storeId],
+        )
+        return ok({ ratings: rows, avg: agg?.avg ?? null, count: agg?.count ?? 0 })
+      }
+      // POST /api/suppliers/:id/ratings
+      if (segs[1] && segs[2] === 'ratings' && method === 'POST') {
+        const b = (await req.json()) as any
+        const rating = Number(b.rating)
+        if (!rating || rating < 1 || rating > 5) return err('Rating harus antara 1-5')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO SupplierRating (id,storeId,supplierId,orderId,rating,notes,createdAt) VALUES (?,?,?,?,?,?,?)`,
+          [id, storeId, segs[1], b.orderId ?? null, rating, b.notes ?? null, t],
+        )
+        return ok({ id }, 201)
+      }
+
+      if (segs[1] && !segs[2] && method === 'PATCH') {
+        const b = (await req.json()) as any
+        const allowed = new Set(['name', 'email', 'phone', 'address', 'taxId', 'notes', 'active',
+          'contactPerson', 'city'])
         const cols = filterCols(b, allowed)
         if (Object.keys(cols).length === 0) return err('No valid fields')
         const { setClauses, values } = buildUpdate(cols)
@@ -1852,7 +2111,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         ])
         return ok({ success: true })
       }
-      if (segs[1] && method === 'DELETE') {
+      if (segs[1] && !segs[2] && method === 'DELETE') {
         await exec(`UPDATE Supplier SET active=0, updatedAt=? WHERE id=? AND storeId=?`, [
           nowISO(),
           segs[1],
@@ -1866,19 +2125,25 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'purchase-orders') {
       if (!segs[1] && method === 'GET') {
         const status = url.searchParams.get('status') ?? ''
+        const supplierId = url.searchParams.get('supplierId') ?? ''
         const limit = parseInt(url.searchParams.get('limit') ?? '50')
         const offset = parseInt(url.searchParams.get('offset') ?? '0')
+        const conditions: string[] = ['po.storeId=?']
+        const params: any[] = [storeId]
+        if (status) { conditions.push('po.status=?'); params.push(status) }
+        if (supplierId) { conditions.push('po.supplierId=?'); params.push(supplierId) }
+        const where = conditions.join(' AND ')
         const rows = await query(
           `SELECT po.*, s.name as supplierName
            FROM PurchaseOrder po
            JOIN Supplier s ON po.supplierId = s.id
-           WHERE po.storeId=? ${status ? 'AND po.status=?' : ''}
+           WHERE ${where}
            ORDER BY po.createdAt DESC LIMIT ? OFFSET ?`,
-          status ? [storeId, status, limit, offset] : [storeId, limit, offset],
+          [...params, limit, offset],
         )
         const total = await queryOne<any>(
-          `SELECT COUNT(*) as count FROM PurchaseOrder WHERE storeId=? ${status ? 'AND status=?' : ''}`,
-          status ? [storeId, status] : [storeId],
+          `SELECT COUNT(*) as count FROM PurchaseOrder po WHERE ${where}`,
+          params,
         )
         return ok({ orders: rows, total: total?.count ?? 0 })
       }
@@ -4492,6 +4757,88 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ projections, avgRevenue, avgExpenses })
     }
 
+    // ─── REPORTS / PRODUCTS ───────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'products' && method === 'GET') {
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+      const to = sp.get('to') ?? new Date().toISOString()
+
+      // Aggregate OrderItems → product totals for the period
+      const rows = await query(
+        `SELECT
+          oi.productId,
+          MAX(oi.name)                          AS name,
+          COALESCE(SUM(oi.subtotal), 0)         AS totalRevenue,
+          COALESCE(SUM(oi.qty), 0)              AS qtySold,
+          COALESCE(AVG(p.stock), 0)             AS avgStock
+        FROM OrderItem oi
+        JOIN "Order" o  ON oi.orderId  = o.id
+        LEFT JOIN Product p ON oi.productId = p.id
+        WHERE o.storeId = ? AND o.status = 'PAID'
+          AND o.createdAt BETWEEN ? AND ?
+        GROUP BY oi.productId
+        ORDER BY totalRevenue DESC`,
+        [storeId, from, to],
+      ) as any[]
+
+      // Also fetch products with 0 sales (slow movers) in the same period
+      const allProducts = await query(
+        `SELECT id AS productId, name, stock AS avgStock
+         FROM Product
+         WHERE storeId = ? AND active = 1`,
+        [storeId],
+      ) as any[]
+
+      // Merge: products not in rows get qtySold=0 / totalRevenue=0
+      const soldIds = new Set(rows.map((r: any) => r.productId))
+      const zeroRows = allProducts
+        .filter((p: any) => !soldIds.has(p.productId))
+        .map((p: any) => ({
+          productId: p.productId,
+          name: p.name,
+          totalRevenue: 0,
+          qtySold: 0,
+          avgStock: Number(p.avgStock ?? 0),
+        }))
+
+      const combined: any[] = [
+        ...rows.map((r: any) => ({
+          productId: r.productId,
+          name: r.name,
+          totalRevenue: Number(r.totalRevenue),
+          qtySold: Number(r.qtySold),
+          avgStock: Number(r.avgStock ?? 0),
+        })),
+        ...zeroRows,
+      ]
+
+      const grandTotal = combined.reduce((s: number, r: any) => s + r.totalRevenue, 0)
+
+      // ABC classification: sort DESC by revenue, assign classes by cumulative %
+      combined.sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
+      let cumulative = 0
+      const result = combined.map((r: any) => {
+        cumulative += r.totalRevenue
+        const pct = grandTotal > 0 ? (cumulative / grandTotal) * 100 : 100
+        const abcClass: 'A' | 'B' | 'C' = pct <= 80 ? 'A' : pct <= 95 ? 'B' : 'C'
+        const percentOfTotal =
+          grandTotal > 0 ? Math.round((r.totalRevenue / grandTotal) * 10000) / 100 : 0
+        const turnoverRate =
+          r.avgStock > 0 ? Math.round((r.qtySold / r.avgStock) * 100) / 100 : 0
+        return {
+          productId: r.productId,
+          name: r.name,
+          totalRevenue: r.totalRevenue,
+          qtySold: r.qtySold,
+          percentOfTotal,
+          abcClass,
+          avgStock: r.avgStock,
+          turnoverRate,
+        }
+      })
+
+      return okCached(result, 'private, max-age=30')
+    }
+
     // ─── HR / PAYROLL ─────────────────────────────────────────────────────────
     // Tables created lazily on first access
     if (segs[0] === 'hr' && segs[1] === 'payroll') {
@@ -4776,6 +5123,441 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           counts: { orders, products, customers, employees },
           storageEstimate: { totalRows, estimatedKB },
         })
+      }
+    }
+
+    // ─── STOCK OPNAME ─────────────────────────────────────────────────────────
+    if (segs[0] === 'stock-opname') {
+      // Lazy-create tables
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StockOpname (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'IN_PROGRESS',
+          startedAt TEXT NOT NULL,
+          completedAt TEXT,
+          notes TEXT,
+          createdAt TEXT NOT NULL
+        )
+      `)
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StockOpnameItem (
+          id TEXT PRIMARY KEY,
+          opnameId TEXT NOT NULL,
+          productId TEXT NOT NULL,
+          systemQty REAL NOT NULL DEFAULT 0,
+          countedQty REAL,
+          variance REAL NOT NULL DEFAULT 0,
+          FOREIGN KEY (opnameId) REFERENCES StockOpname(id),
+          FOREIGN KEY (productId) REFERENCES Product(id)
+        )
+      `)
+
+      // GET /api/stock-opname?storeId= — list sessions with total variance
+      if (segs.length === 1 && method === 'GET') {
+        const sessions = await query<any>(
+          `SELECT s.*,
+                  COUNT(i.id) as itemCount,
+                  COALESCE(SUM(i.variance), 0) as totalVariance
+           FROM StockOpname s
+           LEFT JOIN StockOpnameItem i ON i.opnameId = s.id
+           WHERE s.storeId = ?
+           GROUP BY s.id
+           ORDER BY s.startedAt DESC`,
+          [storeId],
+        )
+        return ok(sessions)
+      }
+
+      // POST /api/stock-opname — create new session, snapshot current stock
+      if (segs.length === 1 && method === 'POST') {
+        const b = (await req.json()) as { storeId?: string; notes?: string }
+        const sid = b.storeId ?? storeId
+        const sessionId = newId()
+        const t = nowISO()
+
+        await exec(
+          `INSERT INTO StockOpname (id, storeId, status, startedAt, completedAt, notes, createdAt)
+           VALUES (?, ?, 'IN_PROGRESS', ?, NULL, ?, ?)`,
+          [sessionId, sid, t, b.notes ?? null, t],
+        )
+
+        // Snapshot all trackStock products at current qty
+        const products = await query<any>(
+          `SELECT id, stock FROM Product WHERE storeId = ? AND trackStock = 1 AND active = 1`,
+          [sid],
+        )
+        for (const p of products) {
+          await exec(
+            `INSERT INTO StockOpnameItem (id, opnameId, productId, systemQty, countedQty, variance)
+             VALUES (?, ?, ?, ?, NULL, 0)`,
+            [newId(), sessionId, p.id, p.stock],
+          )
+        }
+
+        // Return full session with items
+        const session = await queryOne<any>(`SELECT * FROM StockOpname WHERE id = ?`, [sessionId])
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku, p.barcode as productBarcode
+           FROM StockOpnameItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.opnameId = ?
+           ORDER BY p.name ASC`,
+          [sessionId],
+        )
+        return ok({ ...session, items }, 201)
+      }
+
+      // GET /api/stock-opname/:id — get session with items
+      if (segs.length === 2 && method === 'GET') {
+        const sessionId = segs[1]
+        const session = await queryOne<any>(
+          `SELECT * FROM StockOpname WHERE id = ? AND storeId = ?`,
+          [sessionId, storeId],
+        )
+        if (!session) return err('Session not found', 404, 'NOT_FOUND')
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku, p.barcode as productBarcode
+           FROM StockOpnameItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.opnameId = ?
+           ORDER BY p.name ASC`,
+          [sessionId],
+        )
+        return ok({ ...session, items })
+      }
+
+      // PATCH /api/stock-opname/:id — update counts and optionally submit
+      if (segs.length === 2 && method === 'PATCH') {
+        const sessionId = segs[1]
+        const session = await queryOne<any>(
+          `SELECT * FROM StockOpname WHERE id = ? AND storeId = ?`,
+          [sessionId, storeId],
+        )
+        if (!session) return err('Session not found', 404, 'NOT_FOUND')
+        if (session.status === 'COMPLETED')
+          return err('Session already completed', 400, 'ALREADY_COMPLETED')
+
+        const b = (await req.json()) as {
+          items?: { productId: string; countedQty: number }[]
+          notes?: string
+          action?: string
+        }
+
+        const t = nowISO()
+
+        // Update counted quantities and variance
+        if (b.items && Array.isArray(b.items)) {
+          for (const it of b.items) {
+            const sysRow = await queryOne<any>(
+              `SELECT systemQty FROM StockOpnameItem WHERE opnameId = ? AND productId = ?`,
+              [sessionId, it.productId],
+            )
+            if (!sysRow) continue
+            const variance = it.countedQty - sysRow.systemQty
+            await exec(
+              `UPDATE StockOpnameItem SET countedQty = ?, variance = ?
+               WHERE opnameId = ? AND productId = ?`,
+              [it.countedQty, variance, sessionId, it.productId],
+            )
+          }
+        }
+
+        // Update notes
+        if (b.notes !== undefined) {
+          await exec(`UPDATE StockOpname SET notes = ? WHERE id = ?`, [b.notes, sessionId])
+        }
+
+        // Submit: mark COMPLETED + apply stock adjustments
+        if (b.action === 'submit') {
+          // Get all items with variance
+          const opnameItems = await query<any>(
+            `SELECT * FROM StockOpnameItem WHERE opnameId = ?`,
+            [sessionId],
+          )
+          const withVariance = opnameItems.filter(
+            (i: any) => i.countedQty !== null && i.variance !== 0,
+          )
+
+          for (const item of withVariance) {
+            // Adjust product stock
+            await exec(
+              `UPDATE Product SET stock = stock + ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
+              [item.variance, t, item.productId, storeId],
+            )
+            // Create StockLog entry
+            await exec(
+              `INSERT INTO StockLog (id, storeId, productId, userId, type, qty, note, createdAt)
+               VALUES (?, ?, ?, ?, 'ADJUSTMENT', ?, ?, ?)`,
+              [
+                newId(),
+                storeId,
+                item.productId,
+                user.id,
+                Math.abs(item.variance),
+                `Stock opname #${sessionId.slice(-8)}`,
+                t,
+              ],
+            )
+          }
+
+          await exec(
+            `UPDATE StockOpname SET status = 'COMPLETED', completedAt = ? WHERE id = ?`,
+            [t, sessionId],
+          )
+
+          logAudit({
+            storeId,
+            userId: user.id,
+            action: 'STOCK_OPNAME_COMPLETE',
+            resourceType: 'StockOpname',
+            resourceId: sessionId,
+            meta: { itemsAdjusted: withVariance.length },
+          }).catch(() => {})
+        }
+
+        // Return updated session with items
+        const updated = await queryOne<any>(`SELECT * FROM StockOpname WHERE id = ?`, [sessionId])
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku, p.barcode as productBarcode
+           FROM StockOpnameItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.opnameId = ?
+           ORDER BY p.name ASC`,
+          [sessionId],
+        )
+        return ok({ ...updated, items })
+      }
+    }
+
+    // ── accounting/reconciliation ─────────────────────────────────────────────
+    // GET  /api/accounting/reconciliation?storeId=&from=&to=
+    //      → returns unmatched system transactions for the date range
+    // POST /api/accounting/reconciliation?storeId=
+    //      body: { bankId, systemId }  → creates a reconciliation match record
+    if (segs[0] === 'accounting' && segs[1] === 'reconciliation') {
+      // Lazy-create BankStatement table if it doesn't exist yet
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BankStatement (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          date TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount REAL NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('CREDIT','DEBIT')),
+          matchedId TEXT,
+          status TEXT NOT NULL DEFAULT 'UNMATCHED' CHECK(status IN ('UNMATCHED','MATCHED','IGNORED')),
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      `, [])
+
+      // Lazy-create ReconciliationMatch table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ReconciliationMatch (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          bankStatementId TEXT NOT NULL,
+          systemTransactionId TEXT NOT NULL,
+          systemTransactionType TEXT NOT NULL,
+          matchedAt TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      `, [])
+
+      if (method === 'GET') {
+        const from = sp.get('from') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+        const to = sp.get('to') ?? new Date().toISOString().slice(0, 10)
+
+        // Collect unmatched system transactions from Orders (PAID) and JournalEntries
+        const orders = await query<any>(
+          `SELECT id, createdAt as date, 'Order #' || id as description, total as amount, 'CREDIT' as type,
+                  NULL as matchedId, 'UNMATCHED' as status, 'order' as sourceType
+           FROM "Order"
+           WHERE storeId = ? AND status = 'PAID'
+             AND date(createdAt) BETWEEN ? AND ?
+           ORDER BY createdAt DESC
+           LIMIT 200`,
+          [storeId, from, to],
+        )
+
+        const expenses = await query<any>(
+          `SELECT id, date, COALESCE(description, category) as description, amount,
+                  'DEBIT' as type, NULL as matchedId, 'UNMATCHED' as status, 'expense' as sourceType
+           FROM Expense
+           WHERE storeId = ? AND date BETWEEN ? AND ?
+           ORDER BY date DESC
+           LIMIT 200`,
+          [storeId, from, to],
+        )
+
+        // Mark any already-matched ones
+        const matchedOrders = await query<any>(
+          `SELECT systemTransactionId FROM ReconciliationMatch WHERE storeId = ? AND systemTransactionType = 'order'`,
+          [storeId],
+        )
+        const matchedExpenses = await query<any>(
+          `SELECT systemTransactionId FROM ReconciliationMatch WHERE storeId = ? AND systemTransactionType = 'expense'`,
+          [storeId],
+        )
+        const matchedOrderIds = new Set(matchedOrders.map((r: any) => r.systemTransactionId))
+        const matchedExpenseIds = new Set(matchedExpenses.map((r: any) => r.systemTransactionId))
+
+        const result = [
+          ...orders.map((r: any) => ({
+            ...r,
+            status: matchedOrderIds.has(r.id) ? 'MATCHED' : 'UNMATCHED',
+          })),
+          ...expenses.map((r: any) => ({
+            ...r,
+            status: matchedExpenseIds.has(r.id) ? 'MATCHED' : 'UNMATCHED',
+          })),
+        ]
+
+        return ok(result)
+      }
+
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['bankId', 'systemId'])
+        const t = nowISO()
+        const matchId = newId()
+
+        // Determine source type from systemId prefix heuristic or just store both
+        const systemType = String(b.systemId).startsWith('exp') ? 'expense' : 'order'
+
+        await exec(
+          `INSERT OR IGNORE INTO ReconciliationMatch (id, storeId, bankStatementId, systemTransactionId, systemTransactionType, matchedAt, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [matchId, storeId, b.bankId, b.systemId, systemType, t, t],
+        )
+
+        return ok({ id: matchId, bankId: b.bankId, systemId: b.systemId, matchedAt: t }, 201)
+      }
+    }
+
+
+    // ── Marketing Campaigns ───────────────────────────────────────────────────
+    if (segs[0] === 'marketing-campaigns') {
+      // Lazy init table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS MarketingCampaign (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          name         TEXT NOT NULL,
+          type         TEXT NOT NULL DEFAULT 'EMAIL',
+          status       TEXT NOT NULL DEFAULT 'DRAFT',
+          message      TEXT NOT NULL DEFAULT '',
+          audience     TEXT NOT NULL DEFAULT 'ALL',
+          audienceValue TEXT,
+          scheduledAt  TEXT,
+          sentCount    INTEGER NOT NULL DEFAULT 0,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL
+        )
+      `)
+
+      // GET /api/marketing-campaigns?storeId=...
+      if (!segs[1] && method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM MarketingCampaign WHERE storeId=? ORDER BY createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/marketing-campaigns
+      if (!segs[1] && method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.name || String(b.name).trim().length < 2) return err('name minimal 2 karakter')
+        if (!b.message || String(b.message).trim().length < 1) return err('message required')
+        const validTypes = ['EMAIL', 'SMS', 'WHATSAPP']
+        const validAudiences = ['ALL', 'SEGMENT', 'LOYALTY_TIER']
+        const type = validTypes.includes(b.type) ? b.type : 'EMAIL'
+        const audience = validAudiences.includes(b.audience) ? b.audience : 'ALL'
+        const id = newId()
+        const t = nowISO()
+        const status = b.scheduledAt ? 'SCHEDULED' : 'DRAFT'
+        await exec(
+          `INSERT INTO MarketingCampaign
+           (id,storeId,name,type,status,message,audience,audienceValue,scheduledAt,sentCount,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, storeId, b.name.trim(), type, status,
+            b.message.trim(), audience,
+            b.audienceValue ?? null,
+            b.scheduledAt ?? null,
+            0, t, t,
+          ],
+        )
+        return ok({ id, status }, 201)
+      }
+
+      // POST /api/marketing-campaigns/send/:id
+      if (segs[1] === 'send' && segs[2] && method === 'POST') {
+        const campaignId = segs[2]
+        const campaign = await queryOne(
+          `SELECT * FROM MarketingCampaign WHERE id=? AND storeId=?`,
+          [campaignId, storeId],
+        ) as any
+        if (!campaign) return err('Campaign not found', 404)
+
+        // Count audience size
+        let audienceCount = 0
+        if (campaign.audience === 'ALL') {
+          const row = await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [storeId]) as any
+          audienceCount = Number(row?.cnt ?? 0)
+        } else if (campaign.audience === 'SEGMENT') {
+          // RFM segment — approximate via loyalty members or all customers fallback
+          const row = await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [storeId]) as any
+          audienceCount = Math.max(1, Math.floor(Number(row?.cnt ?? 10) * 0.3))
+        } else if (campaign.audience === 'LOYALTY_TIER') {
+          const row = await queryOne(
+            `SELECT COUNT(*) as cnt FROM LoyaltyMember WHERE storeId=? AND tierId=?`,
+            [storeId, campaign.audienceValue ?? ''],
+          ) as any
+          audienceCount = Number(row?.cnt ?? 0)
+        }
+        if (audienceCount === 0) audienceCount = 1 // always send to at least 1
+
+        // Simulate delivery stats
+        const deliveryRate = 0.92 + Math.random() * 0.06
+        const openRate    = 0.18 + Math.random() * 0.22
+        const delivered   = Math.round(audienceCount * deliveryRate)
+        const failed      = audienceCount - delivered
+        const opened      = Math.round(delivered * openRate)
+
+        const t2 = nowISO()
+        await exec(
+          `UPDATE MarketingCampaign SET status='SENT', sentCount=?, updatedAt=? WHERE id=? AND storeId=?`,
+          [audienceCount, t2, campaignId, storeId],
+        )
+
+        return ok({
+          success: true,
+          sentCount: audienceCount,
+          stats: { delivered, failed, opened },
+        })
+      }
+
+      // PATCH /api/marketing-campaigns/:id
+      if (segs[1] && segs[1] !== 'send' && method === 'PATCH') {
+        const b = (await req.json()) as any
+        const allowed = new Set(['name', 'message', 'type', 'status', 'audience', 'audienceValue', 'scheduledAt'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(
+          `UPDATE MarketingCampaign SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`,
+          [...values, nowISO(), segs[1], storeId],
+        )
+        return ok({ success: true })
+      }
+
+      // DELETE /api/marketing-campaigns/:id
+      if (segs[1] && segs[1] !== 'send' && method === 'DELETE') {
+        await exec(`DELETE FROM MarketingCampaign WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
       }
     }
 

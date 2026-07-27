@@ -8,6 +8,7 @@ import { ChevronDown, Store, User, LogOut, Menu, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/permissions'
 import { NotificationCenter } from '@/components/ui/NotificationCenter'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 interface StoreOption {
   id: string
@@ -191,6 +192,9 @@ export function Header({
         <NotificationCenter
           lowStockProducts={lowStockItems.map(p => ({ id: p.id, name: p.name, stock: p.stock }))}
         />
+
+        {/* Theme toggle */}
+        <ThemeToggle />
 
         {/* User menu */}
         <div ref={userRef} className="relative">

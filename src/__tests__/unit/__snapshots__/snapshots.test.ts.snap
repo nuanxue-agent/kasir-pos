@@ -1,0 +1,75 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Snapshot: CSV export header row > orders report header matches snapshot 1`] = `"Order #,Date,Customer,Total,Payment Method,Status"`;
+
+exports[`Snapshot: CSV export header row > products report header matches snapshot 1`] = `"Product Name,SKU,Price,Stock,Category"`;
+
+exports[`Snapshot: buildReceiptText > matches snapshot for a standard receipt 1`] = `
+"🧾 Warung Bahagia
+Jl. Merdeka No. 1, Jakarta
++62-21-12345678
+────────────────────────────
+No. INV-0042
+2025-07-28 10:00
+Customer: Budi
+────────────────────────────
+📦 Items:
+  Nasi Goreng
+  2 × IDR 20,000 = IDR 40,000
+  Es Teh
+  1 × IDR 5,000 = IDR 5,000
+────────────────────────────
+Subtotal: IDR 45,000
+Pajak: IDR 4,500
+💰 TOTAL: IDR 49,500
+Pembayaran: Cash
+────────────────────────────
+Terima kasih! 🙏"
+`;
+
+exports[`Snapshot: buildReceiptText > matches snapshot for receipt with discount 1`] = `
+"🧾 Warung Bahagia
+Jl. Merdeka No. 1, Jakarta
++62-21-12345678
+────────────────────────────
+No. INV-0042
+2025-07-28 10:00
+Customer: Budi
+────────────────────────────
+📦 Items:
+  Nasi Goreng
+  2 × IDR 20,000 = IDR 40,000
+  Es Teh
+  1 × IDR 5,000 = IDR 5,000
+────────────────────────────
+Subtotal: IDR 45,000
+Diskon: -IDR 5,000
+Pajak: IDR 4,500
+💰 TOTAL: IDR 44,500
+Pembayaran: Cash
+────────────────────────────
+Terima kasih! 🙏"
+`;
+
+exports[`Snapshot: buildWhatsAppMessage > decoded WhatsApp message matches snapshot 1`] = `
+"🧾 Warung Bahagia
+Jl. Merdeka No. 1, Jakarta
++62-21-12345678
+────────────────────────────
+No. INV-0042
+2025-07-28 10:00
+Customer: Budi
+────────────────────────────
+📦 Items:
+  Nasi Goreng
+  2 × IDR 20,000 = IDR 40,000
+  Es Teh
+  1 × IDR 5,000 = IDR 5,000
+────────────────────────────
+Subtotal: IDR 45,000
+Pajak: IDR 4,500
+💰 TOTAL: IDR 49,500
+Pembayaran: Cash
+────────────────────────────
+Terima kasih! 🙏"
+`;

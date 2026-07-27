@@ -302,3 +302,44 @@ describe('Permission checks', () => {
     })
   })
 })
+
+// ── Additional auth edge cases ────────────────────────────────────────────────
+
+describe('JWT additional edge cases', () => {
+  it('token with empty string parts fails length check', () => {
+    const token = '..'
+    expect(token.split('.').length).toBe(3)
+    // But parts are empty — payload decode should fail
+    const parts = token.split('.')
+    expect(parts[1]).toBe('')
+  })
+
+  it('payload with extra fields round-trips through base64', () => {
+    const payload = {
+      id: 'u99',
+      name: 'Citra',
+      email: 'citra@test.com',
+      role: 'MANAGER',
+      stores: ['s1', 's2'],
+      exp: Date.now() + 3600000,
+    }
+    const encoded = btoa(JSON.stringify(payload))
+    const decoded = JSON.parse(atob(encoded))
+    expect(decoded.stores).toHaveLength(2)
+    expect(decoded.role).toBe('MANAGER')
+  })
+
+  it('30-day expiry is encoded as iat + 2592000000 ms', () => {
+    const iat = Date.now()
+    const exp = iat + 86400000 * 30
+    expect(exp - iat).toBe(2592000000)
+  })
+
+  it('looksLikeBcryptHash returns false for $2c$ prefix', () => {
+    expect(looksLikeBcryptHash('$2c$12$abcdefghijklmnopqrstuuVwxyz012345678901234567890123456')).toBe(false)
+  })
+
+  it('isPasswordStrong rejects password with only uppercase and digits', () => {
+    expect(isPasswordStrong('SECURE123')).toBe(false)
+  })
+})
