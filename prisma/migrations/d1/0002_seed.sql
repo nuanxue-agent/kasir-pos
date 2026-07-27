@@ -16,10 +16,11 @@ VALUES ('store_demo', 'tenant_demo', 'Warung Demo', 'Jl. Demo No. 1, Jakarta', '
 
 -- Users (passwords are bcrypt of 'demo123')
 -- Owner: owner@demo.com / demo123
+-- Cashier: cashier@demo.com / demo123
 INSERT OR IGNORE INTO User (id, tenantId, name, email, password, role, active, isSuperAdmin, createdAt, updatedAt)
 VALUES 
-  ('user_owner', 'tenant_demo', 'Demo Owner', 'owner@demo.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiGniMd36.jOJtLnPLHBMo9Mf5y6', 'OWNER', 1, 0, '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z'),
-  ('user_cashier', 'tenant_demo', 'Demo Cashier', 'cashier@demo.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiGniMd36.jOJtLnPLHBMo9Mf5y6', 'CASHIER', 1, 0, '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z');
+  ('user_owner', 'tenant_demo', 'Demo Owner', 'owner@demo.com', '$2b$12$RNLc4IRwe4kxfBNw5Kz1ZenSzoWbrTK2OETcFjUe9H08kK8AlswtC', 'OWNER', 1, 0, '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z'),
+  ('user_cashier', 'tenant_demo', 'Demo Cashier', 'cashier@demo.com', '$2b$12$RNLc4IRwe4kxfBNw5Kz1ZenSzoWbrTK2OETcFjUe9H08kK8AlswtC', 'CASHIER', 1, 0, '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z');
 
 -- StoreUser
 INSERT OR IGNORE INTO StoreUser (id, storeId, userId, role)

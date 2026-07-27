@@ -1,110 +1,77 @@
 {
   "name": "Lakoo POS",
   "short_name": "Lakoo",
-  "description": "Point of Sale & Business Management for SMEs",
+  "description": "Sistem kasir modern untuk bisnis Anda",
   "start_url": "/dashboard",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
-  "background_color": "#ffffff",
-  "theme_color": "#f59e0b",
-  "orientation": "any",
-  "categories": ["business", "productivity", "finance"],
+  "background_color": "#faf8f4",
+  "theme_color": "#d97706",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon-72.png",
+      "src": "/icons/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-96.png",
+      "src": "/icons/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-128.png",
+      "src": "/icons/icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-144.png",
+      "src": "/icons/icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-152.png",
+      "src": "/icons/icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-384.png",
+      "src": "/icons/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/pos-desktop.png",
-      "sizes": "1280x800",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "POS Cashier on Desktop"
-    },
-    {
-      "src": "/screenshots/pos-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "POS Cashier on Mobile"
-    },
-    {
-      "src": "/screenshots/dashboard-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Dashboard Overview"
-    }
-  ],
+  "categories": ["business", "productivity"],
   "shortcuts": [
     {
-      "name": "New Sale",
-      "short_name": "New Sale",
-      "description": "Start a new sale transaction",
+      "name": "Kasir (POS)",
+      "short_name": "POS",
+      "description": "Buka halaman kasir",
       "url": "/dashboard/pos",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
-      "name": "View Orders",
-      "short_name": "Orders",
-      "description": "View all orders",
+      "name": "Pesanan",
+      "short_name": "Pesanan",
+      "description": "Lihat daftar pesanan",
       "url": "/dashboard/orders",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Check Inventory",
-      "short_name": "Inventory",
-      "description": "Check and manage inventory",
-      "url": "/dashboard/products",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     }
-  ],
-  "lang": "en",
-  "dir": "ltr"
+  ]
 }

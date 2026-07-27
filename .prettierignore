@@ -1,0 +1,8 @@
+.next/
+node_modules/
+public/
+*.min.js
+*.min.css
+coverage/
+prisma/migrations/
+.wrangler/

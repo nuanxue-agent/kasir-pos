@@ -17,7 +17,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "prepare": "husky",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -64,13 +67,30 @@
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "husky": "^9.1.7",
     "jsdom": "^30.0.0",
+    "lint-staged": "^17.2.0",
     "playwright": "^1.62.0",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vercel": "^57.0.0",
     "vitest": "^4.1.10",
     "wait-on": "^9.1.0",
     "wrangler": "^4.114.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "*.{js,jsx,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
   }
 }
