@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import ManufacturingPageClient from '@/components/manufacturing/ManufacturingPageClient'
+import { ManufacturingPageClient } from '@/components/manufacturing/ManufacturingPageClient'
 
 export default async function ManufacturingPage() {
   const session = await auth()
