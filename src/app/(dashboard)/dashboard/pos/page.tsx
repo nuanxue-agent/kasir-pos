@@ -20,8 +20,8 @@ export default async function POSPage() {
     : null
   const receiptNote: string | null = (storeSettings as any)?.receiptNote ?? null
 
-  // Pre-fetch products and categories server-side
-  const [products, categories] = await Promise.all([
+  // Pre-fetch products, categories, and bundles server-side
+  const [products, categories, bundleRows] = await Promise.all([
     query(
       `SELECT p.*, c.name as categoryName, c.color as categoryColor, c.icon as categoryIcon
        FROM Product p LEFT JOIN Category c ON p.categoryId = c.id
@@ -32,6 +32,14 @@ export default async function POSPage() {
       `SELECT * FROM Category WHERE storeId = ? AND active = 1 ORDER BY sortOrder`,
       [storeId]
     ),
+    query(
+      `SELECT b.id, b.name, b.price, bi.productId, bi.qty
+       FROM ProductBundle b
+       JOIN BundleItem bi ON bi.bundleId = b.id
+       WHERE b.storeId = ? AND b.active = 1
+       ORDER BY b.name`,
+      [storeId]
+    ).catch(() => []), // graceful if table doesn't exist yet
   ])
 
   // Shape products for POS
@@ -53,6 +61,21 @@ export default async function POSPage() {
     } : null,
   }))
 
+  // Shape bundles: group rows by bundle id, attach component products
+  const productMap = Object.fromEntries(shaped.map((p: any) => [p.id, p]))
+  const bundleMap: Record<string, any> = {}
+  for (const row of bundleRows as any[]) {
+    if (!bundleMap[row.id]) {
+      bundleMap[row.id] = { id: row.id, name: row.name, price: row.price, items: [] }
+    }
+    bundleMap[row.id].items.push({
+      productId: row.productId,
+      qty: row.qty,
+      product: productMap[row.productId] ?? null,
+    })
+  }
+  const bundles = Object.values(bundleMap)
+
   return (
     <POSPageClient
       storeId={storeId}
@@ -63,6 +86,7 @@ export default async function POSPage() {
       initialProducts={shaped}
       categories={categories as any}
       receiptNote={receiptNote}
+      initialBundles={bundles as any}
     />
   )
 }

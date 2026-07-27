@@ -264,8 +264,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         if (method === 'GET') {
           const customer = await queryOne(`SELECT * FROM Customer WHERE id = ? AND storeId = ?`, [cid, storeId])
           if (!customer) return err('Not found', 404)
-          const orders = await query(`SELECT * FROM "Order" WHERE customerId = ? ORDER BY createdAt DESC LIMIT 10`, [cid])
-          return ok({ ...customer, orders })
+          return ok(customer)
         }
         if (method === 'PATCH') {
           const raw: any = await req.json()
@@ -282,6 +281,49 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           await exec(`DELETE FROM Customer WHERE id = ? AND storeId = ?`, [cid, storeId])
           return ok({ success: true })
         }
+      }
+
+      // ── GET /api/customers/:id/orders ──────────────────────────────────────
+      if (segs.length === 3 && segs[2] === 'orders' && method === 'GET') {
+        const cid = segs[1]
+        // Verify customer belongs to this store
+        const customer = await queryOne(`SELECT id FROM Customer WHERE id = ? AND storeId = ?`, [cid, storeId])
+        if (!customer) return err('Customer not found', 404)
+        const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
+        const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') ?? '20')))
+        const orders = await query(
+          `SELECT o.id, o.number, o.status, o.total, o.subtotal, o.discountAmt, o.taxAmt, o.note, o.createdAt
+           FROM "Order" o
+           WHERE o.customerId = ? AND o.storeId = ?
+           ORDER BY o.createdAt DESC LIMIT ? OFFSET ?`,
+          [cid, storeId, limit, (page - 1) * limit]
+        )
+        return ok(orders)
+      }
+
+      // ── GET /api/customers/:id/points ──────────────────────────────────────
+      if (segs.length === 3 && segs[2] === 'points' && method === 'GET') {
+        const cid = segs[1]
+        // Verify customer belongs to this store
+        const customer = await queryOne(`SELECT id FROM Customer WHERE id = ? AND storeId = ?`, [cid, storeId])
+        if (!customer) return err('Customer not found', 404)
+        const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
+        const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') ?? '50')))
+        // Try LoyaltyRedemption table; fall back gracefully if it doesn't exist
+        let history: any[] = []
+        try {
+          history = await query(
+            `SELECT id, type, points, note, orderId, createdAt
+             FROM LoyaltyRedemption
+             WHERE customerId = ?
+             ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+            [cid, limit, (page - 1) * limit]
+          )
+        } catch {
+          // Table may not exist yet — return empty array rather than 500
+          history = []
+        }
+        return ok(history)
       }
     }
 
@@ -1538,6 +1580,99 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       topProductToday: topProduct ?? null,
       activeShift: activeShift ?? null,
     })
+  }
+
+  // ─── BUNDLES ──────────────────────────────────────────────────────────────
+  if (segs[0] === 'bundles') {
+    if (segs.length === 1) {
+      if (method === 'GET') {
+        const rows = await query(
+          `SELECT b.*, GROUP_CONCAT(bi.id||':'||bi.productId||':'||bi.qty) as itemsRaw
+           FROM ProductBundle b
+           LEFT JOIN BundleItem bi ON bi.bundleId = b.id
+           WHERE b.storeId = ? AND b.active = 1
+           GROUP BY b.id ORDER BY b.name`,
+          [storeId]
+        )
+        const bundles = (rows as any[]).map(row => {
+          const items = row.itemsRaw
+            ? row.itemsRaw.split(',').map((s: string) => {
+                const [id, productId, qty] = s.split(':')
+                return { id, productId, qty: Number(qty) }
+              })
+            : []
+          const { itemsRaw, ...rest } = row
+          return { ...rest, items }
+        })
+        // Enrich with product names
+        const productIds = [...new Set(bundles.flatMap(b => b.items.map((i: any) => i.productId)))]
+        let products: any[] = []
+        if (productIds.length > 0) {
+          products = await query(
+            `SELECT id, name, price, stock, trackStock FROM Product WHERE id IN (${productIds.map(() => '?').join(',')})`,
+            productIds
+          )
+        }
+        const productMap = Object.fromEntries((products as any[]).map(p => [p.id, p]))
+        const enriched = bundles.map(b => ({
+          ...b,
+          items: b.items.map((i: any) => ({ ...i, product: productMap[i.productId] ?? null })),
+        }))
+        return ok(enriched)
+      }
+
+      if (method === 'POST') {
+        const b: any = await req.json()
+        if (!b.name || b.price === undefined) return err('name and price are required')
+        const bid = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO ProductBundle (id,storeId,name,description,price,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?)`,
+          [bid, storeId, b.name, b.description ?? null, Number(b.price), b.active !== false ? 1 : 0, t, t]
+        )
+        const items: Array<{ productId: string; qty: number }> = b.items ?? []
+        for (const item of items) {
+          await exec(
+            `INSERT INTO BundleItem (id,bundleId,productId,qty) VALUES (?,?,?,?)`,
+            [newId(), bid, item.productId, Number(item.qty) || 1]
+          )
+        }
+        return ok({ id: bid, name: b.name, price: b.price }, 201)
+      }
+    }
+
+    if (segs.length === 2) {
+      const bundleId = segs[1]
+      const bundle = await queryOne<any>(`SELECT * FROM ProductBundle WHERE id=? AND storeId=?`, [bundleId, storeId])
+      if (!bundle) return err('Bundle not found', 404)
+
+      if (method === 'PATCH') {
+        const b: any = await req.json()
+        const allowed = new Set(['name', 'description', 'price', 'active'])
+        const cols = Object.fromEntries(Object.entries(b).filter(([k]) => allowed.has(k)))
+        const t = nowISO()
+        if (Object.keys(cols).length > 0) {
+          const { setClauses, values } = buildUpdate(cols)
+          await exec(`UPDATE ProductBundle SET ${setClauses}, updatedAt=? WHERE id=?`, [...values, t, bundleId])
+        }
+        // Replace items if provided
+        if (Array.isArray(b.items)) {
+          await exec(`DELETE FROM BundleItem WHERE bundleId=?`, [bundleId])
+          for (const item of b.items as Array<{ productId: string; qty: number }>) {
+            await exec(
+              `INSERT INTO BundleItem (id,bundleId,productId,qty) VALUES (?,?,?,?)`,
+              [newId(), bundleId, item.productId, Number(item.qty) || 1]
+            )
+          }
+        }
+        return ok({ ok: true })
+      }
+
+      if (method === 'DELETE') {
+        await exec(`DELETE FROM BundleItem WHERE bundleId=?`, [bundleId])
+        await exec(`DELETE FROM ProductBundle WHERE id=?`, [bundleId])
+        return ok({ ok: true })
+      }
+    }
   }
 
   // ─── PRODUCTS SEARCH ──────────────────────────────────────────────────────
