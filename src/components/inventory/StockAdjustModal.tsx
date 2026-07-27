@@ -193,7 +193,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                 <span className="text-stone-800 font-semibold">{product.stock}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-300">Change</span>
+                <span className="text-gray-300">Kembalian</span>
                 <span className={cn(
                   'font-semibold',
                   stockDiff > 0 ? 'text-green-400' : stockDiff < 0 ? 'text-red-400' : 'text-gray-400'
@@ -202,7 +202,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                 </span>
               </div>
               <div className="flex items-center justify-between border-t border-stone-200 pt-2 mt-1">
-                <span className="text-stone-800 font-medium">New stock</span>
+                <span className="text-stone-800 font-medium">Stok baru</span>
                 <span className="text-stone-800 font-bold text-lg">{newStock}</span>
               </div>
             </div>

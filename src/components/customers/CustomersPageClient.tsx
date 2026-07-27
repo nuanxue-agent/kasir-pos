@@ -89,7 +89,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
             <Users className="h-6 w-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-stone-800">Customers</h1>
+            <h1 className="text-2xl font-bold text-stone-800">Pelanggan</h1>
             <p className="text-sm text-stone-500">
               {total} {total === 1 ? 'customer' : 'customers'}
             </p>

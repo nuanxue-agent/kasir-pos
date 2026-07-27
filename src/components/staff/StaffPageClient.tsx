@@ -85,7 +85,7 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
       ) : staff.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-stone-500">
           <UserCog size={48} strokeWidth={1} className="mb-4" />
-          <p>No staff members yet. Add your first one.</p>
+          <p>Belum ada staf. Tambahkan yang pertama.</p>
         </div>
       ) : (
         <div className="grid gap-3">
@@ -119,7 +119,7 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
                     <Mail size={12} />
                     {member.user.email}
                   </span>
-                  <span>Joined {formatDate(member.user.createdAt)}</span>
+                  <span>Bergabung {formatDate(member.user.createdAt)}</span>
                 </div>
               </div>
 
@@ -254,9 +254,9 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
             onChange={e => setForm(f => ({ ...f, role: e.target.value as any }))}
             className={inputCls}
           >
-            <option value="CASHIER">Cashier — POS only</option>
-            <option value="MANAGER">Manager — Products, reports, staff</option>
-            <option value="OWNER">Owner — Full access</option>
+            <option value="CASHIER">Kasir — Kasir saja</option>
+            <option value="MANAGER">Manajer — Produk, laporan, staf</option>
+            <option value="OWNER">Pemilik — Akses penuh</option>
           </select>
           {staff && (
             <label className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">

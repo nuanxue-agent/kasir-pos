@@ -709,7 +709,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
           {/* Order summary */}
           <div className="bg-stone-50 rounded-xl p-4 space-y-1.5">
             <div className="flex justify-between text-sm text-stone-500"><span>Subtotal</span><span>{fmt(subtotal, currency)}</span></div>
-            {taxAmt > 0 && <div className="flex justify-between text-sm text-stone-500"><span>Tax</span><span>{fmt(taxAmt, currency)}</span></div>}
+            {taxAmt > 0 && <div className="flex justify-between text-sm text-stone-500"><span>Pajak</span><span>{fmt(taxAmt, currency)}</span></div>}
             {!!pointsRedeemed && (
               <div className="flex justify-between text-sm text-amber-400">
                 <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400" />Points ({pointsRedeemed} pts)</span>
@@ -756,7 +756,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
               </div>
               {cashAmount >= total && (
                 <div className="flex justify-between text-sm font-medium">
-                  <span className="text-stone-500">Change</span>
+                  <span className="text-stone-500">Kembalian</span>
                   <span className="text-emerald-600">{fmt(change, currency)}</span>
                 </div>
               )}

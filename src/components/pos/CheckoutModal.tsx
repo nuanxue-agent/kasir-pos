@@ -116,7 +116,7 @@ export default function PembayaranModal({
             </div>
             {discountAmt > 0 && (
               <div className="flex justify-between text-sm text-green-400">
-                <span>Discount</span><span>-{fmt(discountAmt)}</span>
+                <span>Diskon</span><span>-{fmt(discountAmt)}</span>
               </div>
             )}
             {taxRate > 0 && (

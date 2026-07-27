@@ -189,7 +189,7 @@ export default function ReceiptModal({
                 </div>
                 {(receipt.discountAmt ?? 0) > 0 && (
                   <div className="flex justify-between text-gray-600">
-                    <span>Discount</span>
+                    <span>Diskon</span>
                     <span>- {fmt(receipt.discountAmt!, currency)}</span>
                   </div>
                 )}
@@ -220,7 +220,7 @@ export default function ReceiptModal({
                   </div>
                   {primaryPayment.change > 0 && (
                     <div className="flex justify-between text-gray-600">
-                      <span>Change</span>
+                      <span>Kembalian</span>
                       <span>{fmt(primaryPayment.change, currency)}</span>
                     </div>
                   )}

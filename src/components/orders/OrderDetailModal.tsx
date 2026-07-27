@@ -197,13 +197,13 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
             </div>
             {order.discountAmt > 0 && (
               <div className="flex justify-between text-red-500">
-                <span>Discount</span>
+                <span>Diskon</span>
                 <span>-{formatCurrency(order.discountAmt, currency)}</span>
               </div>
             )}
             {order.taxAmt > 0 && (
               <div className="flex justify-between text-gray-600">
-                <span>Tax</span>
+                <span>Pajak</span>
                 <span>{formatCurrency(order.taxAmt, currency)}</span>
               </div>
             )}
@@ -236,7 +236,7 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
               ))}
               {totalChange > 0 && (
                 <div className="flex justify-between text-sm text-gray-500 pt-1 border-t border-gray-50">
-                  <span>Change</span>
+                  <span>Kembalian</span>
                   <span>{formatCurrency(totalChange, currency)}</span>
                 </div>
               )}

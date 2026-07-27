@@ -92,7 +92,7 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-stone-700">{d.name}</p>
-                  {!d.active && <span className="text-xs bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">Inactive</span>}
+                  {!d.active && <span className="text-xs bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">Nonaktif</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-stone-500">
                   {d.code && (
