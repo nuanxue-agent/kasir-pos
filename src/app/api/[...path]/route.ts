@@ -1178,7 +1178,111 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ id, pointsRedeemed: pts, discountGiven }, 201)
     }
 
-    return err('Not found', 404)
+    // ── Manufacturing: Bill of Materials ─────────────────────────────────────
+  if (segs[0] === 'bom') {
+    // GET /api/bom/:id/components
+    if (segs[1] && segs[2] === 'components' && method === 'GET') {
+      const components = await query(
+        `SELECT * FROM BOMComponent WHERE bomId=?`,
+        [segs[1]]
+      )
+      return ok(components)
+    }
+    // GET /api/bom
+    if (!segs[1] && method === 'GET') {
+      const rows = await query(
+        `SELECT * FROM BillOfMaterials WHERE storeId=? ORDER BY createdAt DESC`,
+        [storeId]
+      )
+      return ok(rows)
+    }
+    // POST /api/bom
+    if (!segs[1] && method === 'POST') {
+      const b = await req.json() as any
+      if (!b.name || b.name.trim().length < 2) return err('Nama minimal 2 karakter')
+      if (!b.outputQty || Number(b.outputQty) <= 0) return err('outputQty harus > 0')
+      const id = newId(); const t = nowISO()
+      await exec(
+        `INSERT INTO BillOfMaterials (id,storeId,name,description,outputProductId,outputQty,unit,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,1,?,?)`,
+        [id, storeId, b.name.trim(), b.description ?? null, b.outputProductId ?? null,
+         Number(b.outputQty), b.unit ?? 'pcs', t, t]
+      )
+      return ok({ id }, 201)
+    }
+    // GET /api/bom/:id
+    if (segs[1] && !segs[2] && method === 'GET') {
+      const bom = await queryOne(`SELECT * FROM BillOfMaterials WHERE id=? AND storeId=?`, [segs[1], storeId])
+      if (!bom) return err('BOM not found', 404)
+      return ok(bom)
+    }
+  }
+
+  // ── Manufacturing: Work Orders ────────────────────────────────────────────
+  if (segs[0] === 'work-orders') {
+    // GET /api/work-orders
+    if (!segs[1] && method === 'GET') {
+      const rows = await query(
+        `SELECT wo.*, b.name as bomName FROM WorkOrder wo
+         LEFT JOIN BillOfMaterials b ON wo.bomId = b.id
+         WHERE wo.storeId=? ORDER BY wo.createdAt DESC`,
+        [storeId]
+      )
+      return ok(rows)
+    }
+    // POST /api/work-orders
+    if (!segs[1] && method === 'POST') {
+      const b = await req.json() as any
+      if (!b.bomId) return err('bomId required')
+      if (!b.plannedQty || Number(b.plannedQty) <= 0) return err('plannedQty harus > 0')
+      const bom = await queryOne(`SELECT * FROM BillOfMaterials WHERE id=? AND storeId=?`, [b.bomId, storeId])
+      if (!bom) return err('BOM not found', 404)
+      const id = newId(); const t = nowISO()
+      // Generate sequential WO number
+      const countRow = await queryOne(`SELECT COUNT(*) as cnt FROM WorkOrder WHERE storeId=?`, [storeId]) as any
+      const seq = (countRow?.cnt ?? 0) + 1
+      const number = `WO-${storeId.slice(0, 4).toUpperCase()}-${String(seq).padStart(4, '0')}`
+      await exec(
+        `INSERT INTO WorkOrder (id,storeId,number,bomId,status,plannedQty,producedQty,plannedStart,actualStart,completedAt,notes,createdAt,updatedAt) VALUES (?,?,?,?,?,?,0,?,null,null,?,?,?)`,
+        [id, storeId, number, b.bomId, 'DRAFT', Number(b.plannedQty),
+         b.plannedStart ?? null, b.notes ?? null, t, t]
+      )
+      // Pre-populate WorkOrderMaterial from BOM components
+      const components = await query(`SELECT * FROM BOMComponent WHERE bomId=?`, [b.bomId]) as any[]
+      for (const comp of components) {
+        await exec(
+          `INSERT INTO WorkOrderMaterial (id,workOrderId,productId,requiredQty,consumedQty) VALUES (?,?,?,?,0)`,
+          [newId(), id, comp.productId, comp.qty * Number(b.plannedQty)]
+        )
+      }
+      return ok({ id, number }, 201)
+    }
+    // PATCH /api/work-orders/:id
+    if (segs[1] && method === 'PATCH') {
+      const b = await req.json() as any
+      const wo = await queryOne(`SELECT * FROM WorkOrder WHERE id=? AND storeId=?`, [segs[1], storeId]) as any
+      if (!wo) return err('Work order not found', 404)
+      const validTransitions: Record<string, string[]> = {
+        DRAFT: ['IN_PROGRESS', 'CANCELLED'],
+        IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+        COMPLETED: [],
+        CANCELLED: [],
+      }
+      if (b.status && !validTransitions[wo.status]?.includes(b.status)) {
+        return err(`Tidak bisa transisi dari ${wo.status} ke ${b.status}`)
+      }
+      const t = nowISO()
+      const actualStart = b.status === 'IN_PROGRESS' ? t : (wo.actualStart ?? null)
+      const completedAt = b.status === 'COMPLETED' ? t : (wo.completedAt ?? null)
+      const producedQty = b.producedQty !== undefined ? Number(b.producedQty) : wo.producedQty
+      await exec(
+        `UPDATE WorkOrder SET status=?, producedQty=?, actualStart=?, completedAt=?, notes=?, updatedAt=? WHERE id=? AND storeId=?`,
+        [b.status ?? wo.status, producedQty, actualStart, completedAt, b.notes ?? wo.notes, t, segs[1], storeId]
+      )
+      return ok({ success: true })
+    }
+  }
+
+  return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)
     return err('Internal server error', 500)
