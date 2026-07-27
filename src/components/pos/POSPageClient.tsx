@@ -209,6 +209,7 @@ export default function POSPageClient({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [redeemPoints, setRedeemPoints] = useState(false)
+  const [redeemPointsInput, setRedeemPointsInput] = useState('')
 
   // Camera barcode scanner modal state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
@@ -480,10 +481,13 @@ export default function POSPageClient({
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0)
   const taxAmt = Math.round(subtotal * taxRate)
   const baseTotal = subtotal + taxAmt
-  // Points redemption: 1 point = Rp 100, max redeem = all customer points
+  // Points redemption: 100 points = Rp 1.000 (i.e. 1 pt = Rp 10)
   const maxRedeemablePoints = selectedCustomer?.points ?? 0
-  const pointsDiscount = redeemPoints ? Math.min(maxRedeemablePoints * 100, baseTotal) : 0
-  const pointsRedeemed = redeemPoints ? Math.floor(pointsDiscount / 100) : 0
+  const requestedPoints = redeemPoints ? Math.max(0, parseInt(redeemPointsInput) || 0) : 0
+  // Clamp: can't redeem more than available, and can't make total negative
+  const maxPointsByTotal = Math.floor(Math.max(0, baseTotal - manualDiscountAmt()) / 10)
+  const pointsRedeemed = Math.min(requestedPoints, maxRedeemablePoints, maxPointsByTotal)
+  const pointsDiscount = pointsRedeemed * 10
   const total = baseTotal - pointsDiscount - manualDiscountAmt()
   const addToCart = useCallback((product: Product) => {
     if (product.trackStock && product.stock <= 0) return
@@ -1315,6 +1319,7 @@ export default function POSPageClient({
                   onClick={() => {
                     setSelectedCustomer(null)
                     setRedeemPoints(false)
+                    setRedeemPointsInput('')
                   }}
                   className="text-[var(--text-3)] transition-colors hover:text-[var(--text-2)]"
                 >
@@ -1323,33 +1328,72 @@ export default function POSPageClient({
               </div>
             )}
 
-            {/* Redeem points toggle */}
+            {/* ── Tukar Poin section ── */}
             {selectedCustomer && selectedCustomer.points > 0 && (
-              <button
-                onClick={() => setRedeemPoints(r => !r)}
-                className={cn(
-                  'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs transition-colors',
-                  redeemPoints
-                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
-                    : 'border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-2)] hover:border-stone-300 hover:text-[var(--text-1)]',
-                )}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Star
-                    className={cn('h-3 w-3', redeemPoints ? 'fill-amber-400 text-amber-400' : '')}
+              <div className={cn(
+                'rounded-lg border px-3 py-2.5 space-y-2 transition-colors',
+                redeemPoints
+                  ? 'border-amber-500/50 bg-amber-500/10'
+                  : 'border-[var(--border)] bg-[var(--bg-subtle)]',
+              )}>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-1)]">
+                    <Star className={cn('h-3 w-3', redeemPoints ? 'fill-amber-400 text-amber-400' : 'text-[var(--text-3)]')} />
+                    Tukar Poin
+                  </span>
+                  <span className="text-[10px] text-[var(--text-3)]">
+                    {maxRedeemablePoints.toLocaleString('id-ID')} poin tersedia · 100 poin = {fmt(1000, currency)}
+                  </span>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number"
+                    min={0}
+                    max={maxRedeemablePoints}
+                    value={redeemPointsInput}
+                    onChange={e => {
+                      const v = e.target.value
+                      setRedeemPointsInput(v)
+                      setRedeemPoints(!!v && parseInt(v) > 0)
+                    }}
+                    placeholder="0"
+                    className="w-28 rounded border border-[var(--border)] bg-[var(--bg-card)] px-2 py-1.5 text-xs text-[var(--text-1)] focus:border-amber-400/60 focus:outline-none"
                   />
-                  Tukar {maxRedeemablePoints} poin = {fmt(maxRedeemablePoints * 100, currency)}{' '}
-                  diskon
-                </span>
-                <span
-                  className={cn(
-                    'font-medium',
-                    redeemPoints ? 'text-amber-400' : 'text-[var(--text-3)]',
+                  <button
+                    onClick={() => {
+                      const maxPts = Math.min(maxRedeemablePoints, maxPointsByTotal)
+                      setRedeemPointsInput(String(maxPts))
+                      setRedeemPoints(maxPts > 0)
+                    }}
+                    className="text-[10px] px-2 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors"
+                  >
+                    Maks
+                  </button>
+                  {redeemPoints && (
+                    <button
+                      onClick={() => { setRedeemPointsInput(''); setRedeemPoints(false) }}
+                      className="text-[10px] px-2 py-1.5 rounded border border-[var(--border)] text-[var(--text-3)] hover:text-red-400 transition-colors"
+                    >
+                      Hapus
+                    </button>
                   )}
-                >
-                  {redeemPoints ? 'ON' : 'OFF'}
-                </span>
-              </button>
+                  {redeemPoints && pointsDiscount > 0 && (
+                    <span className="ml-auto text-xs font-semibold text-amber-400">
+                      -{fmt(pointsDiscount, currency)}
+                    </span>
+                  )}
+                </div>
+                {redeemPoints && requestedPoints > maxRedeemablePoints && (
+                  <p className="text-[10px] text-red-400">
+                    Melebihi saldo poin. Menggunakan {pointsRedeemed.toLocaleString('id-ID')} poin.
+                  </p>
+                )}
+                {redeemPoints && requestedPoints > maxPointsByTotal && requestedPoints <= maxRedeemablePoints && (
+                  <p className="text-[10px] text-amber-400">
+                    Dikurangi ke {pointsRedeemed.toLocaleString('id-ID')} poin agar total tidak negatif.
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Totals */}

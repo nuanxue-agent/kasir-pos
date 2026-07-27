@@ -140,6 +140,12 @@ export function CustomerDetailModal({
   const [pointsLog, setPointsLog] = useState<PointsLogEntry[]>([])
   const [currentTier, setCurrentTier] = useState<TierDef | null>(null)
   const [activeTab, setActiveTab] = useState<'orders' | 'points'>('orders')
+  const [pointsExpiry, setPointsExpiry] = useState<{
+    daysUntilExpiry: number | null
+    expiresAt: string | null
+    isExpired: boolean
+    points: number
+  } | null>(null)
 
   const isOwner = userRole === 'OWNER'
   const canAdjustPoints = userRole === 'OWNER' || userRole === 'MANAGER'
@@ -158,9 +164,10 @@ export function CustomerDetailModal({
     setLoading(true)
     try {
       // Fetch base customer data
-      const [baseRes, histRes] = await Promise.all([
+      const [baseRes, histRes, expiryRes] = await Promise.all([
         fetch(`/api/customers/${customerId}`),
         fetch(`/api/customers/${customerId}/history`),
+        fetch(`/api/customers/${customerId}/points-expiry`),
       ])
       if (baseRes.ok) {
         const base = (await baseRes.json()) as any
@@ -172,6 +179,10 @@ export function CustomerDetailModal({
         setOrders(hist.orders ?? [])
         setPointsLog(hist.pointsLog ?? [])
         setCurrentTier(hist.currentTier ?? null)
+      }
+      if (expiryRes.ok) {
+        const expiry = (await expiryRes.json()) as any
+        setPointsExpiry(expiry)
       }
     } finally {
       setLoading(false)
@@ -333,6 +344,43 @@ export function CustomerDetailModal({
                   </div>
                 </div>
               </div>
+
+              {/* Points expiry warning */}
+              {pointsExpiry && customer.points > 0 && pointsExpiry.daysUntilExpiry !== null && (
+                <div
+                  className={cn(
+                    'flex items-start gap-2.5 rounded-lg border px-4 py-3 text-sm',
+                    pointsExpiry.isExpired
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : pointsExpiry.daysUntilExpiry <= 30
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : 'border-stone-200 bg-stone-50 text-stone-600',
+                  )}
+                >
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    {pointsExpiry.isExpired ? (
+                      <p className="font-medium">
+                        {customer.points} poin telah kedaluwarsa karena tidak ada aktivitas selama 12 bulan.
+                      </p>
+                    ) : (
+                      <p>
+                        <span className="font-semibold">{customer.points} poin</span> kedaluwarsa dalam{' '}
+                        <span className="font-semibold">{pointsExpiry.daysUntilExpiry} hari</span>
+                        {pointsExpiry.expiresAt && (
+                          <span className="text-xs opacity-70 ml-1">
+                            ({new Date(pointsExpiry.expiresAt).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })})
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Manual Point Adjustment — OWNER only */}
               {canAdjustPoints && showPointsForm && (
