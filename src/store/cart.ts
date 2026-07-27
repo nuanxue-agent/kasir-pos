@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface CartItem {
   id: string
@@ -22,7 +21,6 @@ export interface CartState {
   discountAmt: number
   note: string
 
-  // actions
   setStore: (storeId: string) => void
   addItem: (item: Omit<CartItem, 'subtotal'>) => void
   updateQty: (id: string, qty: number) => void
@@ -33,105 +31,80 @@ export interface CartState {
   setNote: (note: string) => void
   clearCart: () => void
 
-  // computed
   subtotal: () => number
   taxAmt: (taxRate: number) => number
   total: (taxRate: number) => number
 }
 
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      storeId: null,
-      items: [],
-      customerId: null,
-      discountId: null,
-      discountCode: null,
-      discountAmt: 0,
-      note: '',
+export const useCartStore = create<CartState>()((set, get) => ({
+  storeId: null,
+  items: [],
+  customerId: null,
+  discountId: null,
+  discountCode: null,
+  discountAmt: 0,
+  note: '',
 
-      setStore: (storeId) => set({ storeId }),
+  setStore: (storeId) => set({ storeId }),
 
-      addItem: (item) => set((state) => {
-        const existing = state.items.find(
-          i => i.productId === item.productId && i.variantId === item.variantId
-        )
-        if (existing) {
-          return {
-            items: state.items.map(i =>
-              i.id === existing.id
-                ? { ...i, qty: i.qty + item.qty, subtotal: (i.qty + item.qty) * (i.price - i.discount) }
-                : i
-            ),
-          }
-        }
-        return {
-          items: [...state.items, {
-            ...item,
-            subtotal: item.qty * (item.price - item.discount),
-          }],
-        }
-      }),
-
-      updateQty: (id, qty) => set((state) => ({
-        items: qty <= 0
-          ? state.items.filter(i => i.id !== id)
-          : state.items.map(i =>
-              i.id === id ? { ...i, qty, subtotal: qty * (i.price - i.discount) } : i
-            ),
-      })),
-
-      removeItem: (id) => set((state) => ({
-        items: state.items.filter(i => i.id !== id),
-      })),
-
-      setItemDiscount: (id, discount) => set((state) => ({
+  addItem: (item) => set((state) => {
+    const existing = state.items.find(
+      i => i.productId === item.productId && i.variantId === item.variantId
+    )
+    if (existing) {
+      return {
         items: state.items.map(i =>
-          i.id === id ? { ...i, discount, subtotal: i.qty * (i.price - discount) } : i
+          i.id === existing.id
+            ? { ...i, qty: i.qty + item.qty, subtotal: (i.qty + item.qty) * (i.price - i.discount) }
+            : i
         ),
-      })),
-
-      setCustomer: (customerId) => set({ customerId }),
-
-      setDiscount: (discountId, discountCode, discountAmt) =>
-        set({ discountId, discountCode, discountAmt }),
-
-      setNote: (note) => set({ note }),
-
-      clearCart: () => set({
-        items: [],
-        customerId: null,
-        discountId: null,
-        discountCode: null,
-        discountAmt: 0,
-        note: '',
-      }),
-
-      subtotal: () => get().items.reduce((sum, i) => sum + i.subtotal, 0),
-
-      taxAmt: (taxRate) => {
-        const sub = get().subtotal() - get().discountAmt
-        return Math.round(sub * taxRate)
-      },
-
-      total: (taxRate) => {
-        const sub = get().subtotal()
-        return Math.round(sub - get().discountAmt + get().taxAmt(taxRate))
-      },
-    }),
-    {
-      name: 'kasir-cart',
-      storage: createJSONStorage(() => localStorage),
-      // Only persist non-function fields
-      partialize: (state) => ({
-        storeId: state.storeId,
-        items: state.items,
-        customerId: state.customerId,
-        discountId: state.discountId,
-        discountCode: state.discountCode,
-        discountAmt: state.discountAmt,
-        note: state.note,
-      }),
+      }
     }
-  )
-)
+    return {
+      items: [...state.items, { ...item, subtotal: item.qty * (item.price - item.discount) }],
+    }
+  }),
+
+  updateQty: (id, qty) => set((state) => ({
+    items: qty <= 0
+      ? state.items.filter(i => i.id !== id)
+      : state.items.map(i =>
+          i.id === id ? { ...i, qty, subtotal: qty * (i.price - i.discount) } : i
+        ),
+  })),
+
+  removeItem: (id) => set((state) => ({
+    items: state.items.filter(i => i.id !== id),
+  })),
+
+  setItemDiscount: (id, discount) => set((state) => ({
+    items: state.items.map(i =>
+      i.id === id ? { ...i, discount, subtotal: i.qty * (i.price - discount) } : i
+    ),
+  })),
+
+  setCustomer: (customerId) => set({ customerId }),
+  setDiscount: (discountId, discountCode, discountAmt) => set({ discountId, discountCode, discountAmt }),
+  setNote: (note) => set({ note }),
+
+  clearCart: () => set({
+    items: [],
+    customerId: null,
+    discountId: null,
+    discountCode: null,
+    discountAmt: 0,
+    note: '',
+  }),
+
+  subtotal: () => get().items.reduce((sum, i) => sum + i.subtotal, 0),
+
+  taxAmt: (taxRate) => {
+    const sub = get().subtotal() - get().discountAmt
+    return Math.round(sub * taxRate)
+  },
+
+  total: (taxRate) => {
+    const sub = get().subtotal()
+    return Math.round(sub - get().discountAmt + get().taxAmt(taxRate))
+  },
+}))
