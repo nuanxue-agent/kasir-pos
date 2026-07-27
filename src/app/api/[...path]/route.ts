@@ -15,6 +15,61 @@ function ok(data: any, status = 200) {
 function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status })
 }
+function okCached(data: any, cacheControl: string, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: { 'Cache-Control': cacheControl },
+  })
+}
+
+// ─── In-memory rate limiter ────────────────────────────────────────────────────
+// Max 100 requests per minute per IP. Resets on window expiry.
+
+const RATE_LIMIT_MAX = 100
+const RATE_LIMIT_WINDOW_MS = 60_000
+
+interface RateEntry {
+  count: number
+  resetAt: number
+}
+
+const rateLimitMap = new Map<string, RateEntry>()
+
+function checkRateLimit(req: NextRequest): NextResponse | null {
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+
+  const now = Date.now()
+  const entry = rateLimitMap.get(ip)
+
+  if (!entry || now >= entry.resetAt) {
+    // New window
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return null
+  }
+
+  entry.count += 1
+
+  if (entry.count > RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
+    return NextResponse.json(
+      { error: 'Too Many Requests', retryAfter },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(retryAfter),
+          'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Math.ceil(entry.resetAt / 1000)),
+        },
+      },
+    )
+  }
+
+  return null
+}
 
 // ─── Allowlists for PATCH column names (prevent SQL injection) ────────────────
 
@@ -99,6 +154,10 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
   const url = new URL(req.url)
   const sp = url.searchParams
 
+  // Apply rate limiting
+  const rateLimitResponse = checkRateLimit(req)
+  if (rateLimitResponse) return rateLimitResponse
+
   try {
     const session = await auth()
     if (!session?.user) return err('Unauthorized', 401)
@@ -130,7 +189,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             p.push(`%${search}%`, `%${search}%`)
           }
           sql += ' ORDER BY p.name'
-          return ok(await query(sql, p))
+          return okCached(await query(sql, p), 'public, max-age=30, stale-while-revalidate=60')
         }
         if (method === 'POST') {
           const b: any = await req.json()
@@ -234,11 +293,12 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     // ─── CATEGORIES ───────────────────────────────────────────────────────────
     if (segs[0] === 'categories') {
       if (method === 'GET')
-        return ok(
+        return okCached(
           await query(
             `SELECT * FROM Category WHERE storeId = ? AND active = 1 ORDER BY sortOrder`,
             [storeId],
           ),
+          'public, max-age=300',
         )
     }
 
@@ -1105,17 +1165,20 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       ])
       const totalRevenue = (revenue as any)?.totalRevenue ?? 0
       const totalExpenses = (expenses as any)?.totalExpenses ?? 0
-      return ok({
-        totalRevenue,
-        totalOrders: (revenue as any)?.totalOrders ?? 0,
-        avgOrderValue: (revenue as any)?.avgOrderValue ?? 0,
-        newCustomers: (customers as any)?.newCustomers ?? 0,
-        totalExpenses,
-        netProfit: totalRevenue - totalExpenses,
-        dailySales: daily,
-        topProducts,
-        paymentBreakdown: payments,
-      })
+      return okCached(
+        {
+          totalRevenue,
+          totalOrders: (revenue as any)?.totalOrders ?? 0,
+          avgOrderValue: (revenue as any)?.avgOrderValue ?? 0,
+          newCustomers: (customers as any)?.newCustomers ?? 0,
+          totalExpenses,
+          netProfit: totalRevenue - totalExpenses,
+          dailySales: daily,
+          topProducts,
+          paymentBreakdown: payments,
+        },
+        'private, max-age=10',
+      )
     }
 
     // ─── REPORTS / GROSS PROFIT ───────────────────────────────────────────────
@@ -1141,6 +1204,64 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const grossProfit = revenue - cogs
       const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
       return ok({ revenue, cogs, grossProfit, grossMargin })
+    }
+
+    // ─── REPORTS / STAFF ──────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'staff' && method === 'GET') {
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+      const to = sp.get('to') ?? new Date().toISOString()
+
+      // Aggregate orders by cashier (userId), join with User for name
+      const staffRows = await query(
+        `SELECT
+           o.userId,
+           COALESCE(u.name, 'Unknown') as name,
+           COUNT(o.id)               as totalOrders,
+           COALESCE(SUM(o.total), 0) as totalRevenue,
+           COALESCE(AVG(o.total), 0) as avgOrderValue,
+           COALESCE(SUM(oi.qty), 0)  as itemsSold
+         FROM "Order" o
+         LEFT JOIN User u ON o.userId = u.id
+         LEFT JOIN OrderItem oi ON oi.orderId = o.id
+         WHERE o.storeId = ? AND o.status = 'PAID'
+           AND o.createdAt BETWEEN ? AND ?
+           AND o.userId IS NOT NULL
+         GROUP BY o.userId
+         ORDER BY totalRevenue DESC`,
+        [storeId, from, to],
+      )
+
+      // Fetch commission rates for all users in the result
+      const userIds = (staffRows as any[]).map((r: any) => r.userId)
+      let commissionMap: Record<string, number> = {}
+      if (userIds.length > 0) {
+        const placeholders = userIds.map(() => '?').join(',')
+        const empRows = await query(
+          `SELECT userId, commissionRate FROM Employee WHERE storeId = ? AND userId IN (${placeholders})`,
+          [storeId, ...userIds],
+        )
+        for (const e of empRows as any[]) {
+          commissionMap[e.userId] = Number(e.commissionRate ?? 0)
+        }
+      }
+
+      const result = (staffRows as any[]).map((r: any) => {
+        const commissionRate = commissionMap[r.userId] ?? 0
+        const totalRevenue = Number(r.totalRevenue)
+        const commissionEarned = (totalRevenue * commissionRate) / 100
+        return {
+          userId: r.userId,
+          name: r.name,
+          totalOrders: Number(r.totalOrders),
+          totalRevenue,
+          avgOrderValue: Number(r.avgOrderValue),
+          itemsSold: Number(r.itemsSold),
+          commissionRate,
+          commissionEarned,
+        }
+      })
+
+      return ok(result)
     }
 
     // ─── REPORTS / ANALYTICS ──────────────────────────────────────────────────

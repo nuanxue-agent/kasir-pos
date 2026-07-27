@@ -471,6 +471,24 @@ export default function POSPageClient({
     setShowCustomerSearch(false)
     setDiscountValue('')
     setOrderNote('')
+    // Play a short success beep via Web Audio API
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.35)
+      osc.onended = () => ctx.close()
+    } catch {
+      // Audio not available — ignore silently
+    }
     // Release table when order is paid
     if (selectedTable) {
       fetch(`/api/tables/${selectedTable.id}`, {
@@ -493,6 +511,18 @@ export default function POSPageClient({
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products')
+  const [cartBadgeBump, setCartBadgeBump] = useState(false)
+  const prevCartCount = useRef(cartCount)
+
+  useEffect(() => {
+    if (cartCount > prevCartCount.current) {
+      setCartBadgeBump(true)
+      const t = setTimeout(() => setCartBadgeBump(false), 300)
+      prevCartCount.current = cartCount
+      return () => clearTimeout(t)
+    }
+    prevCartCount.current = cartCount
+  }, [cartCount])
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden bg-[#fffdf7]">
@@ -521,7 +551,12 @@ export default function POSPageClient({
           <ShoppingCart className="h-4 w-4" />
           Keranjang
           {cartCount > 0 && (
-            <span className="absolute top-1.5 right-6 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+            <span
+              className={cn(
+                'absolute top-1.5 right-6 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white transition-transform',
+                cartBadgeBump ? 'scale-125' : 'scale-100',
+              )}
+            >
               {cartCount}
             </span>
           )}
@@ -1448,16 +1483,26 @@ function ProductCard({
 }) {
   const outOfStock = product.trackStock && product.stock <= 0
   const lowStock = product.trackStock && product.stock > 0 && product.stock <= 5
+  const [flashing, setFlashing] = useState(false)
+
+  const handleAdd = () => {
+    if (outOfStock) return
+    onAdd(product)
+    setFlashing(true)
+    setTimeout(() => setFlashing(false), 350)
+  }
 
   return (
     <button
-      onClick={() => !outOfStock && onAdd(product)}
+      onClick={handleAdd}
       disabled={outOfStock}
       className={cn(
         'flex flex-col rounded-xl border p-3.5 text-left transition-all duration-150 active:scale-[0.97]',
         outOfStock
           ? 'cursor-not-allowed border-[var(--border)] bg-[var(--bg-card)]/[0.02] opacity-40'
-          : 'cursor-pointer border-[var(--border)] bg-[var(--bg-subtle)] hover:border-amber-400/60 hover:bg-amber-500/10',
+          : flashing
+            ? 'cursor-pointer border-emerald-400 bg-emerald-500/15'
+            : 'cursor-pointer border-[var(--border)] bg-[var(--bg-subtle)] hover:border-amber-400/60 hover:bg-amber-500/10',
       )}
     >
       {!product.image && product.category?.color && (

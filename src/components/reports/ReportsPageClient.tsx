@@ -12,6 +12,7 @@ import {
   BarChart2,
   LineChart,
   Percent,
+  UserCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
@@ -236,7 +237,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         </Link>
         <Link
           href="/dashboard/reports/analytics"
-          className="group flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm transition-all hover:border-amber-200 hover:shadow-md sm:col-span-2"
+          className="group flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm transition-all hover:border-amber-200 hover:shadow-md"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 transition-colors group-hover:bg-amber-100">
             <LineChart className="h-5 w-5 text-amber-500" />
@@ -245,6 +246,21 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
             <p className="text-sm font-bold text-[var(--text-1)]">Analytics</p>
             <p className="mt-0.5 text-xs text-[var(--text-3)]">
               Hourly trends, category breakdown &amp; customer retention
+            </p>
+          </div>
+          <TrendingUp className="ml-auto h-4 w-4 text-stone-300 transition-colors group-hover:text-amber-400" />
+        </Link>
+        <Link
+          href="/dashboard/reports/staff"
+          className="group flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm transition-all hover:border-amber-200 hover:shadow-md"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 transition-colors group-hover:bg-amber-100">
+            <UserCheck className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[var(--text-1)]">Staff</p>
+            <p className="mt-0.5 text-xs text-[var(--text-3)]">
+              Performa kasir &amp; komisi penjualan
             </p>
           </div>
           <TrendingUp className="ml-auto h-4 w-4 text-stone-300 transition-colors group-hover:text-amber-400" />
