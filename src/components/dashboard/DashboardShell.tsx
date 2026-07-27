@@ -1,0 +1,58 @@
+'use client'
+
+import { useState } from 'react'
+import { Sidebar } from '@/components/dashboard/Sidebar'
+import { Header } from '@/components/dashboard/Header'
+import type { UserRole } from '@prisma/client'
+
+interface DashboardShellProps {
+  children: React.ReactNode
+  userName: string
+  userEmail?: string | null
+  userImage?: string | null
+  userRole: UserRole
+  isSuperAdmin: boolean
+  stores: Array<{ id: string; name: string }>
+}
+
+export function DashboardShell({
+  children,
+  userName,
+  userEmail,
+  userImage,
+  userRole,
+  isSuperAdmin,
+  stores,
+}: DashboardShellProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [currentStoreId, setCurrentStoreId] = useState(stores[0]?.id)
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      <Sidebar
+        userRole={userRole}
+        isSuperAdmin={isSuperAdmin}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      {/* Main area */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <Header
+          userName={userName}
+          userEmail={userEmail}
+          userImage={userImage}
+          userRole={userRole}
+          stores={stores}
+          currentStoreId={currentStoreId}
+          onStoreChange={setCurrentStoreId}
+          onMenuToggle={() => setSidebarOpen((v) => !v)}
+        />
+
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
