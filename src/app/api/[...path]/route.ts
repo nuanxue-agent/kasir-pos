@@ -6684,6 +6684,109 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── REPORTS / HEATMAP ─────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'heatmap' && method === 'GET') {
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 90).toISOString().slice(0, 10)
+      const to = sp.get('to') ?? new Date().toISOString().slice(0, 10)
+
+      // Aggregate orders by hour-of-day AND day-of-week for the given range
+      const raw = (await query(
+        `SELECT
+           CAST(strftime('%H', createdAt) AS INTEGER) AS hour,
+           CAST(strftime('%w', createdAt) AS INTEGER) AS dayOfWeek,
+           COUNT(*) AS orderCount,
+           COALESCE(SUM(total), 0) AS revenue
+         FROM "Order"
+         WHERE storeId = ? AND status = 'PAID'
+           AND DATE(createdAt) BETWEEN ? AND ?
+         GROUP BY hour, dayOfWeek
+         ORDER BY dayOfWeek, hour`,
+        [storeId, from, to],
+      )) as any[]
+
+      const cells = raw.map((r: any) => ({
+        hour: Number(r.hour),
+        dayOfWeek: Number(r.dayOfWeek),
+        orderCount: Number(r.orderCount),
+        revenue: Number(r.revenue),
+      }))
+
+      return ok({ cells })
+    }
+
+    // ── REPORTS / SCHEDULED ───────────────────────────────────────────────────
+    // Lazy-init ScheduledReport table
+    async function ensureScheduledReportTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ScheduledReport (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          type        TEXT NOT NULL DEFAULT 'summary',
+          frequency   TEXT NOT NULL DEFAULT 'weekly',
+          recipients  TEXT NOT NULL DEFAULT '[]',
+          lastSentAt  TEXT,
+          createdAt   TEXT NOT NULL,
+          updatedAt   TEXT NOT NULL
+        )
+      `)
+    }
+
+    // GET /api/reports/scheduled?storeId=
+    if (segs[0] === 'reports' && segs[1] === 'scheduled' && !segs[2] && method === 'GET') {
+      await ensureScheduledReportTable()
+      const rows = (await query(
+        `SELECT * FROM ScheduledReport WHERE storeId = ? ORDER BY createdAt DESC`,
+        [storeId],
+      )) as any[]
+      const items = rows.map((r: any) => ({
+        ...r,
+        recipients: (() => { try { return JSON.parse(r.recipients) } catch { return [] } })(),
+      }))
+      return ok({ items })
+    }
+
+    // POST /api/reports/scheduled?storeId= — create or update
+    if (segs[0] === 'reports' && segs[1] === 'scheduled' && !segs[2] && method === 'POST') {
+      await ensureScheduledReportTable()
+      const body = await req.json() as { type?: string; frequency?: string; recipients?: string[] }
+      const { type = 'summary', frequency, recipients = [] } = body
+      if (!frequency || !['weekly', 'monthly'].includes(frequency)) {
+        return err("frequency must be 'weekly' or 'monthly'", 400, 'VALIDATION_ERROR')
+      }
+      const id = newId()
+      const now = nowISO()
+      await exec(
+        `INSERT INTO ScheduledReport (id, storeId, type, frequency, recipients, lastSentAt, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+        [id, storeId, type, frequency, JSON.stringify(recipients), now, now],
+      )
+      return ok({ id, storeId, type, frequency, recipients, lastSentAt: null, createdAt: now, updatedAt: now }, 201)
+    }
+
+    // DELETE /api/reports/scheduled/:id
+    if (segs[0] === 'reports' && segs[1] === 'scheduled' && segs[2] && method === 'DELETE') {
+      await ensureScheduledReportTable()
+      await exec(`DELETE FROM ScheduledReport WHERE id = ? AND storeId = ?`, [segs[2], storeId])
+      return ok({ success: true })
+    }
+
+    // POST /api/reports/scheduled/send/:id — stub: marks lastSentAt
+    if (segs[0] === 'reports' && segs[1] === 'scheduled' && segs[2] === 'send' && segs[3] && method === 'POST') {
+      await ensureScheduledReportTable()
+      const schedule = await queryOne<any>(
+        `SELECT * FROM ScheduledReport WHERE id = ? AND storeId = ?`,
+        [segs[3], storeId],
+      )
+      if (!schedule) return err('Scheduled report not found', 404, 'NOT_FOUND')
+      const now = nowISO()
+      await exec(
+        `UPDATE ScheduledReport SET lastSentAt = ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
+        [now, now, segs[3], storeId],
+      )
+      // TODO: integrate with email provider (e.g. SendGrid / Nodemailer)
+      return ok({ success: true, sentAt: now, stub: true })
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
