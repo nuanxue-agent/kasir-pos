@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils'
 import { X, Banknote, CreditCard, Smartphone, ArrowLeftRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface CheckoutModalProps {
+interface PembayaranModalProps {
   storeId: string
   taxRate: number
   currency: string
@@ -18,18 +18,18 @@ interface CheckoutModalProps {
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS' | 'OTHER'
 
 const PAYMENT_METHODS = [
-  { id: 'CASH' as PaymentMethod, label: 'Cash', icon: Banknote, color: 'text-green-400' },
+  { id: 'CASH' as PaymentMethod, label: 'Tunai', icon: Banknote, color: 'text-green-400' },
   { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-blue-400' },
   { id: 'QRIS' as PaymentMethod, label: 'QRIS', icon: Smartphone, color: 'text-purple-400' },
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]
 
-export default function CheckoutModal({
+export default function PembayaranModal({
   storeId, taxRate, currency, staffId, onClose, onSuccess
-}: CheckoutModalProps) {
+}: PembayaranModalProps) {
   const { items, customerId, discountId, discountAmt, note, total, subtotal, taxAmt, clearCart } = useCartStore()
   const [method, setMethod] = useState<PaymentMethod>('CASH')
-  const [cashGiven, setCashGiven] = useState('')
+  const [cashGiven, setTunaiGiven] = useState('')
   const [reference, setReference] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -39,15 +39,15 @@ export default function CheckoutModal({
   const cashAmount = parseFloat(cashGiven) || 0
   const change = method === 'CASH' ? Math.max(0, cashAmount - orderTotal) : 0
 
-  const quickCash = [
+  const quickTunai = [
     Math.ceil(orderTotal / 10000) * 10000,
     Math.ceil(orderTotal / 50000) * 50000,
     Math.ceil(orderTotal / 100000) * 100000,
   ].filter((v, i, a) => a.indexOf(v) === i && v >= orderTotal)
 
-  const handleCheckout = async () => {
+  const handlePembayaran = async () => {
     if (method === 'CASH' && cashAmount < orderTotal) {
-      setError('Cash given is less than total')
+      setError('Tunai given is less than total')
       return
     }
 
@@ -83,7 +83,7 @@ export default function CheckoutModal({
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error || 'Checkout failed')
+        setError(data.error || 'Pembayaran failed')
         return
       }
 
@@ -102,7 +102,7 @@ export default function CheckoutModal({
       <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-stone-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
-          <h2 className="text-lg font-semibold text-stone-800">Checkout</h2>
+          <h2 className="text-lg font-semibold text-stone-800">Pembayaran</h2>
           <button onClick={onClose} className="text-stone-500 hover:text-stone-800 transition-colors">
             <X size={20} />
           </button>
@@ -121,7 +121,7 @@ export default function CheckoutModal({
             )}
             {taxRate > 0 && (
               <div className="flex justify-between text-sm text-stone-500">
-                <span>Tax ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt(taxRate))}</span>
+                <span>Pajak ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt(taxRate))}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold text-stone-800 pt-2 border-t border-stone-200">
@@ -131,7 +131,7 @@ export default function CheckoutModal({
 
           {/* Payment method */}
           <div>
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Payment Method</p>
+            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Metode Pembayaran</p>
             <div className="grid grid-cols-4 gap-2">
               {PAYMENT_METHODS.map(({ id, label, icon: Icon, color }) => (
                 <button
@@ -151,23 +151,23 @@ export default function CheckoutModal({
             </div>
           </div>
 
-          {/* Cash input */}
+          {/* Tunai input */}
           {method === 'CASH' && (
             <div>
-              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Cash Given</p>
+              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Tunai Given</p>
               <input
                 type="number"
                 value={cashGiven}
-                onChange={e => setCashGiven(e.target.value)}
+                onKembalian={e => setTunaiGiven(e.target.value)}
                 placeholder={fmt(orderTotal)}
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
               {/* Quick amounts */}
               <div className="flex gap-2 mt-2">
-                {quickCash.slice(0, 3).map(amount => (
+                {quickTunai.slice(0, 3).map(amount => (
                   <button
                     key={amount}
-                    onClick={() => setCashGiven(String(amount))}
+                    onClick={() => setTunaiGiven(String(amount))}
                     className="flex-1 text-xs py-1.5 rounded bg-stone-100 border border-stone-200 text-stone-600 hover:border-slate-500 transition-colors"
                   >
                     {fmt(amount)}
@@ -176,7 +176,7 @@ export default function CheckoutModal({
               </div>
               {cashAmount >= orderTotal && (
                 <div className="mt-3 flex justify-between text-sm font-medium">
-                  <span className="text-stone-500">Change</span>
+                  <span className="text-stone-500">Kembalian</span>
                   <span className="text-green-400">{fmt(change)}</span>
                 </div>
               )}
@@ -192,7 +192,7 @@ export default function CheckoutModal({
               <input
                 type="text"
                 value={reference}
-                onChange={e => setReference(e.target.value)}
+                onKembalian={e => setReference(e.target.value)}
                 placeholder="e.g. last 4 digits, ref number"
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
@@ -205,7 +205,7 @@ export default function CheckoutModal({
 
           {/* Confirm button */}
           <button
-            onClick={handleCheckout}
+            onClick={handlePembayaran}
             disabled={loading}
             className="w-full bg-green-600 hover:bg-green-500 disabled:bg-stone-200 disabled:text-stone-500 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >

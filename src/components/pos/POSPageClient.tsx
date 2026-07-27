@@ -155,6 +155,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
         subtotal: product.price,
       }]
     })
+    // On mobile, briefly flash cart count — don't auto-switch tab so user can keep adding
   }, [])
 
   const updateQty = useCallback((id: string, qty: number) => {
@@ -187,10 +188,45 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
     setTimeout(() => setSuccessMsg(''), 3500)
   }
 
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0)
+  const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products')
+
   return (
-    <div className="flex h-screen bg-[#fffdf7] overflow-hidden">
+    <div className="flex h-[calc(100dvh-3.5rem)] bg-[#fffdf7] overflow-hidden">
+
+      {/* ── Mobile tab switcher (top) ── */}
+      <div className="lg:hidden absolute top-14 left-0 right-0 z-20 flex bg-white border-b border-stone-100 shadow-sm">
+        <button
+          onClick={() => setMobileTab('products')}
+          className={cn('flex-1 py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
+            mobileTab === 'products' ? 'text-amber-600 border-b-2 border-amber-500' : 'text-stone-400')}
+        >
+          <Grid3x3 className="h-4 w-4" /> Produk
+        </button>
+        <button
+          onClick={() => setMobileTab('cart')}
+          className={cn('flex-1 py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2 relative',
+            mobileTab === 'cart' ? 'text-amber-600 border-b-2 border-amber-500' : 'text-stone-400')}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          Keranjang
+          {cartCount > 0 && (
+            <span className="absolute top-1.5 right-6 min-w-[18px] h-[18px] rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+              {cartCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* ── Left: Product Grid ── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className={cn(
+        'flex-1 flex flex-col min-w-0 overflow-hidden',
+        // On mobile: show/hide based on tab, with top padding for tab bar
+        'max-lg:absolute max-lg:inset-0 max-lg:top-[calc(3.5rem+41px)]',
+        mobileTab === 'products' ? 'max-lg:flex' : 'max-lg:hidden',
+        // Desktop: always visible
+        'lg:relative lg:flex'
+      )}>
         {/* Toolbar */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-stone-100 bg-white">
           <div className="relative flex-1 max-w-xs">
@@ -199,7 +235,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
               ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search products…"
+              placeholder="Cari produk…"
               className="w-full pl-9 pr-4 py-2 rounded-lg bg-stone-50 border border-stone-200 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/20"
             />
           </div>
@@ -214,7 +250,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           {/* Barcode scanner indicator */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200" title="Barcode scanner ready">
             <ScanBarcode className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-[10px] font-medium text-emerald-600 hidden sm:block">Scanner</span>
+            <span className="text-[10px] font-medium text-emerald-600 hidden sm:block">Barcode</span>
           </div>
         </div>
 
@@ -223,7 +259,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           <button
             onClick={() => setSelectedCategory(null)}
             className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', !selectedCategory ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-stone-700 hover:bg-stone-100')}
-          >All</button>
+          >Semua</button>
           {categories.map(cat => (
             <button
               key={cat.id}
@@ -241,7 +277,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-stone-400">
               <Search className="h-10 w-10 mb-3" />
-              <p className="text-sm">No products found</p>
+              <p className="text-sm">Produk tidak ditemukan</p>
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -256,12 +292,19 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
       </div>
 
       {/* ── Right: Cart ── */}
-      <div className="w-80 xl:w-96 shrink-0 flex flex-col border-l border-stone-100 bg-white">
+      <div className={cn(
+        'flex flex-col border-l border-stone-100 bg-white',
+        // Desktop: fixed width sidebar
+        'lg:w-80 xl:w-96 lg:shrink-0',
+        // Mobile: full screen tab panel
+        'max-lg:absolute max-lg:inset-0 max-lg:top-[calc(3.5rem+41px)] max-lg:w-full max-lg:border-l-0',
+        mobileTab === 'cart' ? 'max-lg:flex' : 'max-lg:hidden',
+      )}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100">
-          <h2 className="text-sm font-semibold text-stone-800">Current Order</h2>
+          <h2 className="text-sm font-semibold text-stone-800">Pesanan</h2>
           {cart.length > 0 && (
-            <button onClick={clearCart} className="text-xs text-red-400 hover:text-red-300 transition-colors">Clear all</button>
+            <button onClick={clearCart} className="text-xs text-red-400 hover:text-red-300 transition-colors">Hapus semua</button>
           )}
         </div>
 
@@ -270,7 +313,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-stone-300 py-16">
               <CreditCard className="h-12 w-12" />
-              <p className="text-sm">Add items to start an order</p>
+              <p className="text-sm">Tambah produk untuk mulai pesanan</p>
             </div>
           ) : (
             <div className="divide-y divide-white/5">
@@ -279,7 +322,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-stone-700 truncate">{item.name}</p>
-                      <p className="text-xs text-stone-400 mt-0.5">{fmt(item.price, currency)} each</p>
+                      <p className="text-xs text-stone-400 mt-0.5">{fmt(item.price, currency)} / pcs</p>
                     </div>
                     <button onClick={() => removeItem(item.id)} className="text-stone-300 hover:text-red-400 transition-colors mt-0.5">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -288,12 +331,12 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => updateQty(item.id, item.qty - 1)}
-                        className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-white transition-colors">
+                        className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition-colors">
                         <Minus className="h-3 w-3" />
                       </button>
                       <span className="w-8 text-center text-sm font-medium text-stone-700">{item.qty}</span>
                       <button onClick={() => updateQty(item.id, item.qty + 1)}
-                        className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-white transition-colors">
+                        className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition-colors">
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
@@ -335,7 +378,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                     <p className="text-xs font-medium text-stone-700">{selectedCustomer.name}</p>
                     <p className="text-[10px] text-stone-400 flex items-center gap-0.5">
                       <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
-                      {selectedCustomer.points} pts
+                      {selectedCustomer.points} poin
                     </p>
                   </div>
                 </div>
@@ -361,7 +404,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
               >
                 <span className="flex items-center gap-1.5">
                   <Star className={cn('h-3 w-3', redeemPoints ? 'fill-amber-400 text-amber-400' : '')} />
-                  Redeem {maxRedeemablePoints} pts = {fmt(maxRedeemablePoints * 100, currency)} off
+                  Tukar {maxRedeemablePoints} poin = {fmt(maxRedeemablePoints * 100, currency)} diskon
                 </span>
                 <span className={cn('font-medium', redeemPoints ? 'text-amber-400' : 'text-stone-400')}>
                   {redeemPoints ? 'ON' : 'OFF'}
@@ -376,12 +419,12 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
               </div>
               {taxRate > 0 && (
                 <div className="flex justify-between text-sm text-stone-500">
-                  <span>Tax ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt, currency)}</span>
+                  <span>Pajak ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt, currency)}</span>
                 </div>
               )}
               {redeemPoints && pointsDiscount > 0 && (
                 <div className="flex justify-between text-sm text-amber-400">
-                  <span>Points discount ({pointsRedeemed} pts)</span>
+                  <span>Diskon poin ({pointsRedeemed} poin)</span>
                   <span>-{fmt(pointsDiscount, currency)}</span>
                 </div>
               )}
@@ -393,7 +436,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
               onClick={() => setShowCheckout(true)}
               className="w-full mt-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-amber-500/20"
             >
-              Checkout — {fmt(total, currency)}
+              Bayar — {fmt(total, currency)}
             </button>
           </div>
         )}
