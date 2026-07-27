@@ -29,6 +29,7 @@ interface DashboardShellProps {
   isSuperAdmin: boolean
   stores: StoreShell[]
   modules?: string[]
+  initialStoreId?: string
 }
 
 export function DashboardShell({
@@ -40,9 +41,10 @@ export function DashboardShell({
   isSuperAdmin,
   stores,
   modules,
+  initialStoreId,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentStoreId, setCurrentStoreId] = useState(stores[0]?.id)
+  const [currentStoreId, setCurrentStoreId] = useState(initialStoreId ?? stores[0]?.id)
 
   // Derive modules from the current store if not explicitly provided
   const currentStore = stores.find(s => s.id === currentStoreId) ?? stores[0]
