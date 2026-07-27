@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, queryOne, exec, newId, nowISO } from '@/lib/db'
+import { checkStoreLimit, type Plan } from '@/lib/plan'
 
 function ok(data: any, status = 200) { return NextResponse.json(data, { status }) }
 function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
@@ -40,6 +41,20 @@ export async function POST(req: NextRequest) {
 
     const b: any = await req.json()
     if (!b.name || String(b.name).trim().length < 2) return err('name must be at least 2 characters')
+
+    // ── Plan limit: check store count ──────────────────────────────────────
+    const tenantPlan = (user.plan ?? 'FREE') as Plan
+    const [countRow] = await query(
+      `SELECT COUNT(*) as cnt FROM Store WHERE tenantId = ?`,
+      [tenantId],
+    ) as any[]
+    const storeCount = Number(countRow?.cnt ?? 0)
+    if (!checkStoreLimit(tenantPlan, storeCount)) {
+      return NextResponse.json(
+        { error: 'Plan limit reached', upgrade: true },
+        { status: 403 },
+      )
+    }
 
     const id = newId()
     const t = nowISO()

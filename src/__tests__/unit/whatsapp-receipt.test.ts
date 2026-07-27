@@ -57,7 +57,8 @@ describe('buildWhatsAppMessage', () => {
   it('decoded result contains total amount', () => {
     const result = buildWhatsAppMessage(sampleReceipt)
     const decoded = decodeURIComponent(result)
-    expect(decoded).toContain('60.500') // IDR formatted with dots
+    // IDR uses id-ID locale — separator varies by environment (comma or dot)
+    expect(decoded).toMatch(/60[,.]500/)
   })
 
   it('decoded result contains payment method', () => {

@@ -8,6 +8,7 @@ import {
   deductGiftCardBalance,
   resolveGiftCardStatus,
 } from '@/lib/gift-cards'
+import { checkProductLimit, checkStoreLimit, type Plan } from '@/lib/plan'
 
 // ─── Validation helpers ────────────────────────────────────────────────────────
 
@@ -253,6 +254,21 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           const b: any = await req.json()
           validateRequired(b, ['name', 'price'])
           validatePositive(b.price, 'price')
+
+          // ── Plan limit: check product count for FREE plan ──────────────────
+          const storePlan = (user.stores?.find((s: any) => s.id === storeId)?.plan ?? 'FREE') as Plan
+          const [countRow] = await query(
+            `SELECT COUNT(*) as cnt FROM Product WHERE storeId = ? AND active = 1`,
+            [storeId],
+          ) as any[]
+          const currentCount = Number(countRow?.cnt ?? 0)
+          if (!checkProductLimit(storePlan, currentCount)) {
+            return NextResponse.json(
+              { error: 'Plan limit reached', upgrade: true },
+              { status: 403 },
+            )
+          }
+
           const pid = newId()
           const t = nowISO()
           await exec(
