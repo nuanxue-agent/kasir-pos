@@ -1039,6 +1039,80 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── CRM / Leads ───────────────────────────────────────────────────────────
+    if (segs[0] === 'leads') {
+      if (!segs[1] && method === 'GET') {
+        const status = url.searchParams.get('status') ?? ''
+        const search = url.searchParams.get('search') ?? ''
+        let q = `SELECT * FROM Lead WHERE storeId=?`
+        const params: any[] = [storeId]
+        if (status) { q += ` AND status=?`; params.push(status) }
+        if (search) { q += ` AND (name LIKE ? OR company LIKE ? OR email LIKE ? OR phone LIKE ?)`; params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`) }
+        q += ` ORDER BY priority DESC, createdAt DESC`
+        return ok(await query(q, params))
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.name || b.name.trim().length < 2) return err('Nama lead minimal 2 karakter')
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO Lead (id,storeId,name,company,email,phone,source,status,priority,value,probability,expectedCloseDate,assignedTo,notes,tags,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [id, storeId, b.name.trim(), b.company ?? null, b.email ?? null, b.phone ?? null, b.source ?? null,
+           b.status ?? 'NEW', b.priority ?? 'MEDIUM', Number(b.value ?? 0), Number(b.probability ?? 10),
+           b.expectedCloseDate ?? null, b.assignedTo ?? null, b.notes ?? null, b.tags ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'GET') {
+        const lead = await queryOne(`SELECT * FROM Lead WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!lead) return err('Lead not found', 404)
+        return ok(lead)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const allowed = new Set(['name','company','email','phone','source','status','priority','value','probability','expectedCloseDate','assignedTo','customerId','notes','tags'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Lead SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+      if (segs[1] && method === 'DELETE') {
+        await exec(`DELETE FROM Lead WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ── CRM Activities ────────────────────────────────────────────────────────
+    if (segs[0] === 'lead-activities') {
+      if (!segs[1] && method === 'GET') {
+        const leadId = url.searchParams.get('leadId') ?? ''
+        let q = `SELECT * FROM LeadActivity WHERE storeId=?`
+        const params: any[] = [storeId]
+        if (leadId) { q += ` AND leadId=?`; params.push(leadId) }
+        q += ` ORDER BY createdAt DESC`
+        return ok(await query(q, params))
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.leadId || !b.title) return err('leadId and title required')
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO LeadActivity (id,storeId,leadId,userId,type,title,note,dueDate,completedAt,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          [id, storeId, b.leadId, user.id, b.type ?? 'NOTE', b.title.trim(), b.note ?? null, b.dueDate ?? null, b.completedAt ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const allowed = new Set(['title','note','dueDate','completedAt'])
+        const cols = filterCols(b, allowed)
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE LeadActivity SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
     return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)
