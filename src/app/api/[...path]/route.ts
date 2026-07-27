@@ -3,6 +3,11 @@ import { auth } from '@/lib/auth'
 import { query, queryOne, exec, batchExec, newId, nowISO } from '@/lib/db'
 import { postJournalEntry } from '@/lib/accounting'
 import { logAudit, getAuditLogs } from '@/lib/audit'
+import {
+  generateGiftCardCode,
+  deductGiftCardBalance,
+  resolveGiftCardStatus,
+} from '@/lib/gift-cards'
 
 function ok(data: any, status = 200) {
   return NextResponse.json(data, { status })
@@ -286,7 +291,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           const number = `INV-${Date.now()}`
           const stmts: Array<{ sql: string; params: any[] }> = [
             {
-              sql: `INSERT INTO "Order" (id,storeId,number,status,userId,customerId,discountId,subtotal,discountAmt,taxAmt,total,note,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              sql: `INSERT INTO "Order" (id,storeId,number,status,userId,customerId,discountId,subtotal,discountAmt,taxAmt,total,note,tableId,tableNumber,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
               params: [
                 oid,
                 storeId,
@@ -300,6 +305,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
                 Number(b.taxAmt) || 0,
                 Number(b.total) || 0,
                 b.note || null,
+                b.tableId || null,
+                b.tableNumber ? Number(b.tableNumber) : null,
                 t,
                 t,
               ],
@@ -2849,13 +2856,65 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           return err(`Tidak bisa transisi dari ${wo.status} ke ${b.status}`)
         }
         const t = nowISO()
-        const actualStart = b.status === 'IN_PROGRESS' ? t : (wo.actualStart ?? null)
-        const completedAt = b.status === 'COMPLETED' ? t : (wo.completedAt ?? null)
+        const newStatus = b.status ?? wo.status
+        const actualStart = newStatus === 'IN_PROGRESS' ? t : (wo.actualStart ?? null)
+        const completedAt = newStatus === 'COMPLETED' ? t : (wo.completedAt ?? null)
         const producedQty = b.producedQty !== undefined ? Number(b.producedQty) : wo.producedQty
+
+        // ── DRAFT → IN_PROGRESS: reserve raw materials (decrement component stock) ──
+        if (b.status === 'IN_PROGRESS' && wo.status === 'DRAFT') {
+          const materials = (await query(`SELECT * FROM WorkOrderMaterial WHERE workOrderId=?`, [
+            segs[1],
+          ])) as any[]
+          for (const mat of materials) {
+            await exec(
+              `UPDATE Product SET stock = stock - ?, updatedAt=? WHERE id=? AND storeId=?`,
+              [mat.requiredQty, t, mat.productId, storeId],
+            )
+            await exec(
+              `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+              [
+                newId(),
+                mat.productId,
+                'OUT',
+                mat.requiredQty,
+                `WO ${wo.number} – material reserved`,
+                t,
+              ],
+            )
+          }
+        }
+
+        // ── IN_PROGRESS → COMPLETED: increment finished product stock ────────────
+        if (b.status === 'COMPLETED' && wo.status === 'IN_PROGRESS') {
+          const bom = (await queryOne(`SELECT * FROM BillOfMaterials WHERE id=? AND storeId=?`, [
+            wo.bomId,
+            storeId,
+          ])) as any
+          if (bom?.outputProductId) {
+            const finishedQty = producedQty > 0 ? producedQty : wo.plannedQty
+            await exec(
+              `UPDATE Product SET stock = stock + ?, updatedAt=? WHERE id=? AND storeId=?`,
+              [finishedQty, t, bom.outputProductId, storeId],
+            )
+            await exec(
+              `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+              [
+                newId(),
+                bom.outputProductId,
+                'IN',
+                finishedQty,
+                `WO ${wo.number} – production completed`,
+                t,
+              ],
+            )
+          }
+        }
+
         await exec(
           `UPDATE WorkOrder SET status=?, producedQty=?, actualStart=?, completedAt=?, notes=?, updatedAt=? WHERE id=? AND storeId=?`,
           [
-            b.status ?? wo.status,
+            newStatus,
             producedQty,
             actualStart,
             completedAt,
@@ -2866,6 +2925,209 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           ],
         )
         return ok({ success: true })
+      }
+    }
+
+    // ── Manufacturing aliases: /api/manufacturing/work-orders and /api/manufacturing/bom/:productId ──
+    if (segs[0] === 'manufacturing') {
+      // GET /api/manufacturing/work-orders?storeId=
+      if (segs[1] === 'work-orders' && !segs[2] && method === 'GET') {
+        const rows = await query(
+          `SELECT wo.*, b.name as bomName, b.outputProductId,
+                  p.name as productName
+           FROM WorkOrder wo
+           LEFT JOIN BillOfMaterials b ON wo.bomId = b.id
+           LEFT JOIN Product p ON b.outputProductId = p.id
+           WHERE wo.storeId=? ORDER BY wo.createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+      // POST /api/manufacturing/work-orders
+      if (segs[1] === 'work-orders' && !segs[2] && method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.bomId) return err('bomId required')
+        if (!b.plannedQty || Number(b.plannedQty) <= 0) return err('plannedQty must be > 0')
+        const bom = (await queryOne(`SELECT * FROM BillOfMaterials WHERE id=? AND storeId=?`, [
+          b.bomId,
+          storeId,
+        ])) as any
+        if (!bom) return err('BOM not found', 404)
+        const id = newId()
+        const t = nowISO()
+        const countRow = (await queryOne(`SELECT COUNT(*) as cnt FROM WorkOrder WHERE storeId=?`, [
+          storeId,
+        ])) as any
+        const seq = (countRow?.cnt ?? 0) + 1
+        const number = `WO-${storeId.slice(0, 4).toUpperCase()}-${String(seq).padStart(4, '0')}`
+        await exec(
+          `INSERT INTO WorkOrder (id,storeId,number,bomId,status,plannedQty,producedQty,plannedStart,actualStart,completedAt,notes,createdAt,updatedAt) VALUES (?,?,?,?,?,?,0,?,null,null,?,?,?)`,
+          [
+            id,
+            storeId,
+            number,
+            b.bomId,
+            'DRAFT',
+            Number(b.plannedQty),
+            b.plannedStart ?? null,
+            b.notes ?? null,
+            t,
+            t,
+          ],
+        )
+        const components = (await query(`SELECT * FROM BOMComponent WHERE bomId=?`, [
+          b.bomId,
+        ])) as any[]
+        for (const comp of components) {
+          await exec(
+            `INSERT INTO WorkOrderMaterial (id,workOrderId,productId,requiredQty,consumedQty) VALUES (?,?,?,?,0)`,
+            [newId(), id, comp.productId, comp.qty * Number(b.plannedQty)],
+          )
+        }
+        return ok({ id, number }, 201)
+      }
+      // PATCH /api/manufacturing/work-orders/:id
+      if (segs[1] === 'work-orders' && segs[2] && method === 'PATCH') {
+        // Delegate to the existing work-orders PATCH by re-invoking with adjusted segs
+        // (inline the same logic for the alias path)
+        const b = (await req.json()) as any
+        const wo = (await queryOne(`SELECT * FROM WorkOrder WHERE id=? AND storeId=?`, [
+          segs[2],
+          storeId,
+        ])) as any
+        if (!wo) return err('Work order not found', 404)
+        const validTransitions: Record<string, string[]> = {
+          DRAFT: ['IN_PROGRESS', 'CANCELLED'],
+          IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+          COMPLETED: [],
+          CANCELLED: [],
+        }
+        if (b.status && !validTransitions[wo.status]?.includes(b.status)) {
+          return err(`Cannot transition from ${wo.status} to ${b.status}`)
+        }
+        const t = nowISO()
+        const newStatus = b.status ?? wo.status
+        const actualStart = newStatus === 'IN_PROGRESS' ? t : (wo.actualStart ?? null)
+        const completedAt = newStatus === 'COMPLETED' ? t : (wo.completedAt ?? null)
+        const producedQty = b.producedQty !== undefined ? Number(b.producedQty) : wo.producedQty
+        if (b.status === 'IN_PROGRESS' && wo.status === 'DRAFT') {
+          const materials = (await query(`SELECT * FROM WorkOrderMaterial WHERE workOrderId=?`, [
+            segs[2],
+          ])) as any[]
+          for (const mat of materials) {
+            await exec(
+              `UPDATE Product SET stock = stock - ?, updatedAt=? WHERE id=? AND storeId=?`,
+              [mat.requiredQty, t, mat.productId, storeId],
+            )
+            await exec(
+              `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+              [
+                newId(),
+                mat.productId,
+                'OUT',
+                mat.requiredQty,
+                `WO ${wo.number} – material reserved`,
+                t,
+              ],
+            )
+          }
+        }
+        if (b.status === 'COMPLETED' && wo.status === 'IN_PROGRESS') {
+          const bom = (await queryOne(`SELECT * FROM BillOfMaterials WHERE id=? AND storeId=?`, [
+            wo.bomId,
+            storeId,
+          ])) as any
+          if (bom?.outputProductId) {
+            const finishedQty = producedQty > 0 ? producedQty : wo.plannedQty
+            await exec(
+              `UPDATE Product SET stock = stock + ?, updatedAt=? WHERE id=? AND storeId=?`,
+              [finishedQty, t, bom.outputProductId, storeId],
+            )
+            await exec(
+              `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+              [
+                newId(),
+                bom.outputProductId,
+                'IN',
+                finishedQty,
+                `WO ${wo.number} – production completed`,
+                t,
+              ],
+            )
+          }
+        }
+        await exec(
+          `UPDATE WorkOrder SET status=?, producedQty=?, actualStart=?, completedAt=?, notes=?, updatedAt=? WHERE id=? AND storeId=?`,
+          [
+            newStatus,
+            producedQty,
+            actualStart,
+            completedAt,
+            b.notes ?? wo.notes,
+            t,
+            segs[2],
+            storeId,
+          ],
+        )
+        return ok({ success: true })
+      }
+      // GET /api/manufacturing/bom/:productId
+      if (segs[1] === 'bom' && segs[2] && !segs[3] && method === 'GET') {
+        const productId = segs[2]
+        const bom = await queryOne(
+          `SELECT b.*, p.name as outputProductName FROM BillOfMaterials b LEFT JOIN Product p ON b.outputProductId = p.id WHERE b.outputProductId=? AND b.storeId=? AND b.active=1 ORDER BY b.createdAt DESC`,
+          [productId, storeId],
+        )
+        if (!bom) return ok(null)
+        const components = await query(
+          `SELECT bc.*, p.name as productName FROM BOMComponent bc LEFT JOIN Product p ON bc.productId = p.id WHERE bc.bomId=?`,
+          [(bom as any).id],
+        )
+        return ok({ ...(bom as any), components })
+      }
+      // POST /api/manufacturing/bom/:productId — add/replace BOM component
+      if (segs[1] === 'bom' && segs[2] && !segs[3] && method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.productId) return err('componentProductId required')
+        if (!b.qty || Number(b.qty) <= 0) return err('qty must be > 0')
+        // Find or create BOM for the output product
+        let bom = (await queryOne(
+          `SELECT * FROM BillOfMaterials WHERE outputProductId=? AND storeId=? AND active=1`,
+          [segs[2], storeId],
+        )) as any
+        const t = nowISO()
+        if (!bom) {
+          const product = (await queryOne(`SELECT name FROM Product WHERE id=? AND storeId=?`, [
+            segs[2],
+            storeId,
+          ])) as any
+          if (!product) return err('Product not found', 404)
+          const bomId = newId()
+          await exec(
+            `INSERT INTO BillOfMaterials (id,storeId,name,description,outputProductId,outputQty,unit,active,createdAt,updatedAt) VALUES (?,?,?,?,?,1,'pcs',1,?,?)`,
+            [bomId, storeId, `${product.name} BOM`, null, segs[2], t, t],
+          )
+          bom = { id: bomId }
+        }
+        // Upsert component
+        const existing = (await queryOne(
+          `SELECT id FROM BOMComponent WHERE bomId=? AND productId=?`,
+          [bom.id, b.productId],
+        )) as any
+        if (existing) {
+          await exec(`UPDATE BOMComponent SET qty=?, unit=?, notes=? WHERE id=?`, [
+            Number(b.qty),
+            b.unit ?? 'pcs',
+            b.notes ?? null,
+            existing.id,
+          ])
+        } else {
+          await exec(
+            `INSERT INTO BOMComponent (id,bomId,productId,qty,unit,notes) VALUES (?,?,?,?,?,?)`,
+            [newId(), bom.id, b.productId, Number(b.qty), b.unit ?? 'pcs', b.notes ?? null],
+          )
+        }
+        return ok({ success: true, bomId: bom.id }, 201)
       }
     }
 
@@ -3177,6 +3439,108 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── GIFT CARDS ───────────────────────────────────────────────────────────
+    if (segs[0] === 'gift-cards') {
+      // Lazy table creation — runs once per cold start, no-op thereafter
+      await exec(
+        `CREATE TABLE IF NOT EXISTS GiftCard (
+          id              TEXT PRIMARY KEY,
+          storeId         TEXT NOT NULL,
+          code            TEXT NOT NULL UNIQUE,
+          balance         REAL NOT NULL DEFAULT 0,
+          originalBalance REAL NOT NULL DEFAULT 0,
+          expiresAt       TEXT,
+          status          TEXT NOT NULL DEFAULT 'ACTIVE',
+          issuedTo        TEXT,
+          createdAt       TEXT NOT NULL
+        )`,
+        [],
+      )
+
+      // GET /api/gift-cards?storeId= — list active gift cards for the store
+      if (segs.length === 1 && method === 'GET') {
+        const rows = await query(
+          `SELECT g.*, c.name as customerName
+           FROM GiftCard g
+           LEFT JOIN Customer c ON g.issuedTo = c.id
+           WHERE g.storeId = ?
+           ORDER BY g.createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/gift-cards — issue a new gift card
+      if (segs.length === 1 && method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.balance || Number(b.balance) <= 0) return err('balance must be positive')
+        const code = generateGiftCardCode()
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO GiftCard (id,storeId,code,balance,originalBalance,expiresAt,status,issuedTo,createdAt)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            code,
+            Number(b.balance),
+            Number(b.balance),
+            b.expiresAt || null,
+            'ACTIVE',
+            b.issuedTo || null,
+            t,
+          ],
+        )
+        return ok({ id, code, balance: Number(b.balance) }, 201)
+      }
+
+      // GET /api/gift-cards/:code — look up by code (used at POS)
+      if (segs.length === 2 && method === 'GET') {
+        const code = segs[1].toUpperCase()
+        const card = await queryOne<any>(
+          `SELECT g.*, c.name as customerName
+           FROM GiftCard g
+           LEFT JOIN Customer c ON g.issuedTo = c.id
+           WHERE g.code = ? AND g.storeId = ?`,
+          [code, storeId],
+        )
+        if (!card) return err('Gift card not found', 404)
+        // Return with resolved live status
+        const liveStatus = resolveGiftCardStatus(card.balance, card.expiresAt)
+        return ok({ ...card, status: liveStatus })
+      }
+
+      // PATCH /api/gift-cards/:code/redeem — deduct balance
+      if (segs.length === 3 && segs[2] === 'redeem' && method === 'PATCH') {
+        const code = segs[1].toUpperCase()
+        const b = (await req.json()) as any
+        const amount = Number(b.amount)
+        if (!amount || amount <= 0) return err('amount must be positive')
+
+        const card = await queryOne<any>(`SELECT * FROM GiftCard WHERE code = ? AND storeId = ?`, [
+          code,
+          storeId,
+        ])
+        if (!card) return err('Gift card not found', 404)
+
+        const liveStatus = resolveGiftCardStatus(card.balance, card.expiresAt)
+        if (liveStatus === 'EXPIRED') return err('Gift card has expired', 400)
+        if (liveStatus === 'USED') return err('Gift card has no remaining balance', 400)
+
+        const { newBalance, applied } = deductGiftCardBalance(card.balance, amount)
+        const newStatus = resolveGiftCardStatus(newBalance, card.expiresAt)
+
+        await exec(`UPDATE GiftCard SET balance = ?, status = ? WHERE code = ? AND storeId = ?`, [
+          newBalance,
+          newStatus,
+          code,
+          storeId,
+        ])
+        return ok({ applied, newBalance, status: newStatus })
+      }
+    }
+
     // ─── AUDIT LOG ────────────────────────────────────────────────────────────
     if (segs[0] === 'audit') {
       if (method === 'GET') {
@@ -3187,6 +3551,80 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const action = sp.get('action') ?? undefined
         const result = await getAuditLogs({ storeId, page, pageSize: 20, action })
         return ok(result)
+      }
+    }
+
+    // ─── TABLES ───────────────────────────────────────────────────────────────
+    if (segs[0] === 'tables') {
+      // Lazy migration — run once per cold start; idempotent
+      await exec(`CREATE TABLE IF NOT EXISTS RestaurantTable (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'FREE',
+        currentOrderId TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+
+      // GET /api/tables?storeId= — list tables with current order total
+      if (segs.length === 1 && method === 'GET') {
+        const rows = await query(
+          `SELECT t.*,
+                  o.total as currentOrderTotal
+           FROM RestaurantTable t
+           LEFT JOIN "Order" o ON t.currentOrderId = o.id
+           WHERE t.storeId = ?
+           ORDER BY t.number`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/tables — create table
+      if (segs.length === 1 && method === 'POST') {
+        const b: any = await req.json()
+        if (b.number === undefined || b.number === null) return err('number is required')
+        const tableNumber = Number(b.number)
+        if (!Number.isInteger(tableNumber) || tableNumber < 1)
+          return err('number must be a positive integer')
+        // Prevent duplicate table numbers in the same store
+        const existing = await queryOne(
+          `SELECT id FROM RestaurantTable WHERE storeId = ? AND number = ?`,
+          [storeId, tableNumber],
+        )
+        if (existing) return err(`Meja nomor ${tableNumber} sudah ada`, 409)
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO RestaurantTable (id, storeId, number, status, currentOrderId, createdAt, updatedAt)
+           VALUES (?, ?, ?, 'FREE', NULL, ?, ?)`,
+          [id, storeId, tableNumber, t, t],
+        )
+        return ok({ id, storeId, number: tableNumber, status: 'FREE', currentOrderId: null }, 201)
+      }
+
+      // PATCH /api/tables/:id — update status / currentOrderId
+      if (segs.length === 2 && method === 'PATCH') {
+        const tableId = segs[1]
+        const b: any = await req.json()
+        const validStatuses = new Set(['FREE', 'OCCUPIED', 'RESERVED'])
+        const updates: Record<string, any> = {}
+        if (b.status !== undefined) {
+          if (!validStatuses.has(b.status)) return err('Invalid status')
+          updates.status = b.status
+        }
+        if ('currentOrderId' in b) {
+          updates.currentOrderId = b.currentOrderId ?? null
+        }
+        if (Object.keys(updates).length === 0) return err('No valid fields to update')
+        const t = nowISO()
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE RestaurantTable SET ${setClauses}, updatedAt = ? WHERE id = ? AND storeId = ?`,
+          [...values, t, tableId, storeId],
+        )
+        return ok({ success: true })
       }
     }
 

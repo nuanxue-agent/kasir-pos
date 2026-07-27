@@ -25,7 +25,10 @@ import {
   Percent,
   Tag,
   Package,
+  UtensilsCrossed,
+  Gift,
 } from 'lucide-react'
+import TableMapClient, { type TableRecord } from './TableMapClient'
 import { cn } from '@/lib/utils'
 import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 import BarcodeScanner from './BarcodeScanner'
@@ -126,6 +129,10 @@ function fmt(n: number, currency: string) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
+// Forward declaration — CheckoutModal is defined below
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare function CheckoutModal(props: any): React.ReactElement
+
 export default function POSPageClient({
   storeId,
   storeName,
@@ -175,6 +182,11 @@ export default function POSPageClient({
 
   // Notes state
   const [orderNote, setOrderNote] = useState('')
+
+  // Meja (table) mode state
+  const [mejaModeEnabled, setMejaModeEnabled] = useState(false)
+  const [showTableMap, setShowTableMap] = useState(false)
+  const [selectedTable, setSelectedTable] = useState<TableRecord | null>(null)
 
   // Manual discount state
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
@@ -459,6 +471,15 @@ export default function POSPageClient({
     setShowCustomerSearch(false)
     setDiscountValue('')
     setOrderNote('')
+    // Release table when order is paid
+    if (selectedTable) {
+      fetch(`/api/tables/${selectedTable.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, status: 'FREE', currentOrderId: null }),
+      }).catch(() => {})
+      setSelectedTable(null)
+    }
     setReceiptData(order)
   }
 
@@ -577,8 +598,37 @@ export default function POSPageClient({
             title="USB/Bluetooth barcode scanner ready"
           >
             <ScanBarcode className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="hidden text-[10px] font-medium text-emerald-600 sm:block">HID</span>
           </div>
+          {/* Meja (table) mode toggle */}
+          <button
+            onClick={() => {
+              if (!mejaModeEnabled) {
+                setMejaModeEnabled(true)
+                setShowTableMap(true)
+              } else {
+                setMejaModeEnabled(false)
+                setShowTableMap(false)
+                setSelectedTable(null)
+              }
+            }}
+            aria-label={mejaModeEnabled ? 'Nonaktifkan mode meja' : 'Aktifkan mode meja'}
+            aria-pressed={mejaModeEnabled}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition-colors',
+              mejaModeEnabled
+                ? 'border-amber-500/60 bg-amber-500/15 text-amber-700'
+                : 'border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-2)]',
+            )}
+            title="Mode Meja (Dine-in)"
+          >
+            <UtensilsCrossed className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Meja</span>
+            {selectedTable && (
+              <span className="rounded bg-amber-500 px-1 py-0.5 text-[9px] font-bold text-white">
+                {selectedTable.number}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Category filter */}
@@ -718,7 +768,19 @@ export default function POSPageClient({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
-          <h2 className="text-sm font-semibold text-[var(--text-1)]">Pesanan</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-[var(--text-1)]">Pesanan</h2>
+            {selectedTable && (
+              <button
+                onClick={() => mejaModeEnabled && setShowTableMap(true)}
+                className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 hover:bg-amber-500/25"
+                title="Ganti meja"
+              >
+                <UtensilsCrossed className="h-3 w-3" aria-hidden="true" />
+                Meja {selectedTable.number}
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {/* Recall button */}
             <button
@@ -1091,6 +1153,42 @@ export default function POSPageClient({
         onClose={() => setShowBarcodeScanner(false)}
       />
 
+      {/* ── Table Map Overlay (Meja mode) ── */}
+      {showTableMap && mejaModeEnabled && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-page)] shadow-2xl">
+            <button
+              onClick={() => setShowTableMap(false)}
+              aria-label="Tutup peta meja"
+              className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-subtle)] text-[var(--text-2)] transition-colors hover:bg-[var(--bg-muted)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <TableMapClient
+              storeId={storeId}
+              currency={currency}
+              rows={4}
+              cols={5}
+              onSelectFreeTable={async table => {
+                // Mark table OCCUPIED
+                await fetch(`/api/tables/${table.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ storeId, status: 'OCCUPIED' }),
+                }).catch(() => {})
+                setSelectedTable(table)
+                setShowTableMap(false)
+              }}
+              onSelectOccupiedTable={table => {
+                // Switch to that table's context
+                setSelectedTable(table)
+                setShowTableMap(false)
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Checkout Modal ── */}
       {showCheckout && (
         <CheckoutModal
@@ -1107,6 +1205,8 @@ export default function POSPageClient({
           pointsDiscount={pointsDiscount}
           manualDiscountAmt={manualDiscountAmt()}
           note={orderNote}
+          tableId={selectedTable?.id}
+          tableNumber={selectedTable?.number}
           onClose={() => setShowCheckout(false)}
           onSuccess={handleOrderSuccess}
         />
@@ -1471,318 +1571,486 @@ function ProductRow({
       </div>
     </button>
   )
-}
 
-// ─── Checkout Modal ───────────────────────────────────────────────────────────
+  // ─── Checkout Modal ───────────────────────────────────────────────────────────
 
-const PAYMENT_METHODS = [
-  { id: 'CASH' as PaymentMethod, label: 'Cash', icon: Banknote, color: 'text-emerald-600' },
-  { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-violet-500' },
-  { id: 'QRIS' as PaymentMethod, label: 'QRIS', icon: Smartphone, color: 'text-purple-400' },
-  {
-    id: 'TRANSFER' as PaymentMethod,
-    label: 'Transfer',
-    icon: ArrowLeftRight,
-    color: 'text-orange-400',
-  },
-]
+  const PAYMENT_METHODS = [
+    { id: 'CASH' as PaymentMethod, label: 'Cash', icon: Banknote, color: 'text-emerald-600' },
+    { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-violet-500' },
+    { id: 'QRIS' as PaymentMethod, label: 'QRIS', icon: Smartphone, color: 'text-purple-400' },
+    {
+      id: 'TRANSFER' as PaymentMethod,
+      label: 'Transfer',
+      icon: ArrowLeftRight,
+      color: 'text-orange-400',
+    },
+  ]
 
-interface PaymentLine {
-  method: PaymentMethod
-  amount: string // string so input is controlled
-}
-
-function CheckoutModal({
-  storeId,
-  taxRate,
-  currency,
-  staffId,
-  cart,
-  subtotal,
-  taxAmt,
-  total,
-  customerId,
-  pointsRedeemed,
-  pointsDiscount,
-  manualDiscountAmt,
-  note,
-  onClose,
-  onSuccess,
-}: {
-  storeId: string
-  taxRate: number
-  currency: string
-  staffId: string
-  cart: CartItem[]
-  subtotal: number
-  taxAmt: number
-  total: number
-  customerId?: string
-  pointsRedeemed?: number
-  pointsDiscount?: number
-  manualDiscountAmt?: number
-  note?: string
-  onClose: () => void
-  onSuccess: (order: ReceiptData) => void
-}) {
-  const [payments, setPayments] = useState<PaymentLine[]>([{ method: 'CASH', amount: '' }])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const totalPaid = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-  const canPay = totalPaid >= total && payments.every(p => (parseFloat(p.amount) || 0) > 0)
-
-  // Change only applies to the cash portion
-  const cashPaid = payments
-    .filter(p => p.method === 'CASH')
-    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-  const change = Math.max(0, totalPaid - total)
-  const hasCash = payments.some(p => p.method === 'CASH')
-
-  const quickAmounts = (lineTotal: number) => {
-    const exact = lineTotal
-    const r10 = Math.ceil(lineTotal / 10000) * 10000
-    const r50 = Math.ceil(lineTotal / 50000) * 50000
-    const r100 = Math.ceil(lineTotal / 100000) * 100000
-    return [exact, r10, r50, r100].filter((v, i, a) => a.indexOf(v) === i)
+  interface PaymentLine {
+    method: PaymentMethod
+    amount: string // string so input is controlled
   }
 
-  const updateLine = (idx: number, field: keyof PaymentLine, value: string) => {
-    setPayments(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)))
-  }
+  function CheckoutModal({
+    storeId,
+    taxRate,
+    currency,
+    staffId,
+    cart,
+    subtotal,
+    taxAmt,
+    total,
+    customerId,
+    pointsRedeemed,
+    pointsDiscount,
+    manualDiscountAmt,
+    note,
+    tableId,
+    tableNumber,
+    onClose,
+    onSuccess,
+  }: {
+    storeId: string
+    taxRate: number
+    currency: string
+    staffId: string
+    cart: CartItem[]
+    subtotal: number
+    taxAmt: number
+    total: number
+    customerId?: string
+    pointsRedeemed?: number
+    pointsDiscount?: number
+    manualDiscountAmt?: number
+    note?: string
+    tableId?: string
+    tableNumber?: number
+    onClose: () => void
+    onSuccess: (order: ReceiptData) => void
+  }) {
+    const [payments, setPayments] = useState<PaymentLine[]>([{ method: 'CASH', amount: '' }])
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
 
-  const addLine = () => {
-    setPayments(prev => [...prev, { method: 'QRIS', amount: '' }])
-  }
+    // ── Gift card state ──────────────────────────────────────────────────────
+    const [gcCode, setGcCode] = useState('')
+    const [gcBalance, setGcBalance] = useState<number | null>(null)
+    const [gcApplied, setGcApplied] = useState(0)
+    const [gcChecking, setGcChecking] = useState(false)
+    const [gcError, setGcError] = useState('')
 
-  const removeLine = (idx: number) => {
-    setPayments(prev => prev.filter((_, i) => i !== idx))
-  }
+    // Total remaining after gift card
+    const totalAfterGc = Math.max(0, total - gcApplied)
 
-  const handlePay = async () => {
-    if (!canPay) {
-      setError('Total paid must cover the order total')
-      return
+    const totalPaid = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+    const canPay =
+      totalAfterGc === 0
+        ? gcApplied > 0
+        : totalPaid >= totalAfterGc && payments.every(p => (parseFloat(p.amount) || 0) > 0)
+
+    const change = Math.max(0, totalPaid - totalAfterGc)
+    const hasCash = payments.some(p => p.method === 'CASH')
+
+    const quickAmounts = (lineTotal: number) => {
+      const exact = lineTotal
+      const r10 = Math.ceil(lineTotal / 10000) * 10000
+      const r50 = Math.ceil(lineTotal / 50000) * 50000
+      const r100 = Math.ceil(lineTotal / 100000) * 100000
+      return [exact, r10, r50, r100].filter((v, i, a) => a.indexOf(v) === i)
     }
-    if (payments.some(p => (parseFloat(p.amount) || 0) <= 0)) {
-      setError('Each payment line must have an amount greater than 0')
-      return
+
+    const updateLine = (idx: number, field: keyof PaymentLine, value: string) => {
+      setPayments(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)))
     }
-    setLoading(true)
-    setError('')
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storeId,
-          userId: staffId,
-          customerId: customerId ?? null,
-          pointsRedeemed: pointsRedeemed ?? 0,
-          note: note ?? '',
-          items: cart.map(i => ({
-            productId: i.productId,
-            name: i.name,
-            price: i.price,
-            qty: i.qty,
-            discount: 0,
-            subtotal: i.subtotal,
-          })),
-          payments: payments.map(p => ({
-            method: p.method,
-            amount: parseFloat(p.amount) || 0,
-            change:
-              p.method === 'CASH'
-                ? Math.max(
-                    0,
-                    (parseFloat(p.amount) || 0) -
-                      (total - (totalPaid - (parseFloat(p.amount) || 0))),
-                  )
-                : 0,
-          })),
-          subtotal,
-          taxAmt,
-          total,
-          discountAmt: (pointsDiscount ?? 0) + (manualDiscountAmt ?? 0),
-        }),
-      })
-      const data = (await res.json()) as any
-      if (!res.ok) {
-        setError(data.error || 'Payment failed')
+
+    const addLine = () => {
+      setPayments(prev => [...prev, { method: 'QRIS', amount: '' }])
+    }
+
+    const removeLine = (idx: number) => {
+      setPayments(prev => prev.filter((_, i) => i !== idx))
+    }
+
+    // ── Gift card helpers ────────────────────────────────────────────────────
+    const checkGiftCard = async () => {
+      const code = gcCode.trim().toUpperCase()
+      if (!code) return
+      setGcChecking(true)
+      setGcError('')
+      setGcBalance(null)
+      setGcApplied(0)
+      try {
+        const res = await fetch(`/api/gift-cards/${code}?storeId=${storeId}`)
+        const data = (await res.json()) as any
+        if (!res.ok) {
+          setGcError(data.error || 'Gift card not found')
+          return
+        }
+        if (data.status !== 'ACTIVE') {
+          setGcError(`Card is ${String(data.status).toLowerCase()}`)
+          return
+        }
+        const bal = Number(data.balance)
+        setGcBalance(bal)
+        const applied = Math.min(bal, total)
+        setGcApplied(applied)
+      } catch {
+        setGcError('Network error checking gift card')
+      } finally {
+        setGcChecking(false)
+      }
+    }
+
+    const removeGiftCard = () => {
+      setGcCode('')
+      setGcBalance(null)
+      setGcApplied(0)
+      setGcError('')
+    }
+
+    const handlePay = async () => {
+      if (!canPay) {
+        setError('Total paid must cover the order total')
         return
       }
-      onSuccess(data as ReceiptData)
-    } catch {
-      setError('Network error. Please try again.')
-    } finally {
-      setLoading(false)
+      if (totalAfterGc > 0 && payments.some(p => (parseFloat(p.amount) || 0) <= 0)) {
+        setError('Each payment line must have an amount greater than 0')
+        return
+      }
+      setLoading(true)
+      setError('')
+      try {
+        // Redeem gift card first if applied
+        if (gcApplied > 0 && gcCode) {
+          const gcRes = await fetch(
+            `/api/gift-cards/${gcCode.trim().toUpperCase()}/redeem?storeId=${storeId}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ amount: gcApplied }),
+            },
+          )
+          if (!gcRes.ok) {
+            const gcData = (await gcRes.json()) as any
+            setError(gcData.error || 'Gift card redemption failed')
+            setLoading(false)
+            return
+          }
+        }
+
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storeId,
+            userId: staffId,
+            customerId: customerId ?? null,
+            pointsRedeemed: pointsRedeemed ?? 0,
+            note: note ?? '',
+            tableId: tableId ?? null,
+            items: cart.map(i => ({
+              productId: i.productId,
+              name: i.name,
+              price: i.price,
+              qty: i.qty,
+              discount: 0,
+              subtotal: i.subtotal,
+            })),
+            payments: [
+              ...(gcApplied > 0
+                ? [
+                    {
+                      method: 'GIFT_CARD',
+                      amount: gcApplied,
+                      change: 0,
+                      giftCardCode: gcCode.trim().toUpperCase(),
+                    },
+                  ]
+                : []),
+              ...payments.map(p => ({
+                method: p.method,
+                amount: parseFloat(p.amount) || 0,
+                change:
+                  p.method === 'CASH'
+                    ? Math.max(
+                        0,
+                        (parseFloat(p.amount) || 0) -
+                          (totalAfterGc - (totalPaid - (parseFloat(p.amount) || 0))),
+                      )
+                    : 0,
+              })),
+            ],
+            subtotal,
+            taxAmt,
+            total,
+            discountAmt: (pointsDiscount ?? 0) + (manualDiscountAmt ?? 0) + gcApplied,
+          }),
+        })
+        const data = (await res.json()) as any
+        if (!res.ok) {
+          setError(data.error || 'Payment failed')
+          return
+        }
+        onSuccess(data as ReceiptData)
+      } catch {
+        setError('Network error. Please try again.')
+      } finally {
+        setLoading(false)
+      }
     }
-  }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
-          <h2 className="text-base font-semibold text-[var(--text-1)]">Payment</h2>
-          <button
-            onClick={onClose}
-            className="text-[var(--text-3)] transition-colors hover:text-[var(--text-1)]"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="max-h-[80vh] space-y-5 overflow-y-auto p-6">
-          {/* Order summary */}
-          <div className="space-y-1.5 rounded-xl bg-[var(--bg-subtle)] p-4">
-            <div className="flex justify-between text-sm text-[var(--text-2)]">
-              <span>Subtotal</span>
-              <span>{fmt(subtotal, currency)}</span>
-            </div>
-            {taxAmt > 0 && (
-              <div className="flex justify-between text-sm text-[var(--text-2)]">
-                <span>Pajak</span>
-                <span>{fmt(taxAmt, currency)}</span>
-              </div>
-            )}
-            {!!pointsRedeemed && (
-              <div className="flex justify-between text-sm text-amber-400">
-                <span className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-amber-400" />
-                  Points ({pointsRedeemed} pts)
-                </span>
-                <span>-{fmt(pointsRedeemed * 100, currency)}</span>
-              </div>
-            )}
-            {!!manualDiscountAmt && manualDiscountAmt > 0 && (
-              <div className="flex justify-between text-sm text-emerald-500">
-                <span>Diskon manual</span>
-                <span>-{fmt(manualDiscountAmt, currency)}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-[var(--border)] pt-1.5 text-base font-bold text-[var(--text-1)]">
-              <span>Total</span>
-              <span>{fmt(total, currency)}</span>
-            </div>
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
+            <h2 className="text-base font-semibold text-[var(--text-1)]">
+              Payment{tableNumber ? ` — Table ${tableNumber}` : ''}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-[var(--text-3)] transition-colors hover:text-[var(--text-1)]"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          {/* Split payment lines */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="max-h-[80vh] space-y-5 overflow-y-auto p-6">
+            {/* Order summary */}
+            <div className="space-y-1.5 rounded-xl bg-[var(--bg-subtle)] p-4">
+              <div className="flex justify-between text-sm text-[var(--text-2)]">
+                <span>Subtotal</span>
+                <span>{fmt(subtotal, currency)}</span>
+              </div>
+              {taxAmt > 0 && (
+                <div className="flex justify-between text-sm text-[var(--text-2)]">
+                  <span>Pajak</span>
+                  <span>{fmt(taxAmt, currency)}</span>
+                </div>
+              )}
+              {!!pointsRedeemed && (
+                <div className="flex justify-between text-sm text-amber-400">
+                  <span className="flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-amber-400" />
+                    Points ({pointsRedeemed} pts)
+                  </span>
+                  <span>-{fmt(pointsRedeemed * 100, currency)}</span>
+                </div>
+              )}
+              {!!manualDiscountAmt && manualDiscountAmt > 0 && (
+                <div className="flex justify-between text-sm text-emerald-500">
+                  <span>Diskon manual</span>
+                  <span>-{fmt(manualDiscountAmt, currency)}</span>
+                </div>
+              )}
+              {gcApplied > 0 && (
+                <div className="flex justify-between text-sm text-violet-400">
+                  <span className="flex items-center gap-1">
+                    <Gift className="h-3 w-3" />
+                    Gift Card
+                  </span>
+                  <span>-{fmt(gcApplied, currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-[var(--border)] pt-1.5 text-base font-bold text-[var(--text-1)]">
+                <span>Total</span>
+                <span>{fmt(totalAfterGc, currency)}</span>
+              </div>
+            </div>
+
+            {/* ── Gift Card section ── */}
+            <div className="space-y-2">
               <p className="text-xs font-medium tracking-wider text-[var(--text-2)] uppercase">
-                Metode Pembayaran
+                Gift Card
               </p>
-              {payments.length < 4 && (
-                <button
-                  onClick={addLine}
-                  className="flex items-center gap-1 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Tambah pembayaran
-                </button>
+              {gcApplied > 0 ? (
+                <div className="flex items-center justify-between rounded-xl border border-violet-500/40 bg-violet-500/10 px-4 py-3">
+                  <div>
+                    <p className="font-mono text-xs font-semibold text-violet-300">
+                      {gcCode.toUpperCase()}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-3)]">
+                      Applied {fmt(gcApplied, currency)}
+                      {gcBalance !== null && gcBalance - gcApplied > 0 && (
+                        <span className="ml-1 text-violet-400">
+                          · {fmt(gcBalance - gcApplied, currency)} remaining on card
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    onClick={removeGiftCard}
+                    className="text-[var(--text-3)] transition-colors hover:text-red-400"
+                    aria-label="Remove gift card"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={gcCode}
+                    onChange={e => {
+                      setGcCode(e.target.value.toUpperCase())
+                      setGcError('')
+                      setGcBalance(null)
+                      setGcApplied(0)
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') checkGiftCard()
+                    }}
+                    placeholder="ENTER GIFT CARD CODE"
+                    maxLength={16}
+                    aria-label="Gift card code"
+                    className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 font-mono text-xs tracking-widest text-[var(--text-1)] placeholder-stone-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 focus:outline-none"
+                  />
+                  <button
+                    onClick={checkGiftCard}
+                    disabled={gcChecking || !gcCode.trim()}
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-xs font-medium text-[var(--text-2)] transition-colors hover:border-violet-500/40 hover:text-violet-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {gcChecking ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Gift className="h-3.5 w-3.5" />
+                    )}
+                    Check Balance
+                  </button>
+                </div>
+              )}
+              {gcError && <p className="text-xs text-red-400">{gcError}</p>}
+              {gcBalance !== null && gcApplied === 0 && (
+                <p className="text-xs text-[var(--text-3)]">
+                  Balance:{' '}
+                  <span className="font-medium text-violet-400">{fmt(gcBalance, currency)}</span>
+                </p>
               )}
             </div>
 
-            {payments.map((line, idx) => (
-              <div
-                key={idx}
-                className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-3"
-              >
-                {/* Method selector row */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="grid flex-1 grid-cols-4 gap-1.5">
-                    {PAYMENT_METHODS.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => updateLine(idx, 'method', m.id)}
-                        className={cn(
-                          'flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium transition-all',
-                          line.method === m.id
-                            ? 'border-amber-500/60 bg-amber-500/15 text-amber-700'
-                            : 'border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-3)] hover:border-stone-300 hover:text-[var(--text-1)]',
-                        )}
-                      >
-                        <m.icon className={cn('h-4 w-4', line.method === m.id ? m.color : '')} />
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                  {payments.length > 1 && (
+            {/* Payment lines — only shown when there is still a remaining total */}
+            {totalAfterGc > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium tracking-wider text-[var(--text-2)] uppercase">
+                    Metode Pembayaran
+                  </p>
+                  {payments.length < 4 && (
                     <button
-                      onClick={() => removeLine(idx)}
-                      className="shrink-0 text-stone-300 transition-colors hover:text-red-400"
+                      onClick={addLine}
+                      className="flex items-center gap-1 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700"
                     >
-                      <X className="h-4 w-4" />
+                      <Plus className="h-3.5 w-3.5" />
+                      Tambah pembayaran
                     </button>
                   )}
                 </div>
 
-                {/* Amount input */}
-                <input
-                  type="number"
-                  value={line.amount}
-                  onChange={e => updateLine(idx, 'amount', e.target.value)}
-                  placeholder={fmt(payments.length === 1 ? total : 0, currency)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2.5 text-sm text-[var(--text-1)] focus:border-amber-400/60 focus:outline-none"
-                />
+                {payments.map((line, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="grid flex-1 grid-cols-4 gap-1.5">
+                        {PAYMENT_METHODS.map(m => (
+                          <button
+                            key={m.id}
+                            onClick={() => updateLine(idx, 'method', m.id)}
+                            className={cn(
+                              'flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium transition-all',
+                              line.method === m.id
+                                ? 'border-amber-500/60 bg-amber-500/15 text-amber-700'
+                                : 'border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-3)] hover:border-stone-300 hover:text-[var(--text-1)]',
+                            )}
+                          >
+                            <m.icon
+                              className={cn('h-4 w-4', line.method === m.id ? m.color : '')}
+                            />
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                      {payments.length > 1 && (
+                        <button
+                          onClick={() => removeLine(idx)}
+                          className="shrink-0 text-stone-300 transition-colors hover:text-red-400"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
 
-                {/* Quick amounts for single-line cash */}
-                {line.method === 'CASH' && payments.length === 1 && (
-                  <div className="flex gap-1.5">
-                    {quickAmounts(total).map(a => (
-                      <button
-                        key={a}
-                        onClick={() => updateLine(idx, 'amount', String(a))}
-                        className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-1.5 text-[10px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)]"
-                      >
-                        {a === total ? (
-                          <span className="text-emerald-600">Pas</span>
-                        ) : (
-                          fmt(a, currency)
-                        )}
-                      </button>
-                    ))}
+                    <input
+                      type="number"
+                      value={line.amount}
+                      onChange={e => updateLine(idx, 'amount', e.target.value)}
+                      placeholder={fmt(payments.length === 1 ? totalAfterGc : 0, currency)}
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2.5 text-sm text-[var(--text-1)] focus:border-amber-400/60 focus:outline-none"
+                    />
+
+                    {line.method === 'CASH' && payments.length === 1 && (
+                      <div className="flex gap-1.5">
+                        {quickAmounts(totalAfterGc).map(a => (
+                          <button
+                            key={a}
+                            onClick={() => updateLine(idx, 'amount', String(a))}
+                            className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-1.5 text-[10px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)]"
+                          >
+                            {a === totalAfterGc ? (
+                              <span className="text-emerald-600">Pas</span>
+                            ) : (
+                              fmt(a, currency)
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <div className="flex justify-between px-1 text-sm">
+                  <span className="text-[var(--text-2)]">Dibayar</span>
+                  <span
+                    className={cn(
+                      'font-semibold',
+                      totalPaid >= totalAfterGc ? 'text-emerald-600' : 'text-red-400',
+                    )}
+                  >
+                    {fmt(totalPaid, currency)} / {fmt(totalAfterGc, currency)}
+                  </span>
+                </div>
+
+                {totalPaid >= totalAfterGc && hasCash && change > 0 && (
+                  <div className="flex justify-between px-1 text-sm font-medium">
+                    <span className="text-[var(--text-2)]">Kembalian</span>
+                    <span className="text-emerald-600">{fmt(change, currency)}</span>
                   </div>
                 )}
               </div>
-            ))}
+            )}
 
-            {/* Running total */}
-            <div className="flex justify-between px-1 text-sm">
-              <span className="text-[var(--text-2)]">Dibayar</span>
-              <span
-                className={cn(
-                  'font-semibold',
-                  totalPaid >= total ? 'text-emerald-600' : 'text-red-400',
-                )}
-              >
-                {fmt(totalPaid, currency)} / {fmt(total, currency)}
-              </span>
-            </div>
-
-            {/* Change (cash portion) */}
-            {totalPaid >= total && hasCash && change > 0 && (
-              <div className="flex justify-between px-1 text-sm font-medium">
-                <span className="text-[var(--text-2)]">Kembalian</span>
-                <span className="text-emerald-600">{fmt(change, currency)}</span>
+            {/* Gift card covers the full amount */}
+            {totalAfterGc === 0 && gcApplied > 0 && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center text-sm font-medium text-emerald-400">
+                Gift card covers the full amount ✓
               </div>
             )}
+
+            {error && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
+            )}
+
+            <button
+              onClick={handlePay}
+              disabled={loading || !canPay}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading ? 'Processing…' : `Pay ${fmt(total, currency)}`}
+            </button>
           </div>
-
-          {error && (
-            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
-          )}
-
-          <button
-            onClick={handlePay}
-            disabled={loading || !canPay}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {loading ? 'Processing…' : `Pay ${fmt(total, currency)}`}
-          </button>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 }
