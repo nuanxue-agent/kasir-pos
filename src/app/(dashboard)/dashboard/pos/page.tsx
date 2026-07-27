@@ -1,7 +1,9 @@
+import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { query, queryOne } from '@/lib/db'
 import POSPageClient from '@/components/pos/POSPageClient'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 
 export default async function POSPage() {
   const session = await auth()
@@ -77,16 +79,18 @@ export default async function POSPage() {
   const bundles = Object.values(bundleMap)
 
   return (
-    <POSPageClient
-      storeId={storeId}
-      storeName={storeName}
-      taxRate={taxRate}
-      currency={currency}
-      staffId={user.id}
-      initialProducts={shaped}
-      categories={categories as any}
-      receiptNote={receiptNote}
-      initialBundles={bundles as any}
-    />
+    <Suspense fallback={<PageSkeleton />}>
+      <POSPageClient
+        storeId={storeId}
+        storeName={storeName}
+        taxRate={taxRate}
+        currency={currency}
+        staffId={user.id}
+        initialProducts={shaped}
+        categories={categories as any}
+        receiptNote={receiptNote}
+        initialBundles={bundles as any}
+      />
+    </Suspense>
   )
 }
