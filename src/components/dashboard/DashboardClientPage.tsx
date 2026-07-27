@@ -13,6 +13,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 interface DashboardClientPageProps {
   storeId: string
   session: any
+  modules?: string[]
 }
 
 function getGreeting(): string {
@@ -58,9 +59,13 @@ function Sparkline({ data, color = '#f59e0b' }: { data: number[]; color?: string
   )
 }
 
-export default function DashboardClientPage({ storeId, session }: DashboardClientPageProps) {
+export default function DashboardClientPage({ storeId, session, modules }: DashboardClientPageProps) {
   const currency = session?.user?.stores?.[0]?.currency ?? 'IDR'
   const userName = session?.user?.name ?? ''
+  const enabledModules = modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
+  const hasPOS = enabledModules.includes('pos')
+  const hasInventory = enabledModules.includes('inventory')
+  const hasCustomers = enabledModules.includes('customers')
 
   // Today's summary
   const { data, isLoading } = useQuery({

@@ -10,16 +10,20 @@ export default async function SettingsPage() {
   const storeId = user.stores?.[0]?.id ?? ''
 
   const store = await queryOne<any>(
-    `SELECT name, address, phone, email, taxRate, currency, receiptNote, timezone FROM Store WHERE id = ?`,
+    `SELECT name, address, phone, email, taxRate, currency, receiptNote, timezone,
+            COALESCE(modules, '["pos","inventory","customers","discounts","reports"]') as modules
+     FROM Store WHERE id = ?`,
     [storeId]
   )
+
+  const modules = (() => {
+    try { return JSON.parse(store?.modules ?? '[]') } catch { return ['pos','inventory','customers','discounts','reports'] }
+  })()
 
   return (
     <SettingsPageClient
       storeId={storeId}
-      store={store ?? {
-        name: '', taxRate: 0, currency: 'IDR', timezone: 'Asia/Jakarta',
-      }}
+      store={{ ...(store ?? { name: '', taxRate: 0, currency: 'IDR', timezone: 'Asia/Jakarta' }), modules }}
     />
   )
 }

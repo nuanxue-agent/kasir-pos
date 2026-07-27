@@ -14,6 +14,7 @@ interface DashboardShellProps {
   userRole: UserRole
   isSuperAdmin: boolean
   stores: Array<{ id: string; name: string }>
+  modules?: string[]
 }
 
 export function DashboardShell({
@@ -24,6 +25,7 @@ export function DashboardShell({
   userRole,
   isSuperAdmin,
   stores,
+  modules,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentStoreId, setCurrentStoreId] = useState(stores[0]?.id)
@@ -37,9 +39,9 @@ export function DashboardShell({
         userEmail={userEmail}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        modules={modules}
       />
 
-      {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header
           userName={userName}
@@ -52,14 +54,12 @@ export function DashboardShell({
           onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
 
-        {/* Main scroll area — add pb-20 on mobile so content clears bottom nav */}
         <main className="flex-1 overflow-y-auto bg-[#fffdf7] pb-20 lg:pb-0">
           {children}
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
-      <BottomNav />
+      <BottomNav modules={modules} />
     </div>
   )
 }

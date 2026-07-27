@@ -9,8 +9,9 @@ export default async function DashboardPage() {
   const storeId = (session.user as any).stores?.[0]?.id
   if (!storeId) redirect('/login')
 
-  // Data is fetched client-side via React Query
-  return <DashboardClientPage storeId={storeId} session={session} />
+  const modules = (session.user as any).stores?.[0]?.modules ?? ['pos','inventory','customers','discounts','reports']
+
+  return <DashboardClientPage storeId={storeId} session={session} modules={modules} />
 }
 
 // Import client component

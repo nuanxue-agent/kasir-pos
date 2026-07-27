@@ -24,6 +24,7 @@ export default async function DashboardLayout({
       userRole={user.role}
       isSuperAdmin={user.isSuperAdmin}
       stores={user.stores ?? []}
+      modules={user.stores?.[0]?.modules ?? ['pos','inventory','customers','discounts','reports']}
     >
       {children}
     </DashboardShell>

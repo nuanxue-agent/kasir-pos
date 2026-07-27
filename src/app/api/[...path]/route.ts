@@ -16,7 +16,7 @@ const ALLOWED_DISCOUNT_COLS = new Set([
   'name', 'code', 'type', 'value', 'minOrder', 'maxUses', 'startsAt', 'endsAt', 'active',
 ])
 const ALLOWED_STORE_COLS = new Set([
-  'name', 'address', 'phone', 'email', 'taxRate', 'currency', 'timezone', 'receiptNote',
+  'name', 'address', 'phone', 'email', 'taxRate', 'currency', 'timezone', 'receiptNote', 'modules',
 ])
 const ALLOWED_USER_COLS = new Set(['name', 'email', 'password', 'role', 'active'])
 

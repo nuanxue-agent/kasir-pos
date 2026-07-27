@@ -68,10 +68,12 @@ interface SidebarProps {
   userEmail?: string | null
   open: boolean
   onClose: () => void
+  modules?: string[]
 }
 
-export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onClose }: SidebarProps) {
+export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onClose, modules }: SidebarProps) {
   const pathname = usePathname()
+  const enabledModules = modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -82,6 +84,18 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
     if (group.superAdminOnly) return isSuperAdmin
     if (group.minRole) return isAtLeast(userRole, group.minRole)
     return true
+  }
+
+  // Filter nav items by module
+  function filterItems(items: NavItem[]): NavItem[] {
+    return items.filter(item => {
+      if (item.href === '/dashboard/pos')        return enabledModules.includes('pos')
+      if (item.href === '/dashboard/inventory')  return enabledModules.includes('inventory')
+      if (item.href === '/dashboard/customers')  return enabledModules.includes('customers')
+      if (item.href === '/dashboard/discounts')  return enabledModules.includes('discounts')
+      if (item.href === '/dashboard/reports')    return enabledModules.includes('reports')
+      return true
+    })
   }
 
   const initials = (userName ?? 'U').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
@@ -111,13 +125,16 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
-        {NAV_GROUPS.filter(canSeeGroup).map((group) => (
+        {NAV_GROUPS.filter(canSeeGroup).map((group) => {
+            const visibleItems = filterItems(group.items)
+            if (visibleItems.length === 0) return null
+            return (
           <div key={group.title}>
             <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-widest text-stone-400">
               {group.title}
             </p>
             <ul className="space-y-0.5">
-              {group.items.map((item) => {
+              {visibleItems.map((item) => {
                 const active = isActive(item.href)
                 return (
                   <li key={item.href}>
@@ -140,7 +157,8 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
               })}
             </ul>
           </div>
-        ))}
+            )
+        })}
       </nav>
 
       {/* Settings */}

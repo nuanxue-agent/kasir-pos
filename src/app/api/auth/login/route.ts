@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
     if (!user || !valid) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
 
     const stores = await query<any>(
-      `SELECT su.storeId as id, s.name, su.role, s.currency, s.taxRate
+      `SELECT su.storeId as id, s.name, su.role, s.currency, s.taxRate,
+              COALESCE(s.modules, '["pos","inventory","customers","discounts","reports"]') as modules
        FROM StoreUser su JOIN Store s ON su.storeId = s.id WHERE su.userId = ?`,
       [user.id]
     )
@@ -55,7 +56,10 @@ export async function POST(req: NextRequest) {
     const sessionUser = {
       id: user.id, name: user.name, email: user.email,
       role: user.role, tenantId: user.tenantId,
-      stores,
+      stores: stores.map((s: any) => ({
+        ...s,
+        modules: (() => { try { return JSON.parse(s.modules) } catch { return ['pos','inventory','customers','discounts','reports'] } })()
+      })),
     }
 
     const token = await createSession(sessionUser)
