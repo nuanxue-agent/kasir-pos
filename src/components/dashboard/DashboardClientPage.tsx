@@ -107,8 +107,8 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
   // Top products today (from today's summary)
   const topProducts = (data as any)?.topProducts ?? []
 
-  const stats = data ?? {}
-  const yStats = yesterday ?? {}
+  const stats = (data as any) ?? {}
+  const yStats = (yesterday as any) ?? {}
 
   function pctChange(today: number, yest: number) {
     if (!yest) return undefined

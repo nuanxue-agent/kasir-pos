@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
-import { locales } from '@/i18n/config'
+import { locales, type Locale } from '@/i18n'
+
 export async function POST(req: Request) {
   const body = await req.json() as { locale?: unknown }
-  const { locale } = body
-  if (!locales.includes(locale)) return NextResponse.json({ error: 'Invalid locale' }, { status: 400 })
+  const locale = body.locale as string | undefined
+  if (!locale || !locales.includes(locale as Locale)) {
+    return NextResponse.json({ error: 'Invalid locale' }, { status: 400 })
+  }
   const res = NextResponse.json({ ok: true })
-  res.cookies.set('locale', locale, { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' })
+  res.cookies.set('NEXT_LOCALE', locale, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: 'lax',
+  })
   return res
 }

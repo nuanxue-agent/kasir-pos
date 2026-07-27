@@ -41,7 +41,7 @@ function AccountForm({ storeId, account, onClose, onSaved }: { storeId: string; 
     })
     setSaving(false)
     if (res.ok) onSaved()
-    else { const d = await res.json(); setError(d.error ?? 'Gagal menyimpan') }
+    else { const d = await res.json() as any; setError(d.error ?? 'Gagal menyimpan') }
   }
 
   return (

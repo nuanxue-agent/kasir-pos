@@ -51,7 +51,7 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
       const res = await fetch(
         `/api/inventory/${product.id}/logs?page=${page}&limit=${LIMIT}`
       )
-      const data = await res.json()
+      const data = await res.json() as any
       setLogs(data.logs || [])
       setTotal(data.total || 0)
       setTotalPages(data.pages || 1)

@@ -33,7 +33,7 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-      const result = await res.json()
+      const result = await res.json() as any
       if (!res.ok || !result.success) { setError(result.error || 'Email atau password salah'); return }
       router.push('/dashboard')
       router.refresh()

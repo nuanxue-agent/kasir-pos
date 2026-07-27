@@ -46,7 +46,7 @@ function SupplierForm({ storeId, supplier, onClose, onSaved }: {
     setSaving(false)
     if (res.ok) onSaved()
     else {
-      const d = await res.json()
+      const d = await res.json() as any
       setError(d.error ?? 'Gagal menyimpan')
     }
   }

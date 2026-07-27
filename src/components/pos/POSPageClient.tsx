@@ -542,7 +542,7 @@ function CustomerSearch({ storeId, onSelect, onClose }: {
       try {
         const res = await fetch(`/api/customers?storeId=${storeId}&q=${encodeURIComponent(q)}&limit=5`)
         if (res.ok) {
-          const data = await res.json()
+          const data = await res.json() as any
           setResults(Array.isArray(data) ? data : (data.customers ?? []))
         }
       } finally {
@@ -725,7 +725,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
             subtotal, taxAmt, total, discountAmt: pointsDiscount ?? 0,
           }),
         })
-        const data = await res.json()
+        const data = await res.json() as any
         if (!res.ok) { setError(data.error || 'Payment failed'); return }
         onSuccess(data as ReceiptData)
       } catch {

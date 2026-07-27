@@ -34,9 +34,11 @@ async function d1Fetch(sql: string, params: any[] = []): Promise<any[]> {
 // Get D1 binding if on Cloudflare Pages, otherwise use HTTP API
 function getD1Binding(): D1Database | null {
   try {
-    // Try Cloudflare Pages binding
-    const { getRequestContext } = require('@cloudflare/next-on-pages')
-    const { env } = getRequestContext()
+    // Only attempt in Cloudflare Pages runtime (not Vercel/Node)
+    if (typeof (globalThis as any).__next_on_pages__fetch === 'undefined') return null
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('@cloudflare/next-on-pages')
+    const { env } = mod.getRequestContext()
     return (env as any).DB ?? null
   } catch {
     return null

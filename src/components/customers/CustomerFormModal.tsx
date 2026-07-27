@@ -82,10 +82,8 @@ export function CustomerFormModal({
       return
     }
 
-    const data = await res.json()
-    if (res.status === 409) {
-      setError('root', { message: data.error })
-    } else if (data.error?.fieldErrors) {
+    const data = await res.json() as any
+    if (data.error?.fieldErrors) {
       const fieldErrors = data.error.fieldErrors as Record<string, string[]>
       for (const [field, msgs] of Object.entries(fieldErrors)) {
         setError(field as keyof FormValues, { message: msgs[0] })

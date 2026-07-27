@@ -205,7 +205,14 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               <div className="animate-spin rounded-full h-8 w-8 border-4 border-stone-100 border-t-amber-500" />
             </div>
           ) : (
-            <TopProductsChart data={data?.topProducts?.slice(0, 5) ?? []} currency={currency} />
+            <TopProductsChart
+              data={(data?.topProducts?.slice(0, 5) ?? []).map((p: any) => ({
+                productId: p.productId ?? p.id ?? '',
+                name: p.name,
+                _sum: { subtotal: p.revenue ?? 0, qty: p.qty ?? 0 },
+              }))}
+              currency={currency}
+            />
           )}
         </div>
       </div>
@@ -217,7 +224,14 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
           {isLoading ? (
             <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-stone-50 animate-pulse rounded-xl" />)}</div>
           ) : (
-            <PaymentBreakdown data={data?.paymentBreakdown ?? []} currency={currency} />
+            <PaymentBreakdown
+              data={(data?.paymentBreakdown ?? []).map((p: any) => ({
+                method: p.method,
+                _sum: { amount: p.total ?? 0 },
+                _count: { id: p.count ?? 0 },
+              }))}
+              currency={currency}
+            />
           )}
         </div>
 

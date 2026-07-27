@@ -30,10 +30,11 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
   const [editing, setEditing] = useState<Discount | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  const { data: discounts = [], isLoading } = useQuery({
+  const { data: discountsRaw, isLoading } = useQuery({
     queryKey: ['discounts', storeId],
     queryFn: () => fetch(`/api/discounts?storeId=${storeId}`).then(r => r.json()),
   })
+  const discounts: Discount[] = (discountsRaw as any) ?? []
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => fetch(`/api/discounts/${id}`, { method: 'DELETE' }),

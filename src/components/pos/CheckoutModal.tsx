@@ -82,12 +82,12 @@ export default function PembayaranModal({
       })
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json() as any
         setError(data.error || 'Pembayaran failed')
         return
       }
 
-      const order = await res.json()
+      const order = await res.json() as any
       clearCart()
       onSuccess(order.id)
     } catch (e) {
@@ -158,7 +158,7 @@ export default function PembayaranModal({
               <input
                 type="number"
                 value={cashGiven}
-                onKembalian={e => setTunaiGiven(e.target.value)}
+                onChange={(e: any) => setTunaiGiven(e.target.value)}
                 placeholder={fmt(orderTotal)}
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
@@ -192,7 +192,7 @@ export default function PembayaranModal({
               <input
                 type="text"
                 value={reference}
-                onKembalian={e => setReference(e.target.value)}
+                onChange={(e: any) => setReference(e.target.value)}
                 placeholder="Contoh: 4 digit terakhir, nomor ref"
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />

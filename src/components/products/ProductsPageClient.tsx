@@ -90,7 +90,7 @@ export default function ProductsPageClient({
       })
       if (!res.ok) throw new Error('Failed to update')
 
-      const updated = await res.json()
+      const updated = await res.json() as any
       setProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)))
       showToast(`Product ${updated.active ? 'activated' : 'deactivated'}`)
     } catch (error) {

@@ -38,10 +38,11 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
   const [saving, setSaving] = useState(false)
   const [receiptNote, setReceiptNote] = useState('')
 
-  const { data: lines = [], isLoading } = useQuery({
+  const { data: linesRaw, isLoading } = useQuery({
     queryKey: ['po-lines', po.id],
     queryFn: () => fetch(`/api/purchase-orders/lines?storeId=${storeId}&orderId=${po.id}`).then(r => r.json()),
   })
+  const lines: any[] = (linesRaw as any) ?? []
 
   const cfg = STATUS_CONFIG[po.status as POStatus]
   const canReceive = ['SENT', 'CONFIRMED'].includes(po.status)
@@ -69,7 +70,7 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ receive, note: receiptNote }),
     })
-    const data = await res.json()
+    const data = await res.json() as any
     setSaving(false)
     if (res.ok) {
       setReceiving(false)

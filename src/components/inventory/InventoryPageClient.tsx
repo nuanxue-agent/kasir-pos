@@ -58,7 +58,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       if (filter === 'low') params.set('lowStockOnly', 'true')
 
       const res = await fetch(`/api/inventory?${params}`)
-      const data = await res.json()
+      const data = await res.json() as any
       
       let filtered = data.products || []
       

@@ -28,10 +28,12 @@ export default function AccountingPageClient({ storeId, currency }: AccountingPa
     queryFn: () => fetch(`/api/financial-reports/balance-sheet?storeId=${storeId}&to=${to}`).then(r => r.json()),
   })
 
-  const netProfit = pnl?.netProfit ?? 0
-  const totalAssets = balanceSheet?.totalAssets ?? 0
-  const totalLiabilities = balanceSheet?.totalLiabilities ?? 0
-  const totalEquity = balanceSheet?.totalEquity ?? 0
+  const pnlAny = (pnl as any) ?? {}
+  const bsAny = (balanceSheet as any) ?? {}
+  const netProfit = pnlAny?.netProfit ?? 0
+  const totalAssets = bsAny?.totalAssets ?? 0
+  const totalLiabilities = bsAny?.totalLiabilities ?? 0
+  const totalEquity = bsAny?.totalEquity ?? 0
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5 pb-24 lg:pb-6">
@@ -67,7 +69,7 @@ export default function AccountingPageClient({ storeId, currency }: AccountingPa
             <p className="text-xs font-medium text-stone-400">Pendapatan</p>
           </div>
           <p className="text-xl font-bold text-stone-800">
-            {pnlLoading ? '...' : formatCurrency(pnl?.revenue ?? 0, currency)}
+            {pnlLoading ? '...' : formatCurrency(pnlAny?.revenue ?? 0, currency)}
           </p>
         </div>
 
@@ -79,7 +81,7 @@ export default function AccountingPageClient({ storeId, currency }: AccountingPa
             <p className="text-xs font-medium text-stone-400">Biaya</p>
           </div>
           <p className="text-xl font-bold text-red-500">
-            {pnlLoading ? '...' : formatCurrency(pnl?.expenses ?? 0, currency)}
+            {pnlLoading ? '...' : formatCurrency(pnlAny?.expenses ?? 0, currency)}
           </p>
         </div>
 
@@ -124,11 +126,11 @@ export default function AccountingPageClient({ storeId, currency }: AccountingPa
             <div className="space-y-3 text-sm">
               <div className="flex justify-between pb-2 border-b border-stone-100">
                 <span className="font-semibold text-stone-700">Pendapatan</span>
-                <span className="font-semibold text-emerald-600">{formatCurrency(pnl?.revenue ?? 0, currency)}</span>
+                <span className="font-semibold text-emerald-600">{formatCurrency(pnlAny?.revenue ?? 0, currency)}</span>
               </div>
               <div className="flex justify-between pb-2 border-b border-stone-100">
                 <span className="font-semibold text-stone-700">Biaya</span>
-                <span className="font-semibold text-red-500">({formatCurrency(pnl?.expenses ?? 0, currency)})</span>
+                <span className="font-semibold text-red-500">({formatCurrency(pnlAny?.expenses ?? 0, currency)})</span>
               </div>
               <div className={`flex justify-between pt-2 border-t-2 ${netProfit >= 0 ? 'border-emerald-200' : 'border-red-200'}`}>
                 <span className="font-bold text-stone-800">Laba Bersih</span>

@@ -143,7 +143,7 @@ export default function ProductFormModal({
       })
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Failed to save product' }))
+        const errData = await res.json().catch(() => ({ error: 'Failed to save product' })) as any
         throw new Error(errData.error || 'Failed to save product')
       }
 

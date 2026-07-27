@@ -75,7 +75,7 @@ export default function POFormModal({ storeId, currency, taxRate, onClose, onSav
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ supplierId, expectedDate: expectedDate || null, note: note || null, lines, taxRate }),
       })
-      const data = await res.json()
+      const data = await res.json() as any
       if (!res.ok) return setError(data.error ?? 'Gagal membuat PO')
       onSaved()
     } catch {

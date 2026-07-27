@@ -127,7 +127,7 @@ export function CustomerDetailModal({
       setShowPointsForm(false)
       fetchCustomer()
     } else {
-      const data = await res.json()
+      const data = await res.json() as any
       setPointsError(data.error ?? 'Failed to update points')
     }
   }
@@ -141,7 +141,7 @@ export function CustomerDetailModal({
       onUpdate()
       onClose()
     } else {
-      const data = await res.json()
+      const data = await res.json() as any
       setDeleteError(data.error ?? 'Failed to delete customer')
       setDeleting(false)
     }

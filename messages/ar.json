@@ -1,9 +1,5 @@
 {
-  "_meta": {
-    "dir": "rtl",
-    "lang": "ar",
-    "locale": "Arabic"
-  },
+  "_meta": {"dir": "rtl", "locale": "ar"},
   "nav": {
     "dashboard": "لوحة التحكم",
     "pos": "نقطة البيع",
@@ -22,7 +18,7 @@
     "reports": "التقارير",
     "hr": "الموارد البشرية",
     "staff": "الموظفون",
-    "crm": "إدارة العملاء",
+    "crm": "إدارة علاقات العملاء",
     "stores": "المتاجر",
     "settings": "الإعدادات",
     "profile": "الملف الشخصي",
@@ -55,7 +51,7 @@
     "all": "الكل",
     "none": "لا شيء",
     "select": "اختيار",
-    "selectAll": "تحديد الكل",
+    "selectAll": "اختيار الكل",
     "clear": "مسح",
     "reset": "إعادة تعيين",
     "filter": "تصفية",
@@ -71,27 +67,27 @@
     "status": "الحالة",
     "active": "نشط",
     "inactive": "غير نشط",
-    "enabled": "مُفعّل",
+    "enabled": "مفعّل",
     "disabled": "معطّل",
     "required": "مطلوب",
     "optional": "اختياري",
     "noData": "لا توجد بيانات",
     "noResults": "لا توجد نتائج",
-    "rowsPerPage": "صفوف في الصفحة",
+    "rowsPerPage": "صفوف لكل صفحة",
     "of": "من",
     "page": "صفحة",
     "total": "الإجمالي",
     "showing": "عرض {from}–{to} من {total}",
     "confirmDelete": "هل أنت متأكد من حذف هذا العنصر؟",
     "deleteWarning": "لا يمكن التراجع عن هذا الإجراء.",
-    "unsavedChanges": "لديك تغييرات غير محفوظة. هل تريد المغادرة؟",
+    "unsavedChanges": "لديك تغييرات غير محفوظة. هل أنت متأكد من المغادرة؟",
     "or": "أو",
     "and": "و"
   },
   "auth": {
     "login": "تسجيل الدخول",
     "logout": "تسجيل الخروج",
-    "register": "إنشاء حساب",
+    "register": "تسجيل",
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور",
     "confirmPassword": "تأكيد كلمة المرور",
@@ -106,14 +102,14 @@
     "signUp": "إنشاء حساب",
     "signIn": "تسجيل الدخول",
     "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
-    "sessionExpired": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى."
+    "sessionExpired": "انتهت جلستك. يرجى تسجيل الدخول مجدداً."
   },
   "pos": {
     "title": "نقطة البيع",
-    "searchProducts": "ابحث عن منتج…",
-    "cart": "عربة التسوق",
-    "emptyCart": "عربة التسوق فارغة",
-    "addToCart": "أضف إلى العربة",
+    "searchProducts": "البحث عن المنتجات…",
+    "cart": "السلة",
+    "emptyCart": "السلة فارغة",
+    "addToCart": "إضافة إلى السلة",
     "removeFromCart": "إزالة",
     "quantity": "الكمية",
     "subtotal": "المجموع الفرعي",
@@ -128,7 +124,7 @@
     "transfer": "تحويل",
     "amountPaid": "المبلغ المدفوع",
     "change": "الباقي",
-    "processPayment": "إتمام الدفع",
+    "processPayment": "معالجة الدفع",
     "paymentSuccess": "تم الدفع بنجاح",
     "printReceipt": "طباعة الإيصال",
     "newTransaction": "معاملة جديدة",
@@ -138,7 +134,7 @@
     "applyDiscount": "تطبيق الخصم",
     "scanBarcode": "مسح الباركود",
     "outOfStock": "نفد المخزون",
-    "lowStock": "مخزون منخفض: متبقي {count}",
+    "lowStock": "مخزون منخفض: {count} متبقٍ",
     "selectVariant": "اختر المتغير",
     "note": "ملاحظة",
     "orderNote": "ملاحظة الطلب…"
@@ -161,10 +157,10 @@
     "image": "الصورة",
     "status": "الحالة",
     "trackStock": "تتبع المخزون",
-    "hasVariants": "له متغيرات",
+    "hasVariants": "يحتوي على متغيرات",
     "variants": "المتغيرات",
     "noProducts": "لا توجد منتجات بعد",
-    "searchProducts": "ابحث عن منتج…",
+    "searchProducts": "البحث عن المنتجات…",
     "filterByCategory": "تصفية حسب الفئة",
     "allCategories": "جميع الفئات",
     "outOfStock": "نفد المخزون",
@@ -210,7 +206,7 @@
     "refundOrder": "استرداد الطلب",
     "printReceipt": "طباعة الإيصال",
     "noOrders": "لا توجد طلبات بعد",
-    "searchOrders": "ابحث في الطلبات…",
+    "searchOrders": "البحث في الطلبات…",
     "filterByStatus": "تصفية حسب الحالة",
     "filterByDate": "تصفية حسب التاريخ",
     "orderDetails": "تفاصيل الطلب",
@@ -234,10 +230,10 @@
     "joinDate": "تاريخ الانضمام",
     "lastVisit": "آخر زيارة",
     "noCustomers": "لا يوجد عملاء بعد",
-    "searchCustomers": "ابحث عن عميل…",
+    "searchCustomers": "البحث عن العملاء…",
     "customerDetails": "تفاصيل العميل",
     "purchaseHistory": "سجل المشتريات",
-    "notes": "ملاحظات"
+    "notes": "الملاحظات"
   },
   "discounts": {
     "title": "الخصومات",
@@ -251,7 +247,7 @@
     "value": "القيمة",
     "minPurchase": "الحد الأدنى للشراء",
     "maxUses": "الحد الأقصى للاستخدام",
-    "usedCount": "استُخدم",
+    "usedCount": "مستخدم",
     "validFrom": "صالح من",
     "validUntil": "صالح حتى",
     "code": "الرمز",
@@ -263,7 +259,7 @@
   "inventory": {
     "title": "المخزون",
     "stockAdjustment": "تعديل المخزون",
-    "adjustStock": "تعديل المخزون",
+    "adjustStock": "ضبط المخزون",
     "currentStock": "المخزون الحالي",
     "newStock": "المخزون الجديد",
     "adjustment": "التعديل",
@@ -278,7 +274,7 @@
     "sku": "رمز المنتج",
     "product": "المنتج",
     "lastUpdated": "آخر تحديث",
-    "viewAllStock": "عرض كل المخزون ←"
+    "viewAllStock": "عرض كل المخزون →"
   },
   "suppliers": {
     "title": "الموردون",
@@ -286,14 +282,14 @@
     "editSupplier": "تعديل المورد",
     "deleteSupplier": "حذف المورد",
     "supplierName": "اسم المورد",
-    "contactPerson": "شخص الاتصال",
+    "contactPerson": "جهة الاتصال",
     "phone": "الهاتف",
     "email": "البريد الإلكتروني",
     "address": "العنوان",
     "website": "الموقع الإلكتروني",
-    "notes": "ملاحظات",
+    "notes": "الملاحظات",
     "noSuppliers": "لا يوجد موردون بعد",
-    "searchSuppliers": "ابحث عن مورد…",
+    "searchSuppliers": "البحث عن الموردين…",
     "totalOrders": "إجمالي الطلبات",
     "lastOrder": "آخر طلب"
   },
@@ -316,21 +312,21 @@
     "subtotal": "المجموع الفرعي",
     "tax": "الضريبة",
     "total": "الإجمالي",
-    "notes": "ملاحظات",
+    "notes": "الملاحظات",
     "noPurchaseOrders": "لا توجد أوامر شراء بعد",
-    "searchPurchaseOrders": "ابحث في أوامر الشراء…",
+    "searchPurchaseOrders": "البحث في أوامر الشراء…",
     "receiveOrder": "استلام الطلب",
     "poDetails": "تفاصيل أمر الشراء",
     "addItem": "إضافة عنصر",
     "product": "المنتج",
     "quantity": "الكمية",
-    "unitCost": "سعر الوحدة",
+    "unitCost": "تكلفة الوحدة",
     "totalCost": "التكلفة الإجمالية"
   },
   "accounting": {
     "title": "المحاسبة",
     "chartOfAccounts": "دليل الحسابات",
-    "journalEntries": "القيود اليومية",
+    "journalEntries": "قيود اليومية",
     "addAccount": "إضافة حساب",
     "editAccount": "تعديل الحساب",
     "accountCode": "رمز الحساب",
@@ -362,7 +358,7 @@
     "category": "الفئة",
     "date": "التاريخ",
     "paymentMethod": "طريقة الدفع",
-    "notes": "ملاحظات",
+    "notes": "الملاحظات",
     "noExpenses": "لا توجد مصروفات بعد",
     "totalExpenses": "إجمالي المصروفات"
   },
@@ -425,7 +421,7 @@
     "position": "المنصب",
     "department": "القسم",
     "salary": "الراتب",
-    "hireDate": "تاريخ التعيين",
+    "hireDate": "تاريخ التوظيف",
     "phone": "الهاتف",
     "email": "البريد الإلكتروني",
     "address": "العنوان",
@@ -433,9 +429,9 @@
     "active": "نشط",
     "inactive": "غير نشط",
     "attendance": "الحضور",
-    "payroll": "الرواتب",
+    "payroll": "كشف الرواتب",
     "noEmployees": "لا يوجد موظفون بعد",
-    "searchEmployees": "ابحث عن موظف…"
+    "searchEmployees": "البحث عن الموظفين…"
   },
   "staff": {
     "title": "الموظفون",
@@ -448,9 +444,9 @@
     "store": "المتجر",
     "status": "الحالة",
     "noStaff": "لا يوجد موظفون بعد",
-    "searchStaff": "ابحث عن موظف…",
+    "searchStaff": "البحث عن الموظفين…",
     "roles": {
-      "SUPER_ADMIN": "مدير النظام",
+      "SUPER_ADMIN": "مدير عام",
       "OWNER": "المالك",
       "MANAGER": "المدير",
       "CASHIER": "أمين الصندوق"
@@ -471,11 +467,11 @@
     "email": "البريد الإلكتروني",
     "status": "الحالة",
     "source": "المصدر",
-    "notes": "ملاحظات",
+    "notes": "الملاحظات",
     "lastContact": "آخر تواصل",
-    "nextFollowUp": "المتابعة التالية",
+    "nextFollowUp": "المتابعة القادمة",
     "noContacts": "لا توجد جهات اتصال بعد",
-    "pipeline": "خط الأنابيب"
+    "pipeline": "خط المبيعات"
   },
   "stores": {
     "title": "المتاجر",
@@ -489,7 +485,7 @@
     "timezone": "المنطقة الزمنية",
     "currency": "العملة",
     "noStores": "لا توجد متاجر بعد",
-    "selectStore": "اختر متجراً",
+    "selectStore": "اختر المتجر",
     "currentStore": "المتجر الحالي"
   },
   "settings": {
@@ -506,7 +502,7 @@
     "receiptHeader": "ترويسة الإيصال",
     "receiptFooter": "تذييل الإيصال",
     "showLogo": "إظهار الشعار",
-    "taxRate": "معدل الضريبة (%)",
+    "taxRate": "نسبة الضريبة (%)",
     "notifications": "الإشعارات",
     "emailNotifications": "إشعارات البريد الإلكتروني",
     "lowStockAlert": "تنبيه المخزون المنخفض",
@@ -514,7 +510,7 @@
     "theme": "السمة",
     "light": "فاتح",
     "dark": "داكن",
-    "system": "تلقائي",
+    "system": "النظام",
     "saveSettings": "حفظ الإعدادات",
     "settingsSaved": "تم حفظ الإعدادات بنجاح"
   },
@@ -522,9 +518,9 @@
     "title": "الإشعارات",
     "noNotifications": "لا توجد إشعارات جديدة",
     "lowStockWarning": "تحذير المخزون المنخفض",
-    "lowStockItems": "{count} تحذير",
-    "viewAllStock": "عرض كل المخزون ←",
-    "outOfStock": "نفد",
+    "lowStockItems": "{count} تحذير(ات)",
+    "viewAllStock": "عرض كل المخزون →",
+    "outOfStock": "نفد المخزون",
     "stockRemaining": "الحد الأدنى {min}"
   },
   "header": {
@@ -534,24 +530,24 @@
     "profile": "الملف الشخصي",
     "settings": "الإعدادات",
     "logout": "تسجيل الخروج",
-    "selectStore": "اختر متجراً"
+    "selectStore": "اختر المتجر"
   },
   "onboarding": {
     "title": "إعداد متجرك",
-    "subtitle": "لنبدأ",
+    "subtitle": "لنبدأ معاً",
     "storeName": "اسم المتجر",
     "storeType": "نوع المتجر",
     "continue": "متابعة",
     "finish": "إنهاء الإعداد",
-    "step": "خطوة {current} من {total}"
+    "step": "الخطوة {current} من {total}"
   },
   "errors": {
     "notFound": "الصفحة غير موجودة",
     "serverError": "حدث خطأ ما",
     "unauthorized": "غير مصرح",
-    "forbidden": "الوصول مرفوض",
-    "networkError": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
-    "tryAgain": "حاول مرة أخرى",
+    "forbidden": "تم رفض الوصول",
+    "networkError": "خطأ في الشبكة. يرجى المحاولة مجدداً.",
+    "tryAgain": "حاول مجدداً",
     "goHome": "الذهاب إلى لوحة التحكم"
   }
 }

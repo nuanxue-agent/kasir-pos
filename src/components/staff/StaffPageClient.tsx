@@ -35,10 +35,11 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null)
 
-  const { data: rawStaff = [], isLoading } = useQuery({
+  const { data: rawStaffData, isLoading } = useQuery({
     queryKey: ['staff', storeId],
     queryFn: () => fetch(`/api/staff?storeId=${storeId}`).then(r => r.json()),
   })
+  const rawStaff: any[] = (rawStaffData as any) ?? []
 
   // Normalize flat API shape → nested shape the template expects
   const staff: StaffMember[] = rawStaff.map((m: any) => ({
@@ -201,7 +202,7 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
         body: JSON.stringify(body),
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json() as any
         setError(data.error || 'Failed to save')
         return
       }

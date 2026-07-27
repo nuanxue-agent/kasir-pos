@@ -54,7 +54,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   )
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       name: store.name,
       address: store.address ?? '',

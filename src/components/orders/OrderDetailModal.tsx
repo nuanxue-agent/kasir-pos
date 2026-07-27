@@ -73,7 +73,7 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
     try {
       const res = await fetch(`/api/orders/${order.id}/void`, { method: 'POST' })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
+        const body = await res.json().catch(() => ({})) as any
         throw new Error(body.error ?? 'Failed to void order')
       }
       const updated: Order = await res.json()

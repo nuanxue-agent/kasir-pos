@@ -41,7 +41,7 @@ export default function SignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-      const result = await res.json()
+      const result = await res.json() as any
       if (!res.ok) { setError(result.error || 'Pendaftaran gagal'); return }
       // Auto-logged in — go straight to onboarding
       router.push(result.redirect ?? '/onboarding')

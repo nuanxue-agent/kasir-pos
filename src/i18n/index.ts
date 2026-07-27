@@ -1,21 +1,32 @@
 /**
- * i18n/index.ts
+ * src/i18n/index.ts
  *
- * Unified translation helper for both server and client components.
+ * Referenced by next.config.ts → createNextIntlPlugin('./src/i18n/index.ts').
+ * Must default-export getRequestConfig for next-intl's internal alias resolution.
  *
- * Server components:  import { getT } from '@/i18n'
- *                     const t = await getT('products')
+ * For server components that need translations, use next-intl/server directly:
+ *   import { getTranslations } from 'next-intl/server'
+ *   const t = await getTranslations('products')
  *
- * Client components:  use the `useTranslations` hook from next-intl directly,
- *                     or import { useT } from '@/i18n' as a convenience re-export.
+ * For client components:
+ *   import { useTranslations } from 'next-intl'
+ *   const t = useTranslations('products')
  */
+import { getRequestConfig } from 'next-intl/server'
+import { cookies } from 'next/headers'
+import { defaultLocale, locales, type Locale } from './routing'
 
-// Server-side helper — wraps next-intl's getTranslations
-export { getTranslations as getT } from 'next-intl/server'
+export default getRequestConfig(async () => {
+  const cookieStore = await cookies()
+  const raw = cookieStore.get('NEXT_LOCALE')?.value as Locale | undefined
+  const locale: Locale = raw && locales.includes(raw) ? raw : defaultLocale
 
-// Client-side helper — re-export useTranslations under a shorter alias
-export { useTranslations as useT } from 'next-intl'
+  return {
+    locale,
+    messages: (await import(`../../messages/${locale}.json`)).default,
+  }
+})
 
-// Re-export everything from routing for convenience
+// Locale metadata — safe to import anywhere (no next-intl/config dependency)
 export { locales, defaultLocale, localeNames, localeFlags, localeDir } from './routing'
 export type { Locale } from './routing'

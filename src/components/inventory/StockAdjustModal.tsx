@@ -55,7 +55,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
       })
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json() as any
         setError(data.error?.message || 'Failed to adjust stock')
         return
       }

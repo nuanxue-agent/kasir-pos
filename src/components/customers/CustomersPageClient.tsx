@@ -46,7 +46,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
       })
       const res = await fetch(`/api/customers?${params}`)
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as any
         setCustomers(data.customers)
         setTotal(data.total)
         setPages(data.pages)

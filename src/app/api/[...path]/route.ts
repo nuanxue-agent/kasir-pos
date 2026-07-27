@@ -443,7 +443,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok(rows)
       }
       if (method === 'POST') {
-        const b = await req.json()
+        const b = await req.json() as any
         if (!b.description || !b.amount || !b.date) return err('Missing required fields')
         const id = newId(); const t = nowISO()
         await exec(
@@ -453,7 +453,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok({ id }, 201)
       }
       if (segs[1] && method === 'PATCH') {
-        const b = await req.json()
+        const b = await req.json() as any
         const allowed = new Set(['category','description','amount','date','note'])
         const cols = filterCols(b, allowed)
         if (Object.keys(cols).length === 0) return err('No valid fields')
@@ -479,7 +479,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
       if (method === 'POST') {
         // Open a new shift
-        const b = await req.json()
+        const b = await req.json() as any
         // Close any existing open shift first
         await exec(`UPDATE Shift SET status='CLOSED', closedAt=?, updatedAt=? WHERE storeId=? AND status='OPEN'`, [nowISO(), nowISO(), storeId])
         const id = newId(); const t = nowISO()
@@ -491,7 +491,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
       if (segs[1] && method === 'PATCH') {
         // Close shift
-        const b = await req.json()
+        const b = await req.json() as any
         const shift = await queryOne<any>(`SELECT * FROM Shift WHERE id=? AND storeId=?`, [segs[1], storeId])
         if (!shift) return err('Shift not found', 404)
         const cashRevenue = await queryOne<any>(
@@ -516,7 +516,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok(rows)
       }
       if (method === 'POST') {
-        const b = await req.json()
+        const b = await req.json() as any
         if (!b.productId || !b.name) return err('Missing required fields')
         const id = newId(); const t = nowISO()
         await exec(
@@ -526,7 +526,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok({ id }, 201)
       }
       if (segs[1] && method === 'PATCH') {
-        const b = await req.json()
+        const b = await req.json() as any
         const allowed = new Set(['name','sku','price','stock','active'])
         const cols = filterCols(b, allowed)
         if (Object.keys(cols).length === 0) return err('No valid fields')

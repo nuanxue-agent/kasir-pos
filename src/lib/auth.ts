@@ -45,6 +45,8 @@ export interface SessionUser {
   name: string
   email: string
   role: string
+  image?: string | null
+  isSuperAdmin?: boolean
   tenantId?: string
   onboarded?: boolean
   stores: Array<{ id: string; name: string; role: string; currency: string; taxRate: number; modules?: string[] }>

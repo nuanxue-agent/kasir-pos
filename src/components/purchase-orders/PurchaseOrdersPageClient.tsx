@@ -40,11 +40,12 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
   const [showForm, setShowForm] = useState(false)
   const [selectedPO, setSelectedPO] = useState<any>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['purchase-orders', storeId, statusFilter],
     queryFn: () => fetch(`/api/purchase-orders?storeId=${storeId}${statusFilter ? `&status=${statusFilter}` : ''}`).then(r => r.json()),
   })
 
+  const data = rawData as any
   const orders = (data?.orders ?? []).filter((o: any) =>
     !search || o.number.toLowerCase().includes(search.toLowerCase()) || o.supplierName?.toLowerCase().includes(search.toLowerCase())
   )
