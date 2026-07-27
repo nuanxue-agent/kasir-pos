@@ -3872,6 +3872,80 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── KITCHEN TICKETS (KOT) ────────────────────────────────────────────────
+    if (segs[0] === 'kitchen' && segs[1] === 'tickets') {
+      // Lazy migration — idempotent
+      await exec(`CREATE TABLE IF NOT EXISTS KitchenTicket (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        tableNumber INTEGER NOT NULL,
+        items TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        note TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+
+      // GET /api/kitchen/tickets — list open tickets for this store
+      if (segs.length === 2 && method === 'GET') {
+        const statusFilter = sp.get('status') // optional: PENDING|IN_PROGRESS|COMPLETED
+        let sql = `SELECT * FROM KitchenTicket WHERE storeId = ?`
+        const params: any[] = [storeId]
+        if (statusFilter) {
+          sql += ` AND status = ?`
+          params.push(statusFilter)
+        } else {
+          // Default: exclude COMPLETED tickets older than 1 hour
+          sql += ` AND (status != 'COMPLETED' OR updatedAt > datetime('now', '-1 hour'))`
+        }
+        sql += ` ORDER BY createdAt ASC`
+        const rows = await query(sql, params)
+        // Parse items JSON for each row
+        const tickets = (rows as any[]).map(r => ({
+          ...r,
+          items: JSON.parse(r.items),
+        }))
+        return ok(tickets)
+      }
+
+      // POST /api/kitchen/tickets — create new KOT
+      if (segs.length === 2 && method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['tableNumber', 'items'])
+        const tableNumber = Number(b.tableNumber)
+        if (!Number.isInteger(tableNumber) || tableNumber < 1)
+          return err('tableNumber must be a positive integer')
+        if (!Array.isArray(b.items) || b.items.length === 0)
+          return err('items must be a non-empty array')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO KitchenTicket (id, storeId, tableNumber, items, status, note, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
+          [id, storeId, tableNumber, JSON.stringify(b.items), b.note ?? null, t, t],
+        )
+        return ok(
+          { id, storeId, tableNumber, items: b.items, status: 'PENDING', note: b.note ?? null, createdAt: t, updatedAt: t },
+          201,
+        )
+      }
+
+      // PATCH /api/kitchen/tickets/:id — update status
+      if (segs.length === 3 && method === 'PATCH') {
+        const ticketId = segs[2]
+        const b: any = await req.json()
+        const validStatuses = new Set(['PENDING', 'IN_PROGRESS', 'COMPLETED'])
+        if (!b.status || !validStatuses.has(b.status))
+          return err('status must be PENDING | IN_PROGRESS | COMPLETED')
+        const t = nowISO()
+        await exec(
+          `UPDATE KitchenTicket SET status = ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
+          [b.status, t, ticketId, storeId],
+        )
+        return ok({ success: true })
+      }
+    }
+
     // ─── TABLES ───────────────────────────────────────────────────────────────
     if (segs[0] === 'tables') {
       // Lazy migration — run once per cold start; idempotent
@@ -3944,6 +4018,78 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         )
         return ok({ success: true })
       }
+    }
+
+    // ─── REPORTS / TAX ────────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'tax' && method === 'GET') {
+      const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
+      if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
+      const fromStr = `${year}-01-01T00:00:00.000Z`
+      const toStr   = `${year}-12-31T23:59:59.999Z`
+      const monthRows = await query<any>(
+        `SELECT
+           CAST(strftime('%m', datetime(createdAt)) AS INTEGER) AS month,
+           SUM(total)   AS grossRevenue,
+           SUM(taxAmt)  AS taxCollected,
+           COUNT(*)     AS orderCount
+         FROM "Order"
+         WHERE storeId = ?
+           AND status  = 'PAID'
+           AND createdAt BETWEEN ? AND ?
+         GROUP BY month
+         ORDER BY month`,
+        [storeId, fromStr, toStr],
+      )
+      const result = monthRows.map((r: any) => {
+        const gross = Number(r.grossRevenue ?? 0)
+        const tax   = Number(r.taxCollected ?? 0)
+        // taxableRevenue = DPP = gross × 100/111
+        const taxable = Math.round((gross * 100) / 111)
+        return {
+          month:          Number(r.month),
+          grossRevenue:   gross,
+          taxableRevenue: taxable,
+          taxCollected:   tax,
+          orderCount:     Number(r.orderCount ?? 0),
+        }
+      })
+      return okCached(result, 'private, max-age=60')
+    }
+
+    // ─── REPORTS / ANNUAL ─────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'annual' && method === 'GET') {
+      const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
+      if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
+      const fromStr  = `${year}-01-01T00:00:00.000Z`
+      const toStr    = `${year}-12-31T23:59:59.999Z`
+      const dateFrom = `${year}-01-01`
+      const dateTo   = `${year}-12-31`
+      const [revenueRow, expensesRow] = await Promise.all([
+        queryOne<any>(
+          `SELECT
+             COALESCE(SUM(total),   0) AS totalRevenue,
+             COALESCE(SUM(taxAmt),  0) AS totalTax,
+             COUNT(*)                  AS orderCount
+           FROM "Order"
+           WHERE storeId = ? AND status = 'PAID'
+             AND createdAt BETWEEN ? AND ?`,
+          [storeId, fromStr, toStr],
+        ),
+        queryOne<any>(
+          `SELECT COALESCE(SUM(amount), 0) AS totalExpenses
+           FROM Expense
+           WHERE storeId = ? AND date BETWEEN ? AND ?`,
+          [storeId, dateFrom, dateTo],
+        ),
+      ])
+      const totalRevenue  = Number(revenueRow?.totalRevenue  ?? 0)
+      const totalTax      = Number(revenueRow?.totalTax      ?? 0)
+      const totalExpenses = Number(expensesRow?.totalExpenses ?? 0)
+      const netProfit     = totalRevenue - totalExpenses
+      return okCached(
+        { year, totalRevenue, totalTax, totalExpenses, netProfit, orderCount: Number(revenueRow?.orderCount ?? 0) },
+        'private, max-age=60',
+      )
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)

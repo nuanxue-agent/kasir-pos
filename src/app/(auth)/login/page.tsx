@@ -1,17 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Loader2, Mail, Lock, ArrowRight, ShoppingBag, Zap } from 'lucide-react'
+import { Loader2, Mail, Lock, ArrowRight, ShoppingBag, Zap, Star } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 
 const loginSchema = z.object({
   email: z.string().email('Email tidak valid'),
   password: z.string().min(1, 'Password wajib diisi'),
+  rememberMe: z.boolean().optional(),
 })
 
 type LoginForm = z.infer<typeof loginSchema>
@@ -26,6 +27,7 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [demoLoading, setDemoLoading] = useState<string | null>(null)
@@ -33,16 +35,26 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { rememberMe: false },
   })
 
-  const doLogin = async (email: string, password: string) => {
+  // Pre-fill from landing page CTA (?email=...&demo=1)
+  useEffect(() => {
+    const email = searchParams.get('email')
+    const isDemo = searchParams.get('demo') === '1'
+    if (email) setValue('email', email)
+    if (isDemo) setValue('password', 'demo123')
+  }, [searchParams, setValue])
+
+  const doLogin = async (email: string, password: string, rememberMe?: boolean) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, rememberMe: rememberMe ?? false }),
     })
     const result = (await res.json()) as { success?: boolean; error?: string }
     if (!res.ok || !result.success) throw new Error(result.error || 'Email atau password salah')
@@ -54,7 +66,7 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
     try {
-      await doLogin(data.email, data.password)
+      await doLogin(data.email, data.password, data.rememberMe)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Terjadi kesalahan. Coba lagi.')
     } finally {
@@ -86,7 +98,33 @@ export default function LoginPage() {
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[var(--shadow-md)]">
           <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.5} />
         </div>
-        <span className="text-lg font-bold tracking-tight text-[var(--text-1)]">Lakoo</span>
+        <span className="text-lg font-bold tracking-tight text-[var(--text-1)]">Kasir POS</span>
+      </div>
+
+      {/* ── Demo Mode Banner ── */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3" data-testid="demo-banner">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              🎯 Coba dengan akun demo: <span className="font-mono">owner@demo.com</span> / <span className="font-mono">demo123</span>
+            </p>
+            <p className="mt-0.5 text-xs text-amber-600">Akses penuh ke semua fitur — tidak perlu mendaftar.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loginAsDemo(DEMO_ACCOUNTS[0])}
+            disabled={isLoading || !!demoLoading}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            data-testid="btn-demo-quick"
+          >
+            {demoLoading === DEMO_ACCOUNTS[0].email ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="h-3.5 w-3.5" />
+            )}
+            Masuk sebagai Demo
+          </button>
+        </div>
       </div>
 
       {/* Card */}
@@ -154,6 +192,19 @@ export default function LoginPage() {
             {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
           </div>
 
+          {/* Remember me */}
+          <div className="flex items-center gap-2.5">
+            <input
+              {...register('rememberMe')}
+              type="checkbox"
+              id="rememberMe"
+              className="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400 focus:ring-offset-0 accent-amber-500"
+            />
+            <label htmlFor="rememberMe" className="text-sm text-[var(--text-2)] select-none cursor-pointer">
+              Ingat saya selama 30 hari
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={isLoading || !!demoLoading}
@@ -211,6 +262,14 @@ export default function LoginPage() {
             Demo: <span className="font-mono">demo123</span>
           </p>
         </div>
+      </div>
+
+      {/* Social proof */}
+      <div className="flex items-center justify-center gap-1.5" data-testid="social-proof-login">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+        ))}
+        <span className="ml-1 text-xs text-stone-500">Dipercaya oleh 500+ toko</span>
       </div>
 
       <p className="text-center text-sm text-[var(--text-3)]">

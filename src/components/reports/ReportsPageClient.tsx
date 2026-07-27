@@ -13,6 +13,8 @@ import {
   LineChart,
   Percent,
   UserCheck,
+  Receipt,
+  CalendarDays,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
@@ -48,6 +50,15 @@ interface GrossProfitData {
   cogs: number
   grossProfit: number
   grossMargin: number
+}
+
+interface AnnualSummaryData {
+  year: number
+  totalRevenue: number
+  totalTax: number
+  totalExpenses: number
+  netProfit: number
+  orderCount: number
 }
 
 function getDateRange(range: DateRange): { from: string; to: string } {
@@ -119,6 +130,16 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       const params = new URLSearchParams({ storeId, from, to })
       const res = await fetch(`/api/reports/gross-profit?${params}`)
       if (!res.ok) throw new Error('Failed to fetch gross profit')
+      return res.json()
+    },
+  })
+
+  const currentYear = new Date().getFullYear()
+  const { data: annual, isLoading: annualLoading } = useQuery<AnnualSummaryData>({
+    queryKey: ['reports-annual', storeId, currentYear],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/annual?storeId=${storeId}&year=${currentYear}`)
+      if (!res.ok) throw new Error('Failed to fetch annual summary')
       return res.json()
     },
   })
@@ -265,7 +286,81 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
           </div>
           <TrendingUp className="ml-auto h-4 w-4 text-stone-300 transition-colors group-hover:text-amber-400" />
         </Link>
-      </div>
+        <Link
+          href="/dashboard/reports/tax"
+          className="group flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm transition-all hover:border-amber-200 hover:shadow-md"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 transition-colors group-hover:bg-amber-100">
+            <Receipt className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[var(--text-1)]">Laporan Pajak PPN</p>
+            <p className="mt-0.5 text-xs text-[var(--text-3)]">
+              Rekap PPN 11% bulanan &amp; tahunan
+            </p>
+          </div>
+          <TrendingUp className="ml-auto h-4 w-4 text-stone-300 transition-colors group-hover:text-amber-400" />
+        </Link>
+        </div>
+
+        {/* Ringkasan Tahunan */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+        <div className="flex items-center gap-3 border-b border-[var(--border)] px-5 py-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+            <CalendarDays className="h-4 w-4 text-amber-500" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-[var(--text-1)]">Ringkasan Tahunan {currentYear}</h2>
+            <p className="text-xs text-[var(--text-3)]">Total keuangan sepanjang tahun berjalan</p>
+          </div>
+          <Link
+            href="/dashboard/reports/tax"
+            className="ml-auto text-xs font-semibold text-amber-500 hover:underline"
+          >
+            Lihat Detail →
+          </Link>
+        </div>
+        {annualLoading ? (
+          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-3">
+              <p className="mb-1 text-xs font-semibold text-[var(--text-3)]">Total Pendapatan</p>
+              <p className="text-base font-bold text-[var(--text-1)]">
+                {formatCurrency(annual?.totalRevenue ?? 0, currency)}
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-3)]">{annual?.orderCount ?? 0} pesanan</p>
+            </div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+              <p className="mb-1 text-xs font-semibold text-amber-600">Total Pajak (PPN)</p>
+              <p className="text-base font-bold text-amber-700">
+                {formatCurrency(annual?.totalTax ?? 0, currency)}
+              </p>
+              <p className="mt-0.5 text-xs text-amber-500">11% PPN dipungut</p>
+            </div>
+            <div className="rounded-xl border border-red-100 bg-red-50 p-3">
+              <p className="mb-1 text-xs font-semibold text-red-500">Total Pengeluaran</p>
+              <p className="text-base font-bold text-red-600">
+                -{formatCurrency(annual?.totalExpenses ?? 0, currency)}
+              </p>
+            </div>
+            <div
+              className={`rounded-xl border p-3 ${(annual?.netProfit ?? 0) >= 0 ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}
+            >
+              <p className={`mb-1 text-xs font-semibold ${(annual?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                Laba Bersih
+              </p>
+              <p className={`text-base font-bold ${(annual?.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                {formatCurrency(annual?.netProfit ?? 0, currency)}
+              </p>
+            </div>
+          </div>
+        )}
+        </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

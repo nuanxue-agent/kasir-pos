@@ -28,6 +28,8 @@ import {
   Package,
   UtensilsCrossed,
   Gift,
+  Monitor,
+  ChefHat,
 } from 'lucide-react'
 import TableMapClient, { type TableRecord } from './TableMapClient'
 import { cn } from '@/lib/utils'
@@ -35,6 +37,7 @@ import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 import BarcodeScanner from './BarcodeScanner'
 import { useCurrentStore } from '@/context/StoreContext'
 import POSTour, { shouldShowTour } from './POSTour'
+import { useCustomerDisplay, type DisplayPayload } from './CustomerDisplay'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,6 +133,43 @@ function fmt(n: number, currency: string) {
   }).format(n)
 }
 
+// ─── KOT thermal print ───────────────────────────────────────────────────────
+
+function printKOT(
+  ticket: { id: string; tableNumber: number; items: Array<{ name: string; qty: number; note?: string }>; createdAt: string },
+  storeName: string,
+  currency: string,
+) {
+  const lines = ticket.items
+    .map(i => `${i.qty}x ${i.name}${i.note ? ` (${i.note})` : ''}`)
+    .join('\n')
+  const time = new Date(ticket.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>KOT #${ticket.tableNumber}</title>
+<style>
+  @media print { @page { size: 80mm auto; margin: 0; } }
+  body { font-family: monospace; font-size: 14px; padding: 8px; width: 72mm; }
+  h1 { font-size: 18px; text-align: center; margin: 0 0 4px; }
+  .sub { text-align: center; font-size: 11px; margin-bottom: 8px; color: #555; }
+  hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+  .item { margin: 3px 0; }
+  .footer { text-align: center; font-size: 10px; margin-top: 8px; color: #777; }
+</style></head><body>
+<h1>*** DAPUR ***</h1>
+<div class="sub">${storeName}</div>
+<hr>
+<div><strong>Meja: ${ticket.tableNumber}</strong> &nbsp; ${time}</div>
+<hr>
+${ticket.items.map(i => `<div class="item">${i.qty}x <strong>${i.name}</strong>${i.note ? `<br>&nbsp;&nbsp;&nbsp;<em>${i.note}</em>` : ''}</div>`).join('')}
+<hr>
+<div class="footer">ID: ${ticket.id.slice(-8).toUpperCase()}</div>
+</body></html>`
+  const w = window.open('', '_blank', 'width=400,height=600')
+  if (!w) return
+  w.document.write(html)
+  w.document.close()
+  w.onload = () => { w.print(); w.close() }
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 // Forward declaration — CheckoutModal is defined below
@@ -195,6 +235,9 @@ export default function POSPageClient({
   // Manual discount state
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
   const [discountValue, setDiscountValue] = useState('')
+
+  // Customer display (pole display) via BroadcastChannel
+  const { broadcast } = useCustomerDisplay()
 
   // POS tour state — show for first-time users with no orders
   const [showTour, setShowTour] = useState(false)
@@ -530,7 +573,47 @@ export default function POSPageClient({
 
   const clearCart = useCallback(() => setCart([]), [])
 
+  // ─── Send to Kitchen ──────────────────────────────────────────────────────
+  const [kotSending, setKotSending] = useState(false)
+  const [kotMsg, setKotMsg] = useState('')
+
+  const sendToKitchen = useCallback(async () => {
+    if (!selectedTable || cart.length === 0) return
+    setKotSending(true)
+    try {
+      const items = cart.map(i => ({ name: i.name, qty: i.qty, note: '' }))
+      const res = await fetch(`/api/kitchen/tickets?storeId=${storeId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableNumber: selectedTable.number, items, note: orderNote }),
+      })
+      if (!res.ok) throw new Error('Gagal kirim ke dapur')
+      setKotMsg('✓ Tiket dapur dikirim!')
+      // Thermal print: open print window
+      const ticket = await res.json() as { data?: { id: string; tableNumber: number; items: { name: string; qty: number; note?: string }[]; createdAt: string } }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      printKOT((ticket.data ?? ticket) as any, storeName, currency)
+    } catch {
+      setKotMsg('⚠ Gagal kirim ke dapur')
+    } finally {
+      setKotSending(false)
+      setTimeout(() => setKotMsg(''), 3000)
+    }
+  }, [cart, selectedTable, storeId, orderNote, storeName, currency])
+
+
+
   const handleOrderSuccess = (order: ReceiptData) => {
+    // Broadcast thank-you screen to customer display
+    const cashPaid = (order as any).amountPaid ?? total
+    const change = Math.max(0, cashPaid - total)
+    broadcast({
+      type: 'payment',
+      storeName,
+      currency,
+      amountPaid: cashPaid,
+      change,
+    } as DisplayPayload)
     clearCart()
     setShowCheckout(false)
     setSelectedCustomer(null)
@@ -598,6 +681,21 @@ export default function POSPageClient({
     }
     prevCartCount.current = cartCount
   }, [cartCount])
+
+  // Broadcast cart state to customer display whenever cart or totals change
+  useEffect(() => {
+    broadcast({
+      type: 'cart',
+      storeName,
+      currency,
+      taxRate,
+      items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
+      subtotal,
+      taxAmt,
+      total,
+    } as DisplayPayload)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, subtotal, taxAmt, total])
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden bg-[#fffdf7]">
@@ -739,6 +837,41 @@ export default function POSPageClient({
               </span>
             )}
           </button>
+
+          {/* Customer display (pole display) button */}
+          <button
+            onClick={() => window.open('/pos/display', 'kasir-display', 'width=800,height=600')}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-3)] transition-colors hover:text-[var(--text-2)]"
+            title="Buka layar pelanggan"
+            aria-label="Buka layar pelanggan"
+            type="button"
+          >
+            <Monitor className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Display</span>
+          </button>
+
+          {/* Send to Kitchen — only visible in table/dine-in mode */}
+          {mejaModeEnabled && selectedTable && cart.length > 0 && (
+            <button
+              onClick={sendToKitchen}
+              disabled={kotSending}
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-500/60 bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+              title="Kirim pesanan ke dapur"
+              aria-label="Kirim ke dapur"
+              type="button"
+            >
+              {kotSending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                : <ChefHat className="h-3.5 w-3.5" aria-hidden="true" />
+              }
+              <span className="hidden sm:inline">{kotSending ? 'Mengirim…' : 'Dapur'}</span>
+            </button>
+          )}
+          {kotMsg && (
+            <span className="rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-medium text-emerald-700">
+              {kotMsg}
+            </span>
+          )}
         </div>
 
         {/* Category filter */}

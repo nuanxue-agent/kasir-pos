@@ -1,5 +1,63 @@
 import Link from 'next/link'
-import { ShoppingBag, BarChart3, Package, Users, CheckCircle, ArrowRight, Star } from 'lucide-react'
+import {
+  ShoppingBag, BarChart3, Package, Users, CheckCircle, ArrowRight,
+  Star, Wifi, WifiOff, Store, FileText, Zap,
+} from 'lucide-react'
+
+// Demo credentials used site-wide
+export const DEMO_EMAIL = 'owner@demo.com'
+export const DEMO_PASSWORD = 'demo123'
+export const DEMO_LOGIN_HREF = `/login?email=${encodeURIComponent(DEMO_EMAIL)}&demo=1`
+
+// Feature list used in tests
+export const FEATURES = [
+  { id: 'pos',        title: 'Kasir (POS)',         icon: ShoppingBag },
+  { id: 'inventory',  title: 'Manajemen Stok',       icon: Package },
+  { id: 'reports',    title: 'Laporan & Analitik',   icon: BarChart3 },
+  { id: 'multistore', title: 'Multi-Toko',           icon: Store },
+  { id: 'offline',    title: 'Offline-Ready',        icon: WifiOff },
+  { id: 'customers',  title: 'Data Pelanggan',       icon: Users },
+]
+
+// Pricing tiers used in tests
+export const PRICING_TIERS = [
+  {
+    id: 'free',
+    name: 'FREE',
+    price: 0,
+    label: 'Gratis',
+    per: '/bulan',
+    desc: 'Cocok untuk mulai.',
+    features: ['1 toko', '2 kasir', '100 produk', 'Laporan dasar'],
+    cta: 'Mulai Gratis',
+    ctaHref: '/signup',
+    highlight: false,
+  },
+  {
+    id: 'pro',
+    name: 'PRO',
+    price: 99000,
+    label: 'Rp 99rb',
+    per: '/bulan',
+    desc: 'Untuk usaha yang berkembang.',
+    features: ['3 toko', '10 kasir', 'Produk tak terbatas', 'Laporan lengkap', 'Poin loyalitas', 'Prioritas dukungan'],
+    cta: 'Coba Pro',
+    ctaHref: '/signup?plan=pro',
+    highlight: true,
+  },
+  {
+    id: 'enterprise',
+    name: 'ENTERPRISE',
+    price: 299000,
+    label: 'Rp 299rb',
+    per: '/bulan',
+    desc: 'Untuk usaha besar.',
+    features: ['Toko tak terbatas', 'Kasir tak terbatas', 'API akses', 'Custom integrasi', 'Dukungan khusus'],
+    cta: 'Hubungi Kami',
+    ctaHref: '/signup?plan=enterprise',
+    highlight: false,
+  },
+]
 
 export default function LandingPage() {
   return (
@@ -11,18 +69,22 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-amber-200">
               <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="text-xl font-bold tracking-tight text-[#1c1917]">Lakoo</span>
+            <span className="text-xl font-bold tracking-tight text-[#1c1917]">Kasir POS</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#fitur" className="text-sm text-stone-500 hover:text-amber-600 transition-colors">Fitur</a>
+            <a href="#screenshot" className="text-sm text-stone-500 hover:text-amber-600 transition-colors">Tampilan</a>
             <a href="#harga" className="text-sm text-stone-500 hover:text-amber-600 transition-colors">Harga</a>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-sm text-stone-500 hover:text-[#1c1917] transition-colors hidden sm:block">
               Masuk
             </Link>
-            <Link href="/signup" className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all hover:scale-[1.02]">
-              Coba Gratis
+            <Link
+              href={DEMO_LOGIN_HREF}
+              className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all hover:scale-[1.02]"
+            >
+              Coba Demo Gratis
             </Link>
           </div>
         </nav>
@@ -34,34 +96,36 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm text-amber-700">
             <span className="text-amber-500">✦</span>
-            Gratis untuk 1 toko
+            Gratis untuk 1 toko — Tanpa kartu kredit
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-bold leading-[1.1] tracking-tight">
-            Kelola toko,{' '}
+            Kasir POS —{' '}
             <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
-              catat penjualan
+              Solusi Kasir Modern
             </span>
-            , semua dari satu tempat
+            {' '}untuk UMKM Indonesia
           </h1>
 
           <p className="mt-6 text-lg text-stone-500 leading-relaxed max-w-xl mx-auto">
-            Lakoo bantu pemilik warung dan toko kecil kelola jualan sehari-hari — tanpa ribet, tanpa perlu keahlian teknis.
+            Kelola penjualan, stok, laporan, dan multi-toko — semuanya dari satu aplikasi.
+            Bekerja online maupun offline.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
-              href="/signup"
+              href={DEMO_LOGIN_HREF}
               className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-amber-200 hover:shadow-amber-300 hover:scale-[1.02] transition-all"
+              data-testid="cta-demo"
             >
-              Mulai Gratis — Tanpa Kartu Kredit
+              Coba Demo Gratis
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <Link
-              href="/login"
+              href="/signup"
               className="rounded-xl border border-stone-200 px-7 py-3.5 text-sm font-semibold text-stone-600 hover:border-amber-300 hover:text-amber-700 transition-all"
             >
-              Lihat Demo
+              Mulai Gratis — Tanpa Kartu Kredit
             </Link>
           </div>
 
@@ -70,11 +134,13 @@ export default function LandingPage() {
             {[...Array(5)].map((_, i) => (
               <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
             ))}
-            <span className="ml-2 text-sm text-stone-500">Dipercaya ratusan pemilik toko</span>
+            <span className="ml-2 text-sm text-stone-500" data-testid="social-proof">
+              Dipercaya oleh 500+ toko di Indonesia
+            </span>
           </div>
         </div>
 
-        {/* App preview */}
+        {/* App preview mock */}
         <div className="mx-auto mt-16 max-w-4xl">
           <div className="relative rounded-2xl border border-amber-100 bg-white shadow-2xl shadow-amber-100/60 overflow-hidden">
             {/* Fake browser bar */}
@@ -87,7 +153,7 @@ export default function LandingPage() {
               <div className="flex-1 flex justify-center">
                 <div className="flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-1 text-xs text-stone-400">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  app.lakoo.id — Kasir POS
+                  kasir-pos-alpha.vercel.app — Kasir POS
                 </div>
               </div>
             </div>
@@ -154,30 +220,83 @@ export default function LandingPage() {
           <div className="text-center mb-14">
             <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Fitur</p>
             <h2 className="text-3xl sm:text-4xl font-bold">Semua yang kamu butuhkan</h2>
-            <p className="mt-3 text-stone-500">Dirancang khusus untuk usaha kecil yang ingin rapi tanpa ribet.</p>
+            <p className="mt-3 text-stone-500">Dirancang khusus untuk UMKM yang ingin rapi tanpa ribet.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {[
-              { icon: ShoppingBag, title: 'Kasir yang Cepat', desc: 'Catat transaksi hanya dalam beberapa ketuk. Mendukung berbagai metode pembayaran: tunai, transfer, QRIS.', color: 'bg-amber-50 text-amber-600' },
-              { icon: Package, title: 'Stok Otomatis', desc: 'Stok berkurang otomatis setiap ada penjualan. Dapat notifikasi kalau barang hampir habis.', color: 'bg-orange-50 text-orange-600' },
-              { icon: BarChart3, title: 'Laporan Harian', desc: 'Lihat total omzet, produk terlaris, dan riwayat transaksi kapan saja — langsung dari HP.', color: 'bg-amber-50 text-amber-600' },
-              { icon: Users, title: 'Data Pelanggan', desc: 'Simpan data pelanggan, catat poin loyalitas, dan beri reward buat pelanggan setia.', color: 'bg-orange-50 text-orange-600' },
-            ].map(({ icon: Icon, title, desc, color }) => (
-              <div key={title} className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-amber-200 transition-all">
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${color} mb-4`}>
-                  <Icon className="h-5 w-5" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {FEATURES.map(({ id, title, icon: Icon }) => {
+              const descs: Record<string, string> = {
+                pos:        'Catat transaksi dalam hitungan detik. Dukung tunai, transfer, dan QRIS.',
+                inventory:  'Stok berkurang otomatis. Notifikasi kalau barang hampir habis.',
+                reports:    'Lihat omzet, produk terlaris, dan laporan harian kapan saja.',
+                multistore: 'Kelola banyak cabang toko dari satu dashboard terpusat.',
+                offline:    'Tetap bisa transaksi meski koneksi internet putus. Sinkronisasi otomatis.',
+                customers:  'Simpan data pelanggan, kelola poin loyalitas, dan beri reward.',
+              }
+              const colors: Record<string, string> = {
+                pos: 'bg-amber-50 text-amber-600', inventory: 'bg-orange-50 text-orange-600',
+                reports: 'bg-amber-50 text-amber-600', multistore: 'bg-orange-50 text-orange-600',
+                offline: 'bg-stone-100 text-stone-600', customers: 'bg-amber-50 text-amber-600',
+              }
+              return (
+                <div key={id} className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-amber-200 transition-all">
+                  <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${colors[id]} mb-4`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-semibold text-stone-800 mb-2">{title}</h3>
+                  <p className="text-sm text-stone-500 leading-relaxed">{descs[id]}</p>
                 </div>
-                <h3 className="font-semibold text-stone-800 mb-2">{title}</h3>
-                <p className="text-sm text-stone-500 leading-relaxed">{desc}</p>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Screenshots (placeholder) ── */}
+      <section id="screenshot" className="px-6 py-24 bg-amber-50/40">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Tampilan Aplikasi</p>
+            <h2 className="text-3xl sm:text-4xl font-bold">Antarmuka yang bersih & intuitif</h2>
+            <p className="mt-3 text-stone-500">Dirancang agar siapa pun bisa langsung pakai tanpa pelatihan.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {[
+              { label: 'Dashboard Penjualan', color: 'from-amber-400/30 to-orange-400/20', icon: BarChart3, desc: 'Ringkasan omzet & transaksi hari ini' },
+              { label: 'Layar Kasir (POS)', color: 'from-amber-500/25 to-amber-300/15', icon: ShoppingBag, desc: 'Pilih produk → tambah ke keranjang → bayar' },
+              { label: 'Laporan Bulanan', color: 'from-orange-400/30 to-amber-400/20', icon: FileText, desc: 'Grafik penjualan, produk terlaris, margin' },
+            ].map(({ label, color, icon: Icon, desc }) => (
+              <div key={label} className="rounded-2xl border border-amber-100 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all">
+                {/* placeholder colored "screenshot" */}
+                <div className={`h-44 bg-gradient-to-br ${color} flex items-center justify-center`}>
+                  <div className="text-center">
+                    <Icon className="mx-auto h-10 w-10 text-amber-500/60 mb-2" />
+                    <span className="text-xs text-amber-700/60 font-medium">{label}</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm font-semibold text-stone-700">{label}</p>
+                  <p className="text-xs text-stone-400 mt-1">{desc}</p>
+                </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              href={DEMO_LOGIN_HREF}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-amber-200 hover:shadow-amber-300 hover:scale-[1.02] transition-all"
+            >
+              <Zap className="h-4 w-4" />
+              Coba Demo Gratis Sekarang
+            </Link>
           </div>
         </div>
       </section>
 
       {/* ── How it works ── */}
-      <section className="px-6 py-24 bg-amber-50/40">
+      <section className="px-6 py-24">
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-14">
             <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Cara Kerja</p>
@@ -202,7 +321,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Pricing ── */}
-      <section id="harga" className="px-6 py-24">
+      <section id="harga" className="px-6 py-24 bg-amber-50/40">
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-14">
             <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Harga</p>
@@ -211,16 +330,24 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {[
-              { name: 'Gratis', price: 'Rp 0', per: '/bulan', desc: 'Cocok untuk mulai.', features: ['1 toko', '2 kasir', '100 produk', 'Laporan dasar'], cta: 'Mulai Gratis', highlight: false },
-              { name: 'Pro', price: 'Rp 99rb', per: '/bulan', desc: 'Untuk usaha yang berkembang.', features: ['3 toko', '10 kasir', 'Produk tak terbatas', 'Laporan lengkap', 'Poin loyalitas', 'Prioritas dukungan'], cta: 'Coba Pro', highlight: true },
-              { name: 'Bisnis', price: 'Rp 299rb', per: '/bulan', desc: 'Untuk usaha besar.', features: ['Toko tak terbatas', 'Kasir tak terbatas', 'API akses', 'Custom integrasi', 'Dukungan khusus'], cta: 'Hubungi Kami', highlight: false },
-            ].map(({ name, price, per, desc, features, cta, highlight }) => (
-              <div key={name} className={`relative rounded-2xl p-8 ${highlight ? 'bg-gradient-to-b from-amber-500 to-orange-500 text-white shadow-2xl shadow-amber-200 scale-[1.02]' : 'bg-white border border-stone-100 shadow-sm'}`}>
-                {highlight && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-600 shadow">Paling Populer</div>}
-                <div className={`text-sm font-semibold uppercase tracking-widest ${highlight ? 'text-amber-100' : 'text-stone-400'}`}>{name}</div>
+            {PRICING_TIERS.map(({ id, name, label, per, desc, features, cta, ctaHref, highlight }) => (
+              <div
+                key={id}
+                data-testid={`pricing-${id}`}
+                className={`relative rounded-2xl p-8 ${highlight
+                  ? 'bg-gradient-to-b from-amber-500 to-orange-500 text-white shadow-2xl shadow-amber-200 scale-[1.02]'
+                  : 'bg-white border border-stone-100 shadow-sm'}`}
+              >
+                {highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-600 shadow">
+                    Paling Populer
+                  </div>
+                )}
+                <div className={`text-sm font-semibold uppercase tracking-widest ${highlight ? 'text-amber-100' : 'text-stone-400'}`}>
+                  {name}
+                </div>
                 <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{price}</span>
+                  <span className="text-4xl font-bold">{label}</span>
                   <span className={`text-sm ${highlight ? 'text-amber-100' : 'text-stone-400'}`}>{per}</span>
                 </div>
                 <p className={`mt-2 text-sm ${highlight ? 'text-amber-100' : 'text-stone-500'}`}>{desc}</p>
@@ -233,8 +360,12 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/signup"
-                  className={`mt-8 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all ${highlight ? 'bg-white text-amber-600 hover:bg-amber-50' : 'border border-stone-200 text-stone-700 hover:border-amber-300 hover:text-amber-700'}`}
+                  href={ctaHref}
+                  className={`mt-8 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all ${
+                    highlight
+                      ? 'bg-white text-amber-600 hover:bg-amber-50'
+                      : 'border border-stone-200 text-stone-700 hover:border-amber-300 hover:text-amber-700'
+                  }`}
                 >
                   {cta}
                 </Link>
@@ -248,13 +379,18 @@ export default function LandingPage() {
       <section className="px-6 py-24 bg-gradient-to-br from-amber-500 to-orange-500">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white">Siap rapikan tokomu?</h2>
-          <p className="mt-4 text-amber-100 text-lg">Bergabung dengan ratusan pemilik toko yang sudah pakai Lakoo. Gratis untuk mulai.</p>
+          <p className="mt-4 text-amber-100 text-lg">
+            Bergabung dengan 500+ pemilik toko yang sudah pakai Kasir POS. Gratis untuk mulai.
+          </p>
           <div className="mt-8 flex flex-wrap gap-4 justify-center">
             <Link href="/signup" className="rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-amber-600 hover:bg-amber-50 transition-colors shadow-lg">
               Mulai Sekarang — Gratis
             </Link>
-            <Link href="/login" className="rounded-xl border border-white/30 px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors">
-              Masuk ke Akun
+            <Link
+              href={DEMO_LOGIN_HREF}
+              className="rounded-xl border border-white/30 px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+            >
+              Coba Demo Gratis
             </Link>
           </div>
         </div>
@@ -262,20 +398,23 @@ export default function LandingPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-stone-100 px-6 py-10">
-        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
               <ShoppingBag className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-bold text-stone-800">Lakoo</span>
+            <span className="font-bold text-stone-800">Kasir POS</span>
           </div>
-          <div className="flex gap-6 text-sm text-stone-400">
+          <div className="flex flex-wrap gap-6 text-sm text-stone-400">
             <a href="#fitur" className="hover:text-amber-600 transition-colors">Fitur</a>
+            <a href="#screenshot" className="hover:text-amber-600 transition-colors">Tampilan</a>
             <a href="#harga" className="hover:text-amber-600 transition-colors">Harga</a>
             <Link href="/login" className="hover:text-amber-600 transition-colors">Masuk</Link>
             <Link href="/signup" className="hover:text-amber-600 transition-colors">Daftar</Link>
+            <a href="#" className="hover:text-amber-600 transition-colors">Syarat &amp; Ketentuan</a>
+            <a href="#" className="hover:text-amber-600 transition-colors">Privasi</a>
           </div>
-          <p className="text-xs text-stone-400">© 2026 Lakoo. All rights reserved.</p>
+          <p className="text-xs text-stone-400">© 2026 Kasir POS. All rights reserved.</p>
         </div>
       </footer>
     </div>
