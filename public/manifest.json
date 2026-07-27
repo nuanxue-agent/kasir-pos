@@ -1,0 +1,44 @@
+{
+  "name": "Lakoo POS",
+  "short_name": "Lakoo",
+  "description": "Point of Sale & Business Management for SMEs",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f59e0b",
+  "orientation": "any",
+  "categories": ["business", "productivity", "finance"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "POS Cashier",
+      "short_name": "Kasir",
+      "description": "Open POS screen",
+      "url": "/dashboard/pos",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "New Order",
+      "short_name": "Order",
+      "description": "Quick new order",
+      "url": "/dashboard/orders",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "lang": "en",
+  "dir": "ltr"
+}

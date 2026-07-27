@@ -59,10 +59,14 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     const user = session.user as any
     const defaultStoreId = user.stores?.[0]?.id
 
+    // ─── GLOBAL TENANT GUARD ──────────────────────────────────────────────────
+    // Resolve storeId once for all routes. Public endpoints (register/login)
+    // are handled in separate route files and never reach here.
+    const storeId: string = url.searchParams.get('storeId') ?? defaultStoreId
+    if (!storeId) return err('storeId required', 400)
+
     // ─── PRODUCTS ─────────────────────────────────────────────────────────────
     if (segs[0] === 'products') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
 
       if (segs.length === 1) {
         if (method === 'GET') {
@@ -113,16 +117,12 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── CATEGORIES ───────────────────────────────────────────────────────────
     if (segs[0] === 'categories') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       if (method === 'GET') return ok(await query(
         `SELECT * FROM Category WHERE storeId = ? AND active = 1 ORDER BY sortOrder`, [storeId]))
     }
 
     // ─── ORDERS ───────────────────────────────────────────────────────────────
     if (segs[0] === 'orders') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
 
       if (segs.length === 1) {
         if (method === 'GET') {
@@ -229,8 +229,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── CUSTOMERS ────────────────────────────────────────────────────────────
     if (segs[0] === 'customers') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
 
       if (segs.length === 1) {
         if (method === 'GET') {
@@ -280,8 +278,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── INVENTORY ────────────────────────────────────────────────────────────
     if (segs[0] === 'inventory') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
 
       if (segs.length === 1 && method === 'GET') {
         const lowStockOnly = sp.get('lowStockOnly') === 'true'
@@ -311,8 +307,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── DISCOUNTS ────────────────────────────────────────────────────────────
     if (segs[0] === 'discounts') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
 
       if (segs.length === 1) {
         if (method === 'GET') return ok(await query(`SELECT * FROM Discount WHERE storeId = ? ORDER BY createdAt DESC`, [storeId]))
@@ -347,8 +341,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── STAFF ────────────────────────────────────────────────────────────────
     if (segs[0] === 'staff') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       // Only OWNER or MANAGER can manage staff
       const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
       if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
@@ -407,8 +399,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── SETTINGS ─────────────────────────────────────────────────────────────
     if (segs[0] === 'settings' && segs[1] === 'store') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       // Only OWNER can update store settings
       const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
       if (method === 'GET') return ok(await queryOne(`SELECT * FROM Store WHERE id = ?`, [storeId]))
@@ -426,8 +416,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── REPORTS ──────────────────────────────────────────────────────────────
     if (segs[0] === 'reports' && segs[1] === 'summary' && method === 'GET') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
       const to = sp.get('to') ?? new Date().toISOString()
       const [revenue, daily, topProducts, payments, customers, expenses] = await Promise.all([
@@ -445,8 +433,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── EXPENSES ─────────────────────────────────────────────────────────────
     if (segs[0] === 'expenses') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       if (method === 'GET') {
         const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
         const to   = sp.get('to')   ?? new Date().toISOString()
@@ -483,8 +469,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── SHIFTS ───────────────────────────────────────────────────────────────
     if (segs[0] === 'shifts') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       if (method === 'GET') {
         if (sp.get('active') === 'true') {
           const shift = await queryOne(`SELECT * FROM Shift WHERE storeId=? AND status='OPEN' ORDER BY openedAt DESC LIMIT 1`, [storeId])
@@ -525,8 +509,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── VARIANTS ─────────────────────────────────────────────────────────────
     if (segs[0] === 'variants') {
-      const storeId = sp.get('storeId') ?? defaultStoreId
-      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       const productId = sp.get('productId')
       if (method === 'GET') {
         if (!productId) return err('productId required')

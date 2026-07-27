@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode } from 'lucide-react'
+import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode, Scan, ShoppingCart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReceiptModal, { type ReceiptData } from './ReceiptModal'
+import BarcodeScanner from './BarcodeScanner'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,10 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [redeemPoints, setRedeemPoints] = useState(false)
 
-  // Barcode scanner state
+  // Camera barcode scanner modal state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+
+  // HID barcode scanner state
   const barcodeBuffer = useRef('')
   const lastKeyTime = useRef(0)
   const barcodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -157,6 +161,21 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
     })
     // On mobile, briefly flash cart count — don't auto-switch tab so user can keep adding
   }, [])
+
+  const handleBarcodeScan = useCallback((barcode: string) => {
+    const product = products.find(p => p.barcode === barcode)
+    if (product) {
+      if (product.trackStock && product.stock <= 0) {
+        setSuccessMsg(`⚠ ${product.name} habis stok`)
+      } else {
+        addToCart(product)
+        setSuccessMsg(`✓ Ditambahkan: ${product.name}`)
+      }
+    } else {
+      setSuccessMsg(`✗ Barcode tidak ditemukan: ${barcode}`)
+    }
+    setTimeout(() => setSuccessMsg(''), 2500)
+  }, [products, addToCart])
 
   const updateQty = useCallback((id: string, qty: number) => {
     setCart(prev => qty <= 0
@@ -247,10 +266,19 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
               <List className="h-4 w-4" />
             </button>
           </div>
-          {/* Barcode scanner indicator */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200" title="Barcode scanner ready">
+          {/* Camera barcode scanner button */}
+          <button
+            onClick={() => setShowBarcodeScanner(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200 hover:border-amber-400/60 hover:bg-amber-500/10 transition-colors"
+            title="Buka kamera scanner"
+          >
+            <Scan className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-[10px] font-medium text-amber-600 hidden sm:block">Scan</span>
+          </button>
+          {/* HID scanner indicator */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200" title="USB/Bluetooth barcode scanner ready">
             <ScanBarcode className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-[10px] font-medium text-emerald-600 hidden sm:block">Barcode</span>
+            <span className="text-[10px] font-medium text-emerald-600 hidden sm:block">HID</span>
           </div>
         </div>
 
@@ -441,6 +469,16 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           </div>
         )}
       </div>
+
+      {/* ── Barcode Scanner Modal ── */}
+      <BarcodeScanner
+        active={showBarcodeScanner}
+        onScan={(barcode) => {
+          handleBarcodeScan(barcode)
+          setShowBarcodeScanner(false)
+        }}
+        onClose={() => setShowBarcodeScanner(false)}
+      />
 
       {/* ── Checkout Modal ── */}
       {showCheckout && (

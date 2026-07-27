@@ -49,3 +49,15 @@ body {
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Barcode scanner line animation */
+@keyframes scan-line {
+  0%   { top: 10%; }
+  50%  { top: 85%; }
+  100% { top: 10%; }
+}
+
+@utility animate-scan-line {
+  animation: scan-line 2s ease-in-out infinite;
+  position: absolute;
+}
