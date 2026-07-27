@@ -47,6 +47,7 @@ import {
 } from 'recharts'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import ActivityFeedClient from '@/components/dashboard/ActivityFeedClient'
 
 interface DashboardClientPageProps {
   storeId: string
@@ -1039,6 +1040,9 @@ export default function DashboardClientPage({
           )}
         </div>
       </div>
+
+      {/* ── Activity Feed ── */}
+      <ActivityFeedClient storeId={storeId} />
 
       {/* ── Bottom padding for mobile nav ── */}
       <div className="h-4 lg:h-0" />

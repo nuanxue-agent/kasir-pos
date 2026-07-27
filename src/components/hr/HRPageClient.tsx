@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users,
@@ -20,6 +20,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Star,
+  Printer,
+  RefreshCw,
+  TrendingUp,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -740,7 +744,7 @@ function CutiTab({
 // ── Main component ────────────────────────────────────────────────────────────
 export default function HRPageClient({ storeId, currency, userRole }: HRPageClientProps) {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'karyawan' | 'absensi' | 'cuti'>('karyawan')
+  const [tab, setTab] = useState<'karyawan' | 'absensi' | 'cuti' | 'payroll' | 'penilaian'>('karyawan')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -791,6 +795,8 @@ export default function HRPageClient({ storeId, currency, userRole }: HRPageClie
     { key: 'karyawan', label: 'Karyawan', icon: Users },
     { key: 'absensi', label: 'Absensi', icon: UserCheck },
     { key: 'cuti', label: 'Cuti & Izin', icon: FileText },
+    { key: 'payroll', label: 'Payroll', icon: DollarSign },
+    { key: 'penilaian', label: 'Penilaian', icon: TrendingUp },
   ] as const
 
   return (
@@ -1031,6 +1037,140 @@ export default function HRPageClient({ storeId, currency, userRole }: HRPageClie
       {tab === 'cuti' && (
         <CutiTab storeId={storeId} userRole={userRole} employees={employees as any[]} />
       )}
+
+      {tab === 'payroll' && (
+        <PayrollTab storeId={storeId} currency={currency} employees={employees as any[]} />
+      )}
+
+      {tab === 'penilaian' && (
+        <PenilaianTab storeId={storeId} employees={employees as any[]} />
+      )}
+    </div>
+  )
+}
+
+// ─── PayrollTab ───────────────────────────────────────────────────────────────
+
+function PayrollTab({ storeId, currency, employees }: { storeId: string; currency: string; employees: any[] }) {
+  const [month, setMonth] = useState(new Date().getMonth() + 1)
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [payroll, setPayroll] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const generate = async () => {
+    setLoading(true)
+    const res = await fetch('/api/hr/payroll/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId, month, year }),
+    })
+    const data = await res.json() as { data?: any[] }
+    setPayroll(data.data ?? [])
+    setLoading(false)
+  }
+
+  const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <select value={month} onChange={e => setMonth(Number(e.target.value))} className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm">
+          {Array.from({ length: 12 }, (_, i) => <option key={i+1} value={i+1}>{new Date(2000,i).toLocaleString('id-ID',{month:'long'})}</option>)}
+        </select>
+        <select value={year} onChange={e => setYear(Number(e.target.value))} className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm">
+          {[2023,2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <button onClick={generate} disabled={loading} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50">
+          {loading ? 'Menghitung…' : 'Generate Payroll'}
+        </button>
+      </div>
+      {payroll.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+          <table className="w-full text-sm">
+            <thead className="bg-[var(--bg-muted)] text-xs text-[var(--text-2)]">
+              <tr>
+                {['Karyawan','Gaji Pokok','Komisi','Potongan','Gaji Bersih'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {payroll.map((row: any) => (
+                <tr key={row.employeeId} className="hover:bg-[var(--bg-muted)]">
+                  <td className="px-4 py-3 font-medium text-[var(--text-1)]">{row.name}</td>
+                  <td className="px-4 py-3 text-[var(--text-2)]">{fmt(row.baseSalary)}</td>
+                  <td className="px-4 py-3 text-green-500">+{fmt(row.commission)}</td>
+                  <td className="px-4 py-3 text-red-500">-{fmt(row.deductions)}</td>
+                  <td className="px-4 py-3 font-bold text-[var(--text-1)]">{fmt(row.netPay)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── PenilaianTab ─────────────────────────────────────────────────────────────
+
+function PenilaianTab({ storeId, employees }: { storeId: string; employees: any[] }) {
+  const [reviews, setReviews] = useState<any[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ employeeId: '', score: 3, strengths: '', improvements: '', goals: '' })
+
+  useEffect(() => {
+    fetch(`/api/hr/reviews?storeId=${storeId}`)
+      .then(r => r.json())
+      .then((d: any) => setReviews(d.data ?? []))
+      .catch(() => {})
+  }, [storeId])
+
+  const submit = async () => {
+    await fetch('/api/hr/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, storeId }),
+    })
+    setShowForm(false)
+    const d = await fetch(`/api/hr/reviews?storeId=${storeId}`).then(r => r.json()) as any
+    setReviews(d.data ?? [])
+  }
+
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setShowForm(true)} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+        + Tambah Penilaian
+      </button>
+      {showForm && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-3">
+          <select value={form.employeeId} onChange={e => setForm(f => ({...f, employeeId: e.target.value}))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-3 py-2 text-sm">
+            <option value="">Pilih Karyawan</option>
+            {employees.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+          <div className="flex gap-2">
+            {[1,2,3,4,5].map(s => (
+              <button key={s} onClick={() => setForm(f => ({...f, score: s}))} className={`text-2xl ${form.score >= s ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>★</button>
+            ))}
+          </div>
+          <input placeholder="Kelebihan" value={form.strengths} onChange={e => setForm(f => ({...f, strengths: e.target.value}))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-3 py-2 text-sm" />
+          <input placeholder="Perbaikan" value={form.improvements} onChange={e => setForm(f => ({...f, improvements: e.target.value}))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-3 py-2 text-sm" />
+          <input placeholder="Target" value={form.goals} onChange={e => setForm(f => ({...f, goals: e.target.value}))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-3 py-2 text-sm" />
+          <div className="flex gap-2">
+            <button onClick={submit} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white">Simpan</button>
+            <button onClick={() => setShowForm(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Batal</button>
+          </div>
+        </div>
+      )}
+      <div className="space-y-3">
+        {reviews.map((r: any) => (
+          <div key={r.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-[var(--text-1)]">{r.employeeName}</span>
+              <span className="text-amber-400">{'★'.repeat(r.score)}{'☆'.repeat(5 - r.score)}</span>
+            </div>
+            {r.strengths && <p className="mt-1 text-sm text-[var(--text-2)]">+ {r.strengths}</p>}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

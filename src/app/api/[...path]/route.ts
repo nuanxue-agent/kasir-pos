@@ -4492,6 +4492,293 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ projections, avgRevenue, avgExpenses })
     }
 
+    // ─── HR / PAYROLL ─────────────────────────────────────────────────────────
+    // Tables created lazily on first access
+    if (segs[0] === 'hr' && segs[1] === 'payroll') {
+      await exec(`CREATE TABLE IF NOT EXISTS PayrollRecord (
+        id            TEXT PRIMARY KEY,
+        storeId       TEXT NOT NULL,
+        employeeId    TEXT NOT NULL,
+        month         INTEGER NOT NULL,
+        year          INTEGER NOT NULL,
+        baseSalary    REAL NOT NULL DEFAULT 0,
+        commission    REAL NOT NULL DEFAULT 0,
+        lateDeduction REAL NOT NULL DEFAULT 0,
+        leaveDeduction REAL NOT NULL DEFAULT 0,
+        otherDeductions REAL NOT NULL DEFAULT 0,
+        totalDeductions REAL NOT NULL DEFAULT 0,
+        netPay        REAL NOT NULL DEFAULT 0,
+        lateDays      INTEGER NOT NULL DEFAULT 0,
+        unpaidLeaveDays INTEGER NOT NULL DEFAULT 0,
+        status        TEXT NOT NULL DEFAULT 'DRAFT',
+        note          TEXT,
+        generatedAt   TEXT,
+        createdAt     TEXT NOT NULL,
+        updatedAt     TEXT NOT NULL
+      )`, [])
+
+      // GET /api/hr/payroll?storeId=&month=&year=
+      if (method === 'GET') {
+        const month = parseInt(sp.get('month') ?? '0')
+        const year  = parseInt(sp.get('year')  ?? '0')
+        if (!month || !year) return err('month and year required')
+        const rows = await query<any>(
+          `SELECT pr.*, e.name as employeeName, e.position, e.baseSalary as empBaseSalary
+           FROM PayrollRecord pr
+           JOIN Employee e ON pr.employeeId = e.id
+           WHERE pr.storeId=? AND pr.month=? AND pr.year=?
+           ORDER BY e.name`,
+          [storeId, month, year],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/hr/payroll/generate { storeId, month, year }
+      if (method === 'POST' && segs[2] === 'generate') {
+        const b = (await req.json()) as any
+        const month = parseInt(b.month ?? '0')
+        const year  = parseInt(b.year  ?? '0')
+        if (!month || month < 1 || month > 12) return err('month must be 1-12')
+        if (!year  || year < 2000)             return err('year invalid')
+
+        const LATE_DEDUCTION_PER_DAY = 50_000 // Rp 50K per late day
+
+        const employees = await query<any>(
+          `SELECT * FROM Employee WHERE storeId=? AND active=1 AND employmentStatus='ACTIVE'`,
+          [storeId],
+        )
+        if (!employees.length) return err('Tidak ada karyawan aktif')
+
+        const periodStart = `${year}-${String(month).padStart(2,'0')}-01`
+        const periodEnd   = new Date(year, month, 0).toISOString().slice(0,10)
+
+        // Delete existing draft records for this period before regenerating
+        await exec(
+          `DELETE FROM PayrollRecord WHERE storeId=? AND month=? AND year=? AND status='DRAFT'`,
+          [storeId, month, year],
+        )
+
+        const t = nowISO()
+        const results: any[] = []
+
+        for (const emp of employees) {
+          // Count late days
+          const [lateRow] = await query<any>(
+            `SELECT COUNT(*) as cnt FROM Attendance
+             WHERE storeId=? AND employeeId=? AND status='LATE'
+             AND date >= ? AND date <= ?`,
+            [storeId, emp.id, periodStart, periodEnd],
+          )
+          const lateDays = Number(lateRow?.cnt ?? 0)
+          const lateDeduction = lateDays * LATE_DEDUCTION_PER_DAY
+
+          // Count unpaid leave days (PERSONAL type leaves that are APPROVED)
+          const [leaveRow] = await query<any>(
+            `SELECT COALESCE(SUM(
+               (julianday(MIN(endDate, ?)) - julianday(MAX(startDate, ?)) + 1)
+             ), 0) as days
+             FROM LeaveRequest
+             WHERE storeId=? AND employeeId=? AND type='PERSONAL' AND status='APPROVED'
+             AND startDate <= ? AND endDate >= ?`,
+            [periodEnd, periodStart, storeId, emp.id, periodEnd, periodStart],
+          )
+          const unpaidLeaveDays = Math.max(0, Math.round(Number(leaveRow?.days ?? 0)))
+          const dailySalary     = Math.round((emp.baseSalary ?? 0) / 26)
+          const leaveDeduction  = unpaidLeaveDays * dailySalary
+
+          // Commission from sales in this period
+          const [commRow] = await query<any>(
+            `SELECT COALESCE(SUM(o.total * e.commissionRate / 100), 0) as commission
+             FROM "Order" o
+             JOIN Employee e ON e.id=?
+             WHERE o.storeId=? AND o.staffId=e.userId AND o.status='PAID'
+             AND o.createdAt >= ? AND o.createdAt < ?`,
+            [emp.id, storeId, periodStart + 'T00:00:00Z', periodEnd + 'T23:59:59Z'],
+          )
+          const commission = Math.round(Number(commRow?.commission ?? 0))
+
+          const totalDeductions = lateDeduction + leaveDeduction
+          const netPay = Math.max(0, (emp.baseSalary ?? 0) + commission - totalDeductions)
+
+          const recId = newId()
+          await exec(
+            `INSERT INTO PayrollRecord
+               (id,storeId,employeeId,month,year,baseSalary,commission,
+                lateDeduction,leaveDeduction,otherDeductions,totalDeductions,
+                netPay,lateDays,unpaidLeaveDays,status,createdAt,updatedAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?)`,
+            [
+              recId, storeId, emp.id, month, year,
+              emp.baseSalary ?? 0, commission,
+              lateDeduction, leaveDeduction, 0, totalDeductions,
+              netPay, lateDays, unpaidLeaveDays,
+              t, t,
+            ],
+          )
+          results.push({
+            id: recId,
+            employeeId: emp.id,
+            employeeName: emp.name,
+            baseSalary: emp.baseSalary ?? 0,
+            commission,
+            lateDeduction,
+            leaveDeduction,
+            totalDeductions,
+            netPay,
+            lateDays,
+            unpaidLeaveDays,
+          })
+        }
+
+        return ok({ month, year, records: results, count: results.length }, 201)
+      }
+    }
+
+    // ─── HR / REVIEWS (Performance Reviews) ──────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'reviews') {
+      await exec(`CREATE TABLE IF NOT EXISTS PerformanceReview (
+        id           TEXT PRIMARY KEY,
+        storeId      TEXT NOT NULL,
+        employeeId   TEXT NOT NULL,
+        reviewerId   TEXT,
+        reviewerName TEXT,
+        score        INTEGER NOT NULL DEFAULT 3,
+        strengths    TEXT,
+        improvements TEXT,
+        goals        TEXT,
+        notes        TEXT,
+        reviewDate   TEXT NOT NULL,
+        createdAt    TEXT NOT NULL,
+        updatedAt    TEXT NOT NULL
+      )`, [])
+
+      // GET /api/hr/reviews?storeId=&employeeId=&month=&year=
+      if (method === 'GET') {
+        const employeeId = sp.get('employeeId')
+        const month      = sp.get('month')
+        const year       = sp.get('year')
+        let q = `SELECT pr.*, e.name as employeeName, e.position
+                 FROM PerformanceReview pr
+                 JOIN Employee e ON pr.employeeId = e.id
+                 WHERE pr.storeId=?`
+        const params: any[] = [storeId]
+        if (employeeId) { q += ` AND pr.employeeId=?`; params.push(employeeId) }
+        if (year  && month) {
+          q += ` AND strftime('%Y-%m', pr.reviewDate)=?`
+          params.push(`${year}-${String(month).padStart(2,'0')}`)
+        } else if (year) {
+          q += ` AND strftime('%Y', pr.reviewDate)=?`; params.push(year)
+        }
+        q += ` ORDER BY pr.reviewDate DESC`
+        return ok(await query(q, params))
+      }
+
+      // POST /api/hr/reviews
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.employeeId)             return err('employeeId wajib diisi')
+        if (!b.reviewDate)             return err('reviewDate wajib diisi')
+        const score = parseInt(b.score ?? '3')
+        if (score < 1 || score > 5)    return err('score harus antara 1-5')
+
+        const emp = await queryOne<any>(
+          `SELECT id, name FROM Employee WHERE id=? AND storeId=?`,
+          [b.employeeId, storeId],
+        )
+        if (!emp) return err('Karyawan tidak ditemukan', 404)
+
+        const t   = nowISO()
+        const rid = newId()
+        await exec(
+          `INSERT INTO PerformanceReview
+             (id,storeId,employeeId,reviewerId,reviewerName,score,
+              strengths,improvements,goals,notes,reviewDate,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            rid, storeId, b.employeeId,
+            user.id ?? null, user.name ?? null,
+            score,
+            b.strengths    ?? null,
+            b.improvements ?? null,
+            b.goals        ?? null,
+            b.notes        ?? null,
+            b.reviewDate,
+            t, t,
+          ],
+        )
+        return ok({ id: rid, employeeName: emp.name, score }, 201)
+      }
+    }
+
+    // ─── ACTIVITY FEED ────────────────────────────────────────────────────────
+    if (segs[0] === 'activity') {
+      if (method === 'GET') {
+        // Ensure AuditLog table exists (idempotent)
+        await exec(
+          `CREATE TABLE IF NOT EXISTS AuditLog (
+            id TEXT PRIMARY KEY,
+            storeId TEXT NOT NULL,
+            userId TEXT NOT NULL,
+            action TEXT NOT NULL,
+            resourceType TEXT,
+            resourceId TEXT,
+            meta TEXT,
+            createdAt TEXT NOT NULL
+          )`,
+          [],
+        )
+        const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') ?? '20')))
+        const rows = await query<any>(
+          `SELECT al.id, al.action, al.resourceType as resource, al.userId, u.name as userName, al.createdAt
+           FROM AuditLog al
+           LEFT JOIN User u ON al.userId = u.id
+           WHERE al.storeId = ?
+           ORDER BY al.createdAt DESC
+           LIMIT ?`,
+          [storeId, limit],
+        )
+        return ok(rows)
+      }
+    }
+
+    // ─── SYSTEM HEALTH ────────────────────────────────────────────────────────
+    if (segs[0] === 'system' && segs[1] === 'health') {
+      if (method === 'GET') {
+        const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
+        if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(callerRole))
+          return err('Forbidden', 403)
+
+        // Row counts
+        const [orderCount] = await query<{ c: number }>(
+          `SELECT COUNT(*) as c FROM "Order" WHERE storeId = ?`, [storeId])
+        const [productCount] = await query<{ c: number }>(
+          `SELECT COUNT(*) as c FROM Product WHERE storeId = ?`, [storeId])
+        const [customerCount] = await query<{ c: number }>(
+          `SELECT COUNT(*) as c FROM Customer WHERE storeId = ?`, [storeId])
+        const [employeeCount] = await query<{ c: number }>(
+          `SELECT COUNT(*) as c FROM User u
+           JOIN UserStore us ON us.userId = u.id
+           WHERE us.storeId = ?`, [storeId])
+
+        const orders    = orderCount?.c    ?? 0
+        const products  = productCount?.c  ?? 0
+        const customers = customerCount?.c ?? 0
+        const employees = employeeCount?.c ?? 0
+
+        // Storage estimate: assume avg row sizes in bytes
+        // Order≈512, Product≈256, Customer≈256, User≈128
+        const totalRows = orders + products + customers + employees
+        const estimatedBytes =
+          orders * 512 + products * 256 + customers * 256 + employees * 128
+        const estimatedKB = Math.round(estimatedBytes / 1024)
+
+        return ok({
+          counts: { orders, products, customers, employees },
+          storageEstimate: { totalRows, estimatedKB },
+        })
+      }
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
