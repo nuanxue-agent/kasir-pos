@@ -9,6 +9,14 @@ import {
   resolveGiftCardStatus,
 } from '@/lib/gift-cards'
 import { checkProductLimit, checkStoreLimit, type Plan } from '@/lib/plan'
+import {
+  getCurrentTier,
+  detectTierUpgrade,
+  detectNewMilestones,
+  rankLeaderboard,
+  DEFAULT_TIERS,
+  type MilestoneType,
+} from '@/lib/tier-progress'
 
 // ─── Validation helpers ────────────────────────────────────────────────────────
 
@@ -7191,6 +7199,148 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       )
       // TODO: integrate with email provider (e.g. SendGrid / Nodemailer)
       return ok({ success: true, sentAt: now, stub: true })
+    }
+
+    // ── POST /api/customers/:id/check-tier-upgrade ──────────────────────────
+    if (
+      segs[0] === 'customers' &&
+      segs[1] &&
+      segs[2] === 'check-tier-upgrade' &&
+      method === 'POST'
+    ) {
+      const cid = segs[1]
+      // Lazy-init CustomerMilestone table
+      await exec(`CREATE TABLE IF NOT EXISTS CustomerMilestone (
+        id TEXT PRIMARY KEY,
+        customerId TEXT NOT NULL,
+        storeId TEXT NOT NULL,
+        type TEXT NOT NULL,
+        achievedAt TEXT NOT NULL,
+        notified INTEGER NOT NULL DEFAULT 0
+      )`)
+
+      const customer = await queryOne<{
+        id: string
+        points: number
+        name: string
+      }>(`SELECT id, points, name FROM Customer WHERE id=? AND storeId=?`, [cid, storeId])
+      if (!customer) return err('Customer not found', 404)
+
+      const body = (await req.json().catch(() => ({}))) as {
+        previousPoints?: number
+        totalOrders?: number
+        totalSpend?: number
+      }
+      const previousPoints = Number(body.previousPoints ?? customer.points)
+      const newPoints = Number(customer.points)
+      const totalOrders = Number(body.totalOrders ?? 0)
+      const totalSpend = Number(body.totalSpend ?? 0)
+
+      // Detect tier upgrade
+      const upgradedTier = detectTierUpgrade(previousPoints, newPoints, DEFAULT_TIERS)
+      const upgrades: string[] = []
+
+      if (upgradedTier) {
+        const milestoneType = `TIER_${upgradedTier.name.toUpperCase()}` as MilestoneType
+        const existing = await queryOne(
+          `SELECT id FROM CustomerMilestone WHERE customerId=? AND storeId=? AND type=?`,
+          [cid, storeId, milestoneType],
+        )
+        if (!existing) {
+          await exec(
+            `INSERT INTO CustomerMilestone (id,customerId,storeId,type,achievedAt,notified) VALUES (?,?,?,?,?,0)`,
+            [newId(), cid, storeId, milestoneType, nowISO()],
+          )
+        }
+        upgrades.push(upgradedTier.name)
+      }
+
+      // Detect general milestones
+      const currentTier = getCurrentTier(newPoints, DEFAULT_TIERS)
+      const existingMilestones = await query<{ type: string }>(
+        `SELECT type FROM CustomerMilestone WHERE customerId=? AND storeId=?`,
+        [cid, storeId],
+      )
+      const alreadyAchieved = new Set(existingMilestones.map((m) => m.type as MilestoneType))
+
+      const newMilestones = detectNewMilestones(
+        { points: newPoints, totalOrders, totalSpend, currentTierName: currentTier.name },
+        alreadyAchieved,
+      )
+
+      const now = nowISO()
+      for (const mt of newMilestones) {
+        await exec(
+          `INSERT INTO CustomerMilestone (id,customerId,storeId,type,achievedAt,notified) VALUES (?,?,?,?,?,0)`,
+          [newId(), cid, storeId, mt, now],
+        )
+      }
+
+      // Mark all as notified
+      if (upgrades.length || newMilestones.length) {
+        await exec(
+          `UPDATE CustomerMilestone SET notified=1 WHERE customerId=? AND storeId=? AND notified=0`,
+          [cid, storeId],
+        )
+      }
+
+      return ok({
+        customerId: cid,
+        currentPoints: newPoints,
+        currentTier: currentTier.name,
+        tierUpgrade: upgradedTier ? { name: upgradedTier.name, icon: upgradedTier.icon } : null,
+        newMilestones,
+      })
+    }
+
+    // ── GET /api/loyalty/leaderboard?storeId=&period=month ──────────────────
+    if (segs[0] === 'loyalty' && segs[1] === 'leaderboard' && method === 'GET') {
+      const period = (req.nextUrl?.searchParams?.get('period') ?? 'month') as string
+      const now = new Date()
+      let since: string
+
+      if (period === 'month') {
+        since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      } else if (period === 'week') {
+        const day = now.getDay()
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+        since = new Date(now.getFullYear(), now.getMonth(), diff).toISOString()
+      } else {
+        since = new Date(now.getFullYear(), 0, 1).toISOString()
+      }
+
+      // Sum order totals per customer in the period
+      const rows = await query<{ customerId: string; name: string; periodPoints: number }>(
+        `SELECT c.id as customerId, c.name, c.points,
+                COALESCE(SUM(o.total), 0) as periodSpend,
+                COUNT(o.id) as periodOrders
+         FROM Customer c
+         LEFT JOIN "Order" o ON o.customerId = c.id
+           AND o.storeId = c.storeId
+           AND o.status = 'PAID'
+           AND o.createdAt >= ?
+         WHERE c.storeId = ?
+         GROUP BY c.id
+         ORDER BY c.points DESC
+         LIMIT 20`,
+        [since, storeId],
+      )
+
+      const entries = rankLeaderboard(
+        rows.map((r) => ({
+          customerId: r.customerId,
+          name: r.name,
+          points: Number((r as any).points ?? 0),
+        })),
+        DEFAULT_TIERS,
+        10,
+      ).map((e, i) => ({
+        ...e,
+        periodSpend: Number((rows[i] as any)?.periodSpend ?? 0),
+        periodOrders: Number((rows[i] as any)?.periodOrders ?? 0),
+      }))
+
+      return ok({ period, since, leaderboard: entries })
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
