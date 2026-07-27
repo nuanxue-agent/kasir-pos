@@ -45,6 +45,7 @@ const TABS = [
   { id: 'notifikasi', label: 'Notifikasi', icon: Bell },
   { id: 'integrasi', label: 'Integrasi', icon: Zap },
   { id: 'langganan', label: 'Langganan', icon: Crown },
+  { id: 'tema', label: 'Tema', icon: Palette },
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
@@ -55,6 +56,16 @@ const COLOR_SWATCHES = [
   { label: 'Blue', value: '#3b82f6', bg: 'bg-blue-500', ring: 'ring-blue-500' },
   { label: 'Violet', value: '#7c3aed', bg: 'bg-violet-600', ring: 'ring-violet-600' },
   { label: 'Rose', value: '#f43f5e', bg: 'bg-rose-500', ring: 'ring-rose-500' },
+]
+
+type AccentKey = 'amber' | 'blue' | 'green' | 'purple' | 'red'
+
+const ACCENT_PRESETS: { key: AccentKey; label: string; primary: string; accent: string; swatch: string }[] = [
+  { key: 'amber',  label: 'Amber (Default)', primary: '#f59e0b', accent: '#ea580c', swatch: 'bg-amber-400' },
+  { key: 'blue',   label: 'Biru',            primary: '#3b82f6', accent: '#2563eb', swatch: 'bg-blue-500' },
+  { key: 'green',  label: 'Hijau',           primary: '#22c55e', accent: '#16a34a', swatch: 'bg-green-500' },
+  { key: 'purple', label: 'Ungu',            primary: '#8b5cf6', accent: '#7c3aed', swatch: 'bg-violet-500' },
+  { key: 'red',    label: 'Merah',           primary: '#ef4444', accent: '#dc2626', swatch: 'bg-red-500' },
 ]
 
 const ALL_MODULES = [
@@ -101,6 +112,13 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
     store.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports'],
   )
   const [primaryColor, setPrimaryColor] = useState(store.primaryColor ?? '#f59e0b')
+  const [accentColor, setAccentColor] = useState<AccentKey>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('accent-color') as AccentKey | null
+      if (stored && ACCENT_PRESETS.some(p => p.key === stored)) return stored
+    }
+    return 'amber'
+  })
 
   // Printer tab
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(() => loadReceiptSettings())
@@ -752,11 +770,47 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           </section>
         </div>
       )}
+
+      {/* ── Tab: Tema ── */}
+      {activeTab === 'tema' && (
+        <div className="space-y-5">
+          <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+            <SectionHead icon={Palette} label="Warna Aksen" />
+            <p className="text-xs text-[var(--text-2)]">
+              Pilih skema warna utama untuk tampilan aplikasi. Perubahan diterapkan langsung.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {ACCENT_PRESETS.map(preset => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => {
+                    setAccentColor(preset.key)
+                    localStorage.setItem('accent-color', preset.key)
+                    document.documentElement.style.setProperty('--primary', preset.primary)
+                    document.documentElement.style.setProperty('--accent', preset.accent)
+                  }}
+                  className={[
+                    'flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all',
+                    accentColor === preset.key
+                      ? 'border-[var(--primary)] bg-[var(--primary-subtle)] text-[var(--text-1)] shadow-sm'
+                      : 'border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-2)] hover:border-[var(--border-mid)] hover:text-[var(--text-1)]',
+                  ].join(' ')}
+                >
+                  <span className={`h-3.5 w-3.5 rounded-full ${preset.swatch}`} />
+                  {preset.label}
+                  {accentColor === preset.key && (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[var(--primary)]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
-
-// ── Helper components ────────────────────────────────────────────────────────
 
 const inputCls =
   'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
