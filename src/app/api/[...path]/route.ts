@@ -963,6 +963,60 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok(orders)
       }
 
+      // ── GET /api/customers/:id/points-expiry ───────────────────────────────
+      if (segs.length === 3 && segs[2] === 'points-expiry' && method === 'GET') {
+        const cid = segs[1]
+        const customer = await queryOne<any>(
+          `SELECT id, name, points FROM Customer WHERE id = ? AND storeId = ?`,
+          [cid, storeId],
+        )
+        if (!customer) return err('Customer not found', 404)
+
+        // Find the most recent order or points activity for this customer
+        let lastActivity: string | null = null
+        try {
+          const lastOrder = await queryOne<any>(
+            `SELECT createdAt FROM "Order" WHERE customerId = ? AND storeId = ? AND status = 'PAID' ORDER BY createdAt DESC LIMIT 1`,
+            [cid, storeId],
+          )
+          const lastRedemption = await queryOne<any>(
+            `SELECT createdAt FROM LoyaltyRedemption WHERE customerId = ? ORDER BY createdAt DESC LIMIT 1`,
+            [cid],
+          ).catch(() => null)
+
+          const dates = [lastOrder?.createdAt, lastRedemption?.createdAt].filter(Boolean)
+          lastActivity = dates.sort().reverse()[0] ?? null
+        } catch {
+          lastActivity = null
+        }
+
+        // Points expire 12 months after last activity
+        const EXPIRY_MONTHS = 12
+        const now = new Date()
+        let expiresAt: string | null = null
+        let daysUntilExpiry: number | null = null
+        let isExpired = false
+
+        if (lastActivity) {
+          const activityDate = new Date(lastActivity)
+          const exp = new Date(activityDate)
+          exp.setMonth(exp.getMonth() + EXPIRY_MONTHS)
+          expiresAt = exp.toISOString()
+          daysUntilExpiry = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          isExpired = daysUntilExpiry <= 0
+        }
+
+        return ok({
+          customerId: cid,
+          points: Number(customer.points),
+          lastActivity,
+          expiresAt,
+          daysUntilExpiry,
+          isExpired,
+          expiryMonths: EXPIRY_MONTHS,
+        })
+      }
+
       // ── GET /api/customers/:id/points ──────────────────────────────────────
       if (segs.length === 3 && segs[2] === 'points' && method === 'GET') {
         const cid = segs[1]
@@ -1516,6 +1570,154 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const grossProfit = revenue - cogs
       const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
       return ok({ revenue, cogs, grossProfit, grossMargin })
+    }
+
+    // ─── REPORTS / PNL (monthly columns, year + optional compareYear) ─────────
+    if (segs[0] === 'reports' && segs[1] === 'pnl' && method === 'GET') {
+      const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()), 10)
+      const compareYear = sp.get('compareYear') ? parseInt(sp.get('compareYear')!, 10) : null
+
+      async function fetchPnLForYear(y: number) {
+        const yearFrom = `${y}-01-01T00:00:00.000Z`
+        const yearTo = `${y}-12-31T23:59:59.999Z`
+
+        // Monthly revenue from POS orders
+        const revenueRows = await query<any>(
+          `SELECT strftime('%m', datetime(createdAt)) as month,
+                  COALESCE(SUM(total),0) as revenue
+           FROM "Order"
+           WHERE storeId=? AND status='PAID'
+             AND createdAt BETWEEN ? AND ?
+           GROUP BY month`,
+          [storeId, yearFrom, yearTo],
+        )
+
+        // Monthly COGS (qty * cost per item)
+        const cogsRows = await query<any>(
+          `SELECT strftime('%m', datetime(o.createdAt)) as month,
+                  COALESCE(SUM(oi.qty * COALESCE(p.cost, 0)), 0) as cogs
+           FROM OrderItem oi
+           JOIN "Order" o ON oi.orderId = o.id
+           LEFT JOIN Product p ON oi.productId = p.id
+           WHERE o.storeId=? AND o.status='PAID'
+             AND o.createdAt BETWEEN ? AND ?
+           GROUP BY month`,
+          [storeId, yearFrom, yearTo],
+        )
+
+        // Monthly operating expenses
+        const opexRows = await query<any>(
+          `SELECT strftime('%m', date) as month,
+                  COALESCE(SUM(amount),0) as opex
+           FROM Expense
+           WHERE storeId=? AND date BETWEEN ? AND ?
+           GROUP BY month`,
+          [storeId, `${y}-01-01`, `${y}-12-31`],
+        )
+
+        // Build month maps (1-12)
+        const revenueMap: Record<number, number> = {}
+        const cogsMap: Record<number, number> = {}
+        const opexMap: Record<number, number> = {}
+        for (const r of revenueRows) revenueMap[parseInt(r.month, 10)] = Number(r.revenue)
+        for (const r of cogsRows) cogsMap[parseInt(r.month, 10)] = Number(r.cogs)
+        for (const r of opexRows) opexMap[parseInt(r.month, 10)] = Number(r.opex)
+
+        const months = Array.from({ length: 12 }, (_, i) => {
+          const m = i + 1
+          const revenue = revenueMap[m] ?? 0
+          const cogs = cogsMap[m] ?? 0
+          const grossProfit = revenue - cogs
+          const operatingExpenses = opexMap[m] ?? 0
+          const netProfit = grossProfit - operatingExpenses
+          return { month: m, revenue, cogs, grossProfit, operatingExpenses, netProfit }
+        })
+
+        const totals = months.reduce(
+          (acc, m) => ({
+            revenue: acc.revenue + m.revenue,
+            cogs: acc.cogs + m.cogs,
+            grossProfit: acc.grossProfit + m.grossProfit,
+            operatingExpenses: acc.operatingExpenses + m.operatingExpenses,
+            netProfit: acc.netProfit + m.netProfit,
+          }),
+          { revenue: 0, cogs: 0, grossProfit: 0, operatingExpenses: 0, netProfit: 0 },
+        )
+
+        return { year: y, months, totals }
+      }
+
+      const primary = await fetchPnLForYear(year)
+      const compare = compareYear ? await fetchPnLForYear(compareYear) : null
+      return ok({ primary, compare })
+    }
+
+    // ─── REPORTS / BALANCE-SHEET (as-of date) ─────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'balance-sheet' && method === 'GET') {
+      const asOf = sp.get('date') ?? new Date().toISOString().slice(0, 10)
+      const asOfEnd = `${asOf}T23:59:59.999Z`
+
+      // Cash: sum of paid orders up to asOf date
+      const cashRow = await queryOne<any>(
+        `SELECT COALESCE(SUM(total), 0) as cash
+         FROM "Order"
+         WHERE storeId=? AND status='PAID' AND createdAt <= ?`,
+        [storeId, asOfEnd],
+      )
+
+      // Inventory value: current stock × cost
+      const inventoryRow = await queryOne<any>(
+        `SELECT COALESCE(SUM(p.stock * COALESCE(p.cost, 0)), 0) as inventory
+         FROM Product p
+         WHERE p.storeId=?`,
+        [storeId],
+      )
+
+      // Accounts Receivable: unpaid invoices (orders not yet paid)
+      const arRow = await queryOne<any>(
+        `SELECT COALESCE(SUM(total), 0) as ar
+         FROM "Order"
+         WHERE storeId=? AND status NOT IN ('PAID','CANCELLED','REFUNDED')
+           AND createdAt <= ?`,
+        [storeId, asOfEnd],
+      )
+
+      // Accounts Payable: pending purchase orders
+      const apRow = await queryOne<any>(
+        `SELECT COALESCE(SUM(total), 0) as ap
+         FROM PurchaseOrder
+         WHERE storeId=? AND status NOT IN ('RECEIVED','CANCELLED')
+           AND createdAt <= ?`,
+        [storeId, asOfEnd],
+      )
+
+      const cash = Number(cashRow?.cash ?? 0)
+      const inventory = Number(inventoryRow?.inventory ?? 0)
+      const accountsReceivable = Number(arRow?.ar ?? 0)
+      const accountsPayable = Number(apRow?.ap ?? 0)
+
+      const totalAssets = cash + inventory + accountsReceivable
+      const totalLiabilities = accountsPayable
+      const equity = totalAssets - totalLiabilities
+      const isBalanced = Math.abs(totalAssets - (totalLiabilities + equity)) < 0.01
+
+      return ok({
+        asOf,
+        assets: {
+          cash,
+          inventory,
+          accountsReceivable,
+          total: totalAssets,
+        },
+        liabilities: {
+          accountsPayable,
+          total: totalLiabilities,
+        },
+        equity,
+        totalAssets,
+        totalLiabilities,
+        isBalanced,
+      })
     }
 
     // ─── REPORTS / STAFF ──────────────────────────────────────────────────────
@@ -3313,6 +3515,141 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         [pts, t, b.customerId, storeId],
       )
       return ok({ id, pointsRedeemed: pts, discountGiven }, 201)
+    }
+
+    // ─── REWARDS MARKETPLACE ─────────────────────────────────────────────────
+    // Lazy-init RewardItem table
+    async function ensureRewardItemTable() {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS RewardItem (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          pointsCost INTEGER NOT NULL DEFAULT 0,
+          type TEXT NOT NULL DEFAULT 'DISCOUNT_VOUCHER',
+          value REAL NOT NULL DEFAULT 0,
+          stock INTEGER NOT NULL DEFAULT -1,
+          active INTEGER NOT NULL DEFAULT 1,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )`,
+        [],
+      )
+      await exec(
+        `CREATE TABLE IF NOT EXISTS RewardVoucher (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          rewardItemId TEXT NOT NULL,
+          customerId TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          used INTEGER NOT NULL DEFAULT 0,
+          usedAt TEXT,
+          createdAt TEXT NOT NULL
+        )`,
+        [],
+      )
+    }
+
+    if (segs[0] === 'rewards') {
+      await ensureRewardItemTable()
+
+      // GET /api/rewards — list all active rewards for this store
+      if (segs.length === 1 && method === 'GET') {
+        const rewards = await query(
+          `SELECT * FROM RewardItem WHERE storeId=? AND active=1 ORDER BY pointsCost ASC`,
+          [storeId],
+        )
+        return ok(rewards)
+      }
+
+      // POST /api/rewards — create a reward item (owner/manager only)
+      if (segs.length === 1 && method === 'POST') {
+        const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
+        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+        const b = (await req.json()) as any
+        if (!b.name?.trim()) return err('name is required')
+        if (!b.type || !['DISCOUNT_VOUCHER', 'FREE_PRODUCT', 'CASHBACK'].includes(b.type))
+          return err('type must be DISCOUNT_VOUCHER, FREE_PRODUCT, or CASHBACK')
+        if (Number(b.pointsCost) <= 0) return err('pointsCost must be > 0')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO RewardItem (id,storeId,name,description,pointsCost,type,value,stock,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,1,?,?)`,
+          [
+            id,
+            storeId,
+            b.name.trim(),
+            b.description ?? null,
+            Number(b.pointsCost),
+            b.type,
+            Number(b.value ?? 0),
+            b.stock !== undefined ? Number(b.stock) : -1,
+            t,
+            t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+
+      // POST /api/rewards/:id/redeem — customer redeems a reward
+      if (segs.length === 3 && segs[2] === 'redeem' && method === 'POST') {
+        const rewardId = segs[1]
+        const b = (await req.json()) as any
+        if (!b.customerId) return err('customerId is required')
+
+        const reward = await queryOne<any>(
+          `SELECT * FROM RewardItem WHERE id=? AND storeId=? AND active=1`,
+          [rewardId, storeId],
+        )
+        if (!reward) return err('Reward not found or inactive', 404)
+        if (reward.stock !== -1 && reward.stock <= 0) return err('Reward out of stock', 400)
+
+        const customer = await queryOne<any>(
+          `SELECT id, points FROM Customer WHERE id=? AND storeId=?`,
+          [b.customerId, storeId],
+        )
+        if (!customer) return err('Customer not found', 404)
+        if (customer.points < reward.pointsCost)
+          return err('Insufficient points', 400)
+
+        // Generate voucher code
+        const voucherCode = `RWD-${crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`
+        const vid = newId()
+        const t = nowISO()
+
+        // Deduct points and create voucher in one batch
+        await exec(
+          `UPDATE Customer SET points = MAX(0, points - ?), updatedAt=? WHERE id=? AND storeId=?`,
+          [reward.pointsCost, t, b.customerId, storeId],
+        )
+        await exec(
+          `INSERT INTO RewardVoucher (id,storeId,rewardItemId,customerId,code,used,createdAt) VALUES (?,?,?,?,?,0,?)`,
+          [vid, storeId, rewardId, b.customerId, voucherCode, t],
+        )
+        if (reward.stock !== -1) {
+          await exec(
+            `UPDATE RewardItem SET stock = stock - 1, updatedAt=? WHERE id=? AND storeId=?`,
+            [t, rewardId, storeId],
+          )
+        }
+        // Record redemption
+        await exec(
+          `INSERT INTO LoyaltyRedemption (id,storeId,customerId,orderId,pointsRedeemed,discountGiven,createdAt) VALUES (?,?,?,?,?,?,?)`,
+          [newId(), storeId, b.customerId, null, reward.pointsCost, 0, t],
+        )
+
+        return ok(
+          {
+            voucherCode,
+            rewardName: reward.name,
+            rewardType: reward.type,
+            rewardValue: reward.value,
+            pointsDeducted: reward.pointsCost,
+          },
+          201,
+        )
+      }
     }
 
     // ── Manufacturing: Bill of Materials ─────────────────────────────────────
