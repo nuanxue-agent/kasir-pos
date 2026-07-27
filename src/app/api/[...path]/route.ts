@@ -440,6 +440,122 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ totalRevenue, totalOrders: (revenue as any)?.totalOrders ?? 0, avgOrderValue: (revenue as any)?.avgOrderValue ?? 0, newCustomers: (customers as any)?.newCustomers ?? 0, totalExpenses, netProfit: totalRevenue - totalExpenses, dailySales: daily, topProducts, paymentBreakdown: payments })
     }
 
+    // ─── REPORTS / ANALYTICS ──────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'analytics' && method === 'GET') {
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+      const to   = sp.get('to')   ?? new Date().toISOString()
+
+      const [hourlyRaw, dowRaw, categoryRaw, paymentRaw, newCustRaw, returningRaw] = await Promise.all([
+        // Revenue & orders grouped by hour-of-day (0-23)
+        query(
+          `SELECT CAST(strftime('%H', createdAt) AS INTEGER) as hour,
+                  SUM(total) as revenue, COUNT(*) as orders
+           FROM "Order"
+           WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?
+           GROUP BY hour ORDER BY hour`,
+          [storeId, from, to]
+        ),
+        // Revenue & orders grouped by day-of-week (0=Sun … 6=Sat in SQLite)
+        query(
+          `SELECT CAST(strftime('%w', createdAt) AS INTEGER) as dow,
+                  SUM(total) as revenue, COUNT(*) as orders
+           FROM "Order"
+           WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?
+           GROUP BY dow ORDER BY dow`,
+          [storeId, from, to]
+        ),
+        // Revenue grouped by product category
+        query(
+          `SELECT COALESCE(c.name, 'Uncategorized') as category,
+                  SUM(oi.subtotal) as revenue
+           FROM OrderItem oi
+           JOIN "Order" o ON oi.orderId = o.id
+           LEFT JOIN Product p ON oi.productId = p.id
+           LEFT JOIN Category c ON p.categoryId = c.id
+           WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ?
+           GROUP BY category ORDER BY revenue DESC`,
+          [storeId, from, to]
+        ),
+        // Payment method breakdown
+        query(
+          `SELECT pm.method, SUM(pm.amount) as total, COUNT(*) as count
+           FROM Payment pm
+           JOIN "Order" o ON pm.orderId = o.id
+           WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ?
+           GROUP BY pm.method`,
+          [storeId, from, to]
+        ),
+        // New customers (created in range)
+        queryOne(
+          `SELECT COUNT(*) as cnt FROM Customer WHERE storeId=? AND createdAt BETWEEN ? AND ?`,
+          [storeId, from, to]
+        ),
+        // Returning customers (had ≥1 order before the range AND ≥1 order in range)
+        queryOne(
+          `SELECT COUNT(DISTINCT o.customerId) as cnt
+           FROM "Order" o
+           WHERE o.storeId=? AND o.status='PAID'
+             AND o.customerId IS NOT NULL
+             AND o.createdAt BETWEEN ? AND ?
+             AND EXISTS (
+               SELECT 1 FROM "Order" o2
+               WHERE o2.customerId = o.customerId
+                 AND o2.storeId = o.storeId
+                 AND o2.status = 'PAID'
+                 AND o2.createdAt < ?
+             )`,
+          [storeId, from, to, from]
+        ),
+      ])
+
+      // Build full 0-23 hourly array, filling missing hours with zeros
+      const hourMap = new Map((hourlyRaw as any[]).map((r: any) => [r.hour, r]))
+      const hourlyData = Array.from({ length: 24 }, (_, h) => ({
+        hour: h,
+        revenue: Number(hourMap.get(h)?.revenue ?? 0),
+        orders:  Number(hourMap.get(h)?.orders  ?? 0),
+      }))
+
+      // Map SQLite dow (0=Sun) to short day names
+      const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      const dowMap = new Map((dowRaw as any[]).map((r: any) => [r.dow, r]))
+      const dayOfWeekData = DOW_NAMES.map((day, i) => ({
+        day,
+        revenue: Number(dowMap.get(i)?.revenue ?? 0),
+        orders:  Number(dowMap.get(i)?.orders  ?? 0),
+      }))
+
+      // Category breakdown with pct
+      const catRows = categoryRaw as any[]
+      const totalCatRevenue = catRows.reduce((s: number, r: any) => s + Number(r.revenue), 0)
+      const categoryBreakdown = catRows.map((r: any) => ({
+        category: r.category,
+        revenue:  Number(r.revenue),
+        pct: totalCatRevenue > 0 ? (Number(r.revenue) / totalCatRevenue) * 100 : 0,
+      }))
+
+      // Payment methods
+      const paymentMethods = (paymentRaw as any[]).map((r: any) => ({
+        method: r.method,
+        total:  Number(r.total),
+        count:  Number(r.count),
+      }))
+
+      // Customer stats
+      const newCustomers       = Number((newCustRaw as any)?.cnt ?? 0)
+      const returningCustomers = Number((returningRaw as any)?.cnt ?? 0)
+      const totalWithOrders    = newCustomers + returningCustomers
+      const retentionRate      = totalWithOrders > 0 ? (returningCustomers / totalWithOrders) * 100 : 0
+
+      return ok({
+        hourlyData,
+        dayOfWeekData,
+        categoryBreakdown,
+        customerStats: { newCustomers, returningCustomers, retentionRate },
+        paymentMethods,
+      })
+    }
+
     // ─── EXPENSES ─────────────────────────────────────────────────────────────
     if (segs[0] === 'expenses') {
       if (method === 'GET') {
@@ -721,11 +837,26 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
       if (segs[1] && method === 'PATCH') {
         const b = await req.json() as any
-        const allowed = new Set(['name','type','parentId','active'])
+        // Validate code if provided — must be exactly 4 numeric digits
+        if (b.code !== undefined) {
+          if (!/^\d{4}$/.test(b.code)) return err('Kode akun harus 4 digit angka')
+        }
+        if (b.name !== undefined && b.name.trim().length < 2) return err('Nama akun minimal 2 karakter')
+        const allowed = new Set(['name', 'code', 'type', 'parentId', 'active'])
         const cols = filterCols(b, allowed)
+        if (b.name) cols.name = (b.name as string).trim()
         if (Object.keys(cols).length === 0) return err('No valid fields')
         const { setClauses, values } = buildUpdate(cols)
         await exec(`UPDATE Account SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+      if (segs[1] && method === 'DELETE') {
+        const account = await queryOne<any>(`SELECT * FROM Account WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!account) return err('Akun tidak ditemukan', 404)
+        if (account.isSystem) return err('Akun sistem tidak dapat dihapus', 403)
+        if (account.balance !== 0) return err('Tidak dapat menghapus akun dengan saldo tidak nol', 409)
+        // Soft-delete: set active=0 so journal history is preserved
+        await exec(`UPDATE Account SET active=0, updatedAt=? WHERE id=? AND storeId=?`, [nowISO(), segs[1], storeId])
         return ok({ success: true })
       }
     }

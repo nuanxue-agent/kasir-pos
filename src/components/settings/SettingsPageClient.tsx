@@ -48,7 +48,6 @@ interface SettingsPageClientProps {
 
 export default function SettingsPageClient({ storeId, store }: SettingsPageClientProps) {
   const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [modules, setModules] = useState<string[]>(
     store.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
@@ -77,7 +76,6 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   const onSubmit = async (data: FormData) => {
     setSaving(true)
     setError('')
-    setSuccess(false)
     try {
       const res = await fetch('/api/settings/store', {
         method: 'PATCH',
@@ -90,10 +88,10 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         }),
       })
       if (!res.ok) throw new Error('Gagal menyimpan')
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      toast.success('Pengaturan disimpan')
     } catch {
       setError('Gagal menyimpan pengaturan')
+      toast.error('Gagal menyimpan pengaturan')
     } finally {
       setSaving(false)
     }
@@ -232,12 +230,6 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
             <Save className="h-4 w-4" />
             {saving ? 'Menyimpan…' : 'Simpan Pengaturan'}
           </button>
-          {success && (
-            <div className="flex items-center gap-2 text-emerald-600 text-sm font-medium">
-              <CheckCircle2 className="h-4 w-4" />
-              Tersimpan
-            </div>
-          )}
         </div>
       </form>
     </div>

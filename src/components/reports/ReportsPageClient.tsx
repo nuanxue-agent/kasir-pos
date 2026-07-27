@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Scale, BarChart2 } from 'lucide-react'
+import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Scale, BarChart2, LineChart } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
 import { SalesChart } from './SalesChart'
@@ -187,6 +187,19 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
           <div>
             <p className="text-sm font-bold text-stone-800">Laba Rugi</p>
             <p className="text-xs text-stone-400 mt-0.5">P&amp;L — pendapatan &amp; beban</p>
+          </div>
+          <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
+        </Link>
+        <Link
+          href="/dashboard/reports/analytics"
+          className="group bg-white border border-stone-100 rounded-2xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4 sm:col-span-2"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+            <LineChart className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-stone-800">Analytics</p>
+            <p className="text-xs text-stone-400 mt-0.5">Hourly trends, category breakdown &amp; customer retention</p>
           </div>
           <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
         </Link>

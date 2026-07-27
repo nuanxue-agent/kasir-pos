@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import StockAdjustModal from './StockAdjustModal'
 import StockLogsModal from './StockLogsModal'
+import { toast } from '@/components/ui/Toaster'
 import {
   LineChart,
   Line,
@@ -128,6 +129,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
   const handleAdjustSuccess = () => {
     setShowAdjustModal(false)
+    toast.success('Stok diperbarui')
     fetchProducts()
   }
 

@@ -2,12 +2,71 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { usePathname } from 'next/navigation'
 import { DollarSign, TrendingUp, TrendingDown, Calendar, Download, FileText } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 
 interface AccountingPageClientProps {
   storeId: string
   currency: string
+}
+
+const NAV_TABS = [
+  { label: 'Ringkasan',         href: '/dashboard/accounting' },
+  { label: 'Chart of Accounts', href: '/dashboard/accounting/chart-of-accounts' },
+  { label: 'Jurnal',            href: '/dashboard/accounting/journal' },
+  { label: 'Neraca Saldo',      href: '/dashboard/accounting/trial-balance' },
+]
+
+const REPORT_LINKS = [
+  { label: 'Neraca',    href: '/dashboard/reports/balance-sheet' },
+  { label: 'Laba Rugi', href: '/dashboard/reports/pnl' },
+]
+
+function SubNav() {
+  const pathname = usePathname()
+  return (
+    <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+      {NAV_TABS.map(tab => {
+        const active = pathname === tab.href
+        return (
+          <a
+            key={tab.href}
+            href={tab.href}
+            className={cn(
+              'whitespace-nowrap px-4 py-2 rounded-xl text-sm font-semibold transition-all',
+              active
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
+                : 'bg-stone-50 text-stone-500 border border-stone-200 hover:bg-stone-100'
+            )}
+          >
+            {tab.label}
+          </a>
+        )
+      })}
+      {/* Laporan sub-links rendered as a group */}
+      <div className="flex items-center gap-1 ml-1 pl-2 border-l border-stone-200">
+        <span className="text-xs text-stone-400 mr-1 shrink-0">Laporan:</span>
+        {REPORT_LINKS.map(r => {
+          const active = pathname === r.href
+          return (
+            <a
+              key={r.href}
+              href={r.href}
+              className={cn(
+                'whitespace-nowrap px-3 py-2 rounded-xl text-sm font-semibold transition-all',
+                active
+                  ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
+                  : 'bg-stone-50 text-stone-500 border border-stone-200 hover:bg-stone-100'
+              )}
+            >
+              {r.label}
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function AccountingPageClient({ storeId, currency }: AccountingPageClientProps) {
@@ -42,6 +101,9 @@ export default function AccountingPageClient({ storeId, currency }: AccountingPa
         <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Akuntansi & Laporan Keuangan</h1>
         <p className="text-stone-400 text-sm mt-0.5">Laba rugi, neraca, dan jurnal umum</p>
       </div>
+
+      {/* Sub-navigation */}
+      <SubNav />
 
       {/* Date Range */}
       <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">

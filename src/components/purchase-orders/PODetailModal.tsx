@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { X, Truck, CheckCircle2, Clock, Send, XCircle, Package, ChevronDown } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
 interface Props {
   po: any
@@ -56,7 +57,13 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
       body: JSON.stringify({ status }),
     })
     setSaving(false)
-    if (res.ok) onUpdated({ ...po, status })
+    if (res.ok) {
+      const label = STATUS_CONFIG[status]?.label ?? status
+      toast.success(`Status diubah ke ${label}`)
+      onUpdated({ ...po, status })
+    } else {
+      toast.error('Gagal mengubah status PO')
+    }
   }
 
   async function submitReceipt() {
@@ -73,9 +80,12 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
     const data = await res.json() as any
     setSaving(false)
     if (res.ok) {
+      toast.success('Barang diterima', `${receive.length} item stok diperbarui`)
       setReceiving(false)
       setReceiveQtys({})
       onUpdated({ ...po, status: data.status ?? po.status })
+    } else {
+      toast.error('Gagal menerima barang')
     }
   }
 
