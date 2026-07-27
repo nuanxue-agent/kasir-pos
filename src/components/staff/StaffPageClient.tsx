@@ -26,7 +26,7 @@ interface StaffPageClientProps {
 
 const ROLE_COLORS = {
   OWNER: 'bg-purple-900/50 text-purple-400',
-  MANAGER: 'bg-blue-900/50 text-blue-400',
+  MANAGER: 'bg-amber-100 text-amber-700',
   CASHIER: 'bg-green-900/50 text-green-400',
 }
 

@@ -19,7 +19,7 @@ type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS' | 'OTHER'
 
 const PAYMENT_METHODS = [
   { id: 'CASH' as PaymentMethod, label: 'Tunai', icon: Banknote, color: 'text-green-400' },
-  { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-blue-400' },
+  { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-violet-500' },
   { id: 'QRIS' as PaymentMethod, label: 'QRIS', icon: Smartphone, color: 'text-purple-400' },
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]

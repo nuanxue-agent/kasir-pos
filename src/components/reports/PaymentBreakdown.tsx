@@ -13,7 +13,7 @@ interface PaymentBreakdownProps {
 
 const METHOD_STYLES: Record<string, { label: string; color: string; bg: string; text: string }> = {
   CASH:     { label: 'Cash',     color: 'bg-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
-  CARD:     { label: 'Card',     color: 'bg-blue-500',    bg: 'bg-blue-500/10',    text: 'text-blue-400'    },
+  CARD:     { label: 'Card',     color: 'bg-violet-500',    bg: 'bg-violet-500/10',    text: 'text-violet-500'    },
   QRIS:     { label: 'QRIS',     color: 'bg-purple-500',  bg: 'bg-purple-500/10',  text: 'text-purple-400'  },
   TRANSFER: { label: 'Transfer', color: 'bg-orange-500',  bg: 'bg-orange-500/10',  text: 'text-orange-400'  },
 }

@@ -580,7 +580,7 @@ function ProductCard({ product, currency, onAdd }: { product: Product; currency:
       <div className="w-full aspect-square rounded-lg bg-stone-50 flex items-center justify-center mb-3 text-2xl">
         {product.category?.icon || '📦'}
       </div>
-      <p className="text-sm font-medium text-white leading-tight line-clamp-2">{product.name}</p>
+      <p className="text-sm font-medium text-stone-800 leading-tight line-clamp-2">{product.name}</p>
       {product.category && (
         <p className="text-[10px] text-stone-400 mt-0.5">{product.category.icon} {product.category.name}</p>
       )}
@@ -641,7 +641,7 @@ function ProductRow({ product, currency, onAdd }: { product: Product; currency: 
 
 const PAYMENT_METHODS = [
   { id: 'CASH' as PaymentMethod, label: 'Cash', icon: Banknote, color: 'text-emerald-600' },
-  { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-blue-400' },
+  { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-violet-500' },
   { id: 'QRIS' as PaymentMethod, label: 'QRIS', icon: Smartphone, color: 'text-purple-400' },
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]

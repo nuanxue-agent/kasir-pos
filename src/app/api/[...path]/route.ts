@@ -430,14 +430,17 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
       const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
       const to = sp.get('to') ?? new Date().toISOString()
-      const [revenue, daily, topProducts, payments, customers] = await Promise.all([
+      const [revenue, daily, topProducts, payments, customers, expenses] = await Promise.all([
         queryOne(`SELECT SUM(total) as totalRevenue, COUNT(*) as totalOrders, AVG(total) as avgOrderValue FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`, [storeId, from, to]),
         query(`SELECT DATE(createdAt) as date, SUM(total) as total, COUNT(*) as orders FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ? GROUP BY DATE(createdAt) ORDER BY date`, [storeId, from, to]),
         query(`SELECT oi.name, SUM(oi.subtotal) as revenue, SUM(oi.qty) as qty FROM OrderItem oi JOIN "Order" o ON oi.orderId=o.id WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ? GROUP BY oi.name ORDER BY revenue DESC LIMIT 5`, [storeId, from, to]),
         query(`SELECT p.method, SUM(p.amount) as total, COUNT(*) as count FROM Payment p JOIN "Order" o ON p.orderId=o.id WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ? GROUP BY p.method`, [storeId, from, to]),
         queryOne(`SELECT COUNT(*) as newCustomers FROM Customer WHERE storeId=? AND createdAt BETWEEN ? AND ?`, [storeId, from, to]),
+        queryOne(`SELECT COALESCE(SUM(amount),0) as totalExpenses FROM Expense WHERE storeId=? AND date BETWEEN ? AND ?`, [storeId, from.slice(0,10), to.slice(0,10)]),
       ])
-      return ok({ totalRevenue: (revenue as any)?.totalRevenue ?? 0, totalOrders: (revenue as any)?.totalOrders ?? 0, avgOrderValue: (revenue as any)?.avgOrderValue ?? 0, newCustomers: (customers as any)?.newCustomers ?? 0, dailySales: daily, topProducts, paymentBreakdown: payments })
+      const totalRevenue = (revenue as any)?.totalRevenue ?? 0
+      const totalExpenses = (expenses as any)?.totalExpenses ?? 0
+      return ok({ totalRevenue, totalOrders: (revenue as any)?.totalOrders ?? 0, avgOrderValue: (revenue as any)?.avgOrderValue ?? 0, newCustomers: (customers as any)?.newCustomers ?? 0, totalExpenses, netProfit: totalRevenue - totalExpenses, dailySales: daily, topProducts, paymentBreakdown: payments })
     }
 
     // ─── EXPENSES ─────────────────────────────────────────────────────────────

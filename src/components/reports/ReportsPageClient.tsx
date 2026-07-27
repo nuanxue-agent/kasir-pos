@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { DollarSign, ShoppingCart, TrendingUp, Users } from 'lucide-react'
-import { StatsCard } from '@/components/dashboard/StatsCard'
+import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { SalesChart } from './SalesChart'
 import { TopProductsChart } from './TopProductsChart'
@@ -18,67 +17,47 @@ interface ReportsPageClientProps {
 type DateRange = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
 
 interface ReportData {
-  summary: {
-    totalRevenue: number
-    totalOrders: number
-    avgOrderValue: number
-    newCustomers: number
-  }
-  topProducts: Array<{
-    productId: string
-    name: string
-    _sum: { subtotal: number; qty: number }
-  }>
+  totalRevenue: number
+  totalOrders: number
+  avgOrderValue: number
+  newCustomers: number
+  totalExpenses: number
+  netProfit: number
+  topProducts: Array<{ name: string; revenue: number; qty: number }>
   dailySales: Array<{ date: string; total: number; orders: number }>
-  paymentBreakdown: Array<{
-    method: string
-    _sum: { amount: number }
-    _count: { id: number }
-  }>
+  paymentBreakdown: Array<{ method: string; total: number; count: number }>
 }
 
 function getDateRange(range: DateRange): { from: string; to: string } {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  
   switch (range) {
     case 'today':
-      return {
-        from: today.toISOString(),
-        to: now.toISOString(),
-      }
+      return { from: today.toISOString(), to: now.toISOString() }
     case 'yesterday': {
-      const yesterday = new Date(today)
-      yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayEnd = new Date(yesterday)
-      yesterdayEnd.setHours(23, 59, 59, 999)
-      return {
-        from: yesterday.toISOString(),
-        to: yesterdayEnd.toISOString(),
-      }
+      const y = new Date(today); y.setDate(y.getDate() - 1)
+      const ye = new Date(y); ye.setHours(23, 59, 59, 999)
+      return { from: y.toISOString(), to: ye.toISOString() }
     }
     case 'week': {
-      const weekStart = new Date(today)
-      weekStart.setDate(weekStart.getDate() - 7)
-      return {
-        from: weekStart.toISOString(),
-        to: now.toISOString(),
-      }
+      const w = new Date(today); w.setDate(w.getDate() - 7)
+      return { from: w.toISOString(), to: now.toISOString() }
     }
     case 'month': {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      return {
-        from: monthStart.toISOString(),
-        to: now.toISOString(),
-      }
+      const m = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { from: m.toISOString(), to: now.toISOString() }
     }
-    default:
-      return {
-        from: today.toISOString(),
-        to: now.toISOString(),
-      }
+    default: return { from: today.toISOString(), to: now.toISOString() }
   }
 }
+
+const RANGE_BTNS: { value: DateRange; label: string }[] = [
+  { value: 'today',     label: 'Hari Ini' },
+  { value: 'yesterday', label: 'Kemarin' },
+  { value: 'week',      label: '7 Hari' },
+  { value: 'month',     label: 'Bulan Ini' },
+  { value: 'custom',    label: 'Kustom' },
+]
 
 export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageClientProps) {
   const [dateRange, setDateRange] = useState<DateRange>('today')
@@ -99,213 +78,171 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
     },
   })
 
-  const rangeButtons: Array<{ value: DateRange; label: string }> = [
-    { value: 'today', label: 'Today' },
-    { value: 'yesterday', label: 'Yesterday' },
-    { value: 'week', label: 'This Week' },
-    { value: 'month', label: 'This Month' },
-    { value: 'custom', label: 'Custom' },
-  ]
+  const skeleton = (h = 'h-28') => (
+    <div className={`${h} bg-stone-50 animate-pulse rounded-2xl border border-stone-100`} />
+  )
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5 pb-24 lg:pb-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-stone-800">Reports</h1>
-        <p className="text-stone-500 mt-1">Sales analytics and performance metrics</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Laporan</h1>
+        <p className="text-stone-400 text-sm mt-0.5">Analitik penjualan dan performa toko</p>
       </div>
 
-      {/* Date Range Selector */}
-      <div className="bg-stone-100 rounded-lg p-4 border border-stone-200">
-        <div className="flex flex-wrap items-center gap-2">
-          {rangeButtons.map((btn) => (
+      {/* Date range selector */}
+      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {RANGE_BTNS.map(btn => (
             <button
               key={btn.value}
               onClick={() => setDateRange(btn.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 dateRange === btn.value
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
+                  ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
+                  : 'bg-stone-50 text-stone-500 hover:bg-stone-100 border border-stone-200'
               }`}
             >
               {btn.label}
             </button>
           ))}
         </div>
-
         {dateRange === 'custom' && (
-          <div className="flex gap-4 mt-4">
-            <div>
-              <label className="block text-sm text-stone-500 mb-1">From</label>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="bg-stone-50 text-stone-800 rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
+              <span className="text-xs text-stone-400">Dari</span>
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                className="text-sm text-stone-700 bg-transparent focus:outline-none" />
             </div>
-            <div>
-              <label className="block text-sm text-stone-500 mb-1">To</label>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="bg-stone-50 text-stone-800 rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
+            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
+              <span className="text-xs text-stone-400">Sampai</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                className="text-sm text-stone-700 bg-transparent focus:outline-none" />
             </div>
           </div>
         )}
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {isLoading ? (
-          <>
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-stone-100 rounded-lg h-32 animate-pulse border border-stone-200" />
-            ))}
-          </>
+          <>{[...Array(6)].map((_, i) => <div key={i}>{skeleton()}</div>)}</>
         ) : (
           <>
-            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg p-2.5 bg-emerald-500/10 shrink-0">
-                  <DollarSign className="h-5 w-5 text-emerald-400" />
+            {/* Omzet */}
+            <div className="col-span-2 sm:col-span-1 lg:col-span-2 bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-stone-500">Total Revenue</p>
-                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
-                    {formatCurrency(data?.summary.totalRevenue ?? 0, currency)}
-                  </p>
-                </div>
+                <p className="text-xs font-medium text-stone-400">Omzet</p>
               </div>
+              <p className="text-2xl font-bold text-stone-800">{formatCurrency(data?.totalRevenue ?? 0, currency)}</p>
             </div>
-
-            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg p-2.5 bg-blue-500/10 shrink-0">
-                  <ShoppingCart className="h-5 w-5 text-blue-400" />
+            {/* Pengeluaran */}
+            <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                  <TrendingDown className="h-4 w-4 text-red-500" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-stone-500">Total Orders</p>
-                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
-                    {data?.summary.totalOrders ?? 0}
-                  </p>
-                </div>
+                <p className="text-xs font-medium text-stone-400">Pengeluaran</p>
               </div>
+              <p className="text-xl font-bold text-red-500">-{formatCurrency(data?.totalExpenses ?? 0, currency)}</p>
             </div>
-
-            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg p-2.5 bg-purple-500/10 shrink-0">
-                  <TrendingUp className="h-5 w-5 text-purple-400" />
+            {/* Laba Bersih */}
+            <div className={`bg-white rounded-2xl p-4 shadow-sm border ${(data?.netProfit ?? 0) >= 0 ? 'border-emerald-200' : 'border-red-200'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${(data?.netProfit ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <TrendingUp className={`h-4 w-4 ${(data?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-stone-500">Avg Order Value</p>
-                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
-                    {formatCurrency(data?.summary.avgOrderValue ?? 0, currency)}
-                  </p>
-                </div>
+                <p className="text-xs font-medium text-stone-400">Laba Bersih</p>
               </div>
+              <p className={`text-xl font-bold ${(data?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {formatCurrency(data?.netProfit ?? 0, currency)}
+              </p>
             </div>
-
-            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg p-2.5 bg-orange-500/10 shrink-0">
-                  <Users className="h-5 w-5 text-orange-400" />
+            {/* Pesanan */}
+            <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                  <ShoppingCart className="h-4 w-4 text-amber-500" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-stone-500">New Customers</p>
-                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
-                    {data?.summary.newCustomers ?? 0}
-                  </p>
-                </div>
+                <p className="text-xs font-medium text-stone-400">Pesanan</p>
               </div>
+              <p className="text-xl font-bold text-stone-800">{data?.totalOrders ?? 0}</p>
+            </div>
+            {/* Pelanggan Baru */}
+            <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+                  <Users className="h-4 w-4 text-orange-400" />
+                </div>
+                <p className="text-xs font-medium text-stone-400">Pelanggan</p>
+              </div>
+              <p className="text-xl font-bold text-stone-800">{data?.newCustomers ?? 0}</p>
             </div>
           </>
         )}
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Chart */}
-        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-stone-800 mb-4">Revenue Trend</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-stone-800 mb-4">Tren Penjualan</h3>
           {isLoading ? (
-            <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-indigo-500" />
+            <div className="h-48 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-stone-100 border-t-amber-500" />
             </div>
           ) : (
             <SalesChart data={data?.dailySales ?? []} currency={currency} />
           )}
         </div>
 
-        {/* Top Products Chart */}
-        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-stone-800 mb-4">Top 5 Products</h3>
+        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-stone-800 mb-4">5 Produk Terlaris</h3>
           {isLoading ? (
-            <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-indigo-500" />
+            <div className="h-48 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-stone-100 border-t-amber-500" />
             </div>
           ) : (
-            <TopProductsChart data={data?.topProducts.slice(0, 5) ?? []} currency={currency} />
+            <TopProductsChart data={data?.topProducts?.slice(0, 5) ?? []} currency={currency} />
           )}
         </div>
       </div>
 
-      {/* Bottom Row: Payment Breakdown & Recent Orders */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Payment Breakdown */}
-        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-stone-800 mb-4">Payment Methods</h3>
+      {/* Bottom Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-stone-800 mb-4">Metode Pembayaran</h3>
           {isLoading ? (
-            <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-indigo-500" />
-            </div>
+            <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-stone-50 animate-pulse rounded-xl" />)}</div>
           ) : (
             <PaymentBreakdown data={data?.paymentBreakdown ?? []} currency={currency} />
           )}
         </div>
 
-        {/* Recent Orders Table */}
-        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-stone-800 mb-4">Recent Orders</h3>
+        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-stone-800 mb-4">Penjualan Harian</h3>
           {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-12 bg-stone-200 rounded animate-pulse" />
-              ))}
+            <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-stone-50 animate-pulse rounded-xl" />)}</div>
+          ) : (data?.dailySales ?? []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <ShoppingCart className="h-8 w-8 text-stone-200 mb-2" />
+              <p className="text-sm text-stone-400">Belum ada penjualan di periode ini</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-stone-500 border-b border-stone-200">
-                    <th className="text-left py-2 px-2">Order #</th>
-                    <th className="text-left py-2 px-2">Time</th>
-                    <th className="text-right py-2 px-2">Total</th>
-                    <th className="text-left py-2 px-2">Method</th>
-                  </tr>
-                </thead>
-                <tbody className="text-stone-600">
-                  {data?.dailySales.slice(0, 5).map((sale, idx) => (
-                    <tr key={idx} className="border-b border-stone-200/50">
-                      <td className="py-3 px-2">#{idx + 1}</td>
-                      <td className="py-3 px-2">{new Date(sale.date).toLocaleDateString()}</td>
-                      <td className="py-3 px-2 text-right font-medium">
-                        {formatCurrency(sale.total, currency)}
-                      </td>
-                      <td className="py-3 px-2">-</td>
-                    </tr>
-                  )) ?? (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-stone-500">
-                        No orders found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="space-y-1">
+              {(data?.dailySales ?? []).map((s, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-stone-50 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-stone-700">
+                      {new Date(s.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </p>
+                    <p className="text-xs text-stone-400">{s.orders} pesanan</p>
+                  </div>
+                  <p className="text-sm font-bold text-stone-800">{formatCurrency(s.total, currency)}</p>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -130,7 +130,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                 className={cn(
                   'flex items-center justify-center gap-2 px-4 py-3 rounded-lg border font-medium transition-colors',
                   type === 'ADJUSTMENT'
-                    ? 'bg-blue-600 border-blue-500 text-white'
+                    ? 'bg-amber-500 border-amber-400 text-white'
                     : 'bg-gray-700 border-stone-200 text-gray-300 hover:bg-gray-600'
                 )}
               >
@@ -227,7 +227,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
           <button
             onClick={handleSubmit}
             disabled={loading || !qtyNum}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+            className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
             {loading ? 'Saving...' : 'Apply'}
           </button>
