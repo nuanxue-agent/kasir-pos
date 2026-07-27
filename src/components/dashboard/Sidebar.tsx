@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -19,6 +18,7 @@ import {
   Settings,
   LogOut,
   X,
+  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
@@ -33,9 +33,7 @@ interface NavItem {
 interface NavGroup {
   title: string
   items: NavItem[]
-  /** Minimum role required to see this group */
   minRole?: Parameters<typeof isAtLeast>[1]
-  /** If true, only visible to SUPER_ADMIN */
   superAdminOnly?: boolean
 }
 
@@ -89,12 +87,13 @@ const NAV_GROUPS: NavGroup[] = [
 interface SidebarProps {
   userRole: UserRole
   isSuperAdmin: boolean
-  /** Controls mobile visibility */
+  userName?: string
+  userEmail?: string | null
   open: boolean
   onClose: () => void
 }
 
-export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps) {
+export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onClose }: SidebarProps) {
   const pathname = usePathname()
 
   function isActive(href: string) {
@@ -108,23 +107,35 @@ export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps)
     return true
   }
 
+  const initials = (userName ?? 'U')
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+
+  const handleLogout = () => {
+    fetch('/api/auth/logout', { method: 'POST' }).then(() => {
+      window.location.href = '/login'
+    })
+  }
+
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-5 border-b border-slate-700/50 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center">
-            <ShoppingCart className="h-4 w-4 text-white" />
+      <div className="flex items-center justify-between h-14 px-4 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <Zap className="h-4 w-4 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-white font-semibold text-lg tracking-tight">Kasir</span>
+          <span className="text-white font-bold text-base tracking-tight">Kasir</span>
         </div>
-        {/* Close button — mobile only */}
         <button
           onClick={onClose}
-          className="lg:hidden text-slate-400 hover:text-white p-1 rounded"
+          className="lg:hidden text-white/40 hover:text-white/80 p-1 rounded-lg hover:bg-white/5 transition-colors"
           aria-label="Close sidebar"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
 
@@ -132,7 +143,7 @@ export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps)
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
         {NAV_GROUPS.filter(canSeeGroup).map((group) => (
           <div key={group.title}>
-            <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/30">
               {group.title}
             </p>
             <ul className="space-y-0.5">
@@ -144,21 +155,22 @@ export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps)
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                         active
-                          ? 'bg-indigo-500/20 text-indigo-300'
-                          : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
+                          ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/10 text-white border border-indigo-500/20'
+                          : 'text-white/50 hover:text-white hover:bg-white/5'
                       )}
                     >
                       <item.icon
                         className={cn(
-                          'h-4 w-4 shrink-0',
-                          active ? 'text-indigo-400' : 'text-slate-500'
+                          'shrink-0 transition-colors',
+                          active ? 'text-indigo-400' : 'text-white/30'
                         )}
+                        style={{ width: 18, height: 18 }}
                       />
-                      {item.label}
+                      <span className="truncate">{item.label}</span>
                       {active && (
-                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
                       )}
                     </Link>
                   </li>
@@ -169,28 +181,50 @@ export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps)
         ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="shrink-0 border-t border-slate-700/50 p-3 space-y-0.5">
+      {/* Settings link */}
+      <div className="px-3 pb-2">
         <Link
           href="/dashboard/settings"
           onClick={onClose}
           className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
             pathname.startsWith('/dashboard/settings')
-              ? 'bg-indigo-500/20 text-indigo-300'
-              : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
+              ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/10 text-white border border-indigo-500/20'
+              : 'text-white/50 hover:text-white hover:bg-white/5'
           )}
         >
-          <Settings className="h-4 w-4 shrink-0 text-slate-500" />
+          <Settings
+            className={cn(
+              'shrink-0',
+              pathname.startsWith('/dashboard/settings') ? 'text-indigo-400' : 'text-white/30'
+            )}
+            style={{ width: 18, height: 18 }}
+          />
           Settings
         </Link>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          Log out
-        </button>
+      </div>
+
+      {/* User section */}
+      <div className="shrink-0 border-t border-white/5 p-3">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">{userName ?? 'User'}</p>
+            {userEmail && (
+              <p className="text-xs text-white/30 truncate">{userEmail}</p>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+            aria-label="Log out"
+            title="Log out"
+          >
+            <LogOut style={{ width: 15, height: 15 }} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -199,7 +233,7 @@ export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps)
     <>
       {/* Desktop sidebar */}
       <aside
-        className="hidden lg:flex flex-col w-60 shrink-0 bg-[#1e293b] h-screen sticky top-0"
+        className="hidden lg:flex flex-col w-[240px] shrink-0 bg-[#0d0d14] border-r border-white/5 h-screen sticky top-0"
         aria-label="Main navigation"
       >
         {sidebarContent}
@@ -208,15 +242,13 @@ export function Sidebar({ userRole, isSuperAdmin, open, onClose }: SidebarProps)
       {/* Mobile overlay */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-40 flex">
-          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
             aria-hidden="true"
           />
-          {/* Drawer */}
           <aside
-            className="relative z-50 w-60 bg-[#1e293b] h-full flex flex-col shadow-xl"
+            className="relative z-50 w-[240px] bg-[#0d0d14] border-r border-white/5 h-full flex flex-col shadow-2xl"
             aria-label="Main navigation"
           >
             {sidebarContent}

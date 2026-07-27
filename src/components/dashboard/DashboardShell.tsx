@@ -28,10 +28,12 @@ export function DashboardShell({
   const [currentStoreId, setCurrentStoreId] = useState(stores[0]?.id)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
       <Sidebar
         userRole={userRole}
         isSuperAdmin={isSuperAdmin}
+        userName={userName}
+        userEmail={userEmail}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
