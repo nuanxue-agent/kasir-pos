@@ -558,6 +558,144 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── Suppliers ────────────────────────────────────────────────────────────
+    if (segs[0] === 'suppliers') {
+      if (!segs[1] && method === 'GET') {
+        const search = url.searchParams.get('search') ?? ''
+        const rows = search
+          ? await query(`SELECT * FROM Supplier WHERE storeId=? AND active=1 AND name LIKE ? ORDER BY name`, [storeId, `%${search}%`])
+          : await query(`SELECT * FROM Supplier WHERE storeId=? AND active=1 ORDER BY name`, [storeId])
+        return ok(rows)
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.name || b.name.trim().length < 2) return err('Nama supplier minimal 2 karakter')
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO Supplier (id,storeId,name,email,phone,address,taxId,notes,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,1,?,?)`,
+          [id, storeId, b.name.trim(), b.email ?? null, b.phone ?? null, b.address ?? null, b.taxId ?? null, b.notes ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const allowed = new Set(['name','email','phone','address','taxId','notes','active'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Supplier SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+      if (segs[1] && method === 'DELETE') {
+        await exec(`UPDATE Supplier SET active=0, updatedAt=? WHERE id=? AND storeId=?`, [nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ── Purchase Orders ───────────────────────────────────────────────────────
+    if (segs[0] === 'purchase-orders') {
+      if (!segs[1] && method === 'GET') {
+        const status = url.searchParams.get('status') ?? ''
+        const limit = parseInt(url.searchParams.get('limit') ?? '50')
+        const offset = parseInt(url.searchParams.get('offset') ?? '0')
+        const rows = await query(
+          `SELECT po.*, s.name as supplierName
+           FROM PurchaseOrder po
+           JOIN Supplier s ON po.supplierId = s.id
+           WHERE po.storeId=? ${status ? 'AND po.status=?' : ''}
+           ORDER BY po.createdAt DESC LIMIT ? OFFSET ?`,
+          status ? [storeId, status, limit, offset] : [storeId, limit, offset]
+        )
+        const total = await queryOne<any>(`SELECT COUNT(*) as count FROM PurchaseOrder WHERE storeId=? ${status ? 'AND status=?' : ''}`,
+          status ? [storeId, status] : [storeId])
+        return ok({ orders: rows, total: total?.count ?? 0 })
+      }
+      if (segs[1] === 'lines' && method === 'GET') {
+        // /api/purchase-orders/lines?orderId=xxx
+        const orderId = url.searchParams.get('orderId')
+        if (!orderId) return err('orderId required')
+        const lines = await query(`SELECT * FROM PurchaseOrderLine WHERE orderId=?`, [orderId])
+        return ok(lines)
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.supplierId) return err('Supplier harus dipilih')
+        if (!b.lines || !Array.isArray(b.lines) || b.lines.length === 0) return err('Minimal 1 item')
+        // Generate PO number
+        const count = await queryOne<any>(`SELECT COUNT(*) as c FROM PurchaseOrder WHERE storeId=?`, [storeId])
+        const num = `PO-${String((count?.c ?? 0) + 1).padStart(4, '0')}`
+        const t = nowISO(); const id = newId()
+        const subtotal = b.lines.reduce((s: number, l: any) => s + (Number(l.qty) * Number(l.unitCost)), 0)
+        const taxAmt = Math.round(subtotal * (b.taxRate ?? 0))
+        const total = subtotal + taxAmt
+        await exec(
+          `INSERT INTO PurchaseOrder (id,storeId,supplierId,userId,number,status,expectedDate,subtotal,taxAmt,total,note,createdAt,updatedAt) VALUES (?,?,?,?,?,'DRAFT',?,?,?,?,?,?,?)`,
+          [id, storeId, b.supplierId, user.id, num, b.expectedDate ?? null, subtotal, taxAmt, total, b.note ?? null, t, t]
+        )
+        for (const line of b.lines) {
+          await exec(
+            `INSERT INTO PurchaseOrderLine (id,orderId,productId,productName,qty,unitCost,receivedQty,subtotal,createdAt) VALUES (?,?,?,?,?,?,0,?,?)`,
+            [newId(), id, line.productId, line.productName ?? '', Number(line.qty), Number(line.unitCost), Number(line.qty) * Number(line.unitCost), t]
+          )
+        }
+        return ok({ id, number: num }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        // Status change
+        if (b.status) {
+          const po = await queryOne<any>(`SELECT * FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+          if (!po) return err('PO not found', 404)
+          await exec(`UPDATE PurchaseOrder SET status=?, updatedAt=? WHERE id=? AND storeId=?`, [b.status, nowISO(), segs[1], storeId])
+          return ok({ success: true })
+        }
+        // Goods receipt — receive items
+        if (b.receive && Array.isArray(b.receive)) {
+          const po = await queryOne<any>(`SELECT * FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+          if (!po) return err('PO not found', 404)
+          if (!['SENT','CONFIRMED'].includes(po.status)) return err('PO tidak bisa diterima dalam status ini')
+          const t = nowISO(); const receiptId = newId()
+          const grNum = `GR-${Date.now().toString(36).toUpperCase()}`
+          await exec(
+            `INSERT INTO GoodsReceipt (id,storeId,orderId,userId,number,note,createdAt) VALUES (?,?,?,?,?,?,?)`,
+            [receiptId, storeId, segs[1], user.id, grNum, b.note ?? null, t]
+          )
+          let allReceived = true
+          for (const item of b.receive) {
+            if (!item.lineId || !item.qty || item.qty <= 0) continue
+            const line = await queryOne<any>(`SELECT * FROM PurchaseOrderLine WHERE id=?`, [item.lineId])
+            if (!line) continue
+            const newReceived = line.receivedQty + Number(item.qty)
+            await exec(`UPDATE PurchaseOrderLine SET receivedQty=? WHERE id=?`, [newReceived, item.lineId])
+            await exec(`INSERT INTO GoodsReceiptLine (id,receiptId,lineId,productId,qty) VALUES (?,?,?,?,?)`,
+              [newId(), receiptId, item.lineId, line.productId, Number(item.qty)])
+            // Update product stock
+            await exec(`UPDATE Product SET stock = stock + ?, updatedAt=? WHERE id=? AND storeId=?`,
+              [Number(item.qty), t, line.productId, storeId])
+            await exec(`INSERT INTO StockLog (id,storeId,productId,userId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?,?,?)`,
+              [newId(), storeId, line.productId, user.id, 'PURCHASE', Number(item.qty), `GR: ${grNum}`, t])
+            if (newReceived < line.qty) allReceived = false
+          }
+          // Check all lines received
+          const allLines = await query<any>(`SELECT * FROM PurchaseOrderLine WHERE orderId=?`, [segs[1]])
+          const fullyReceived = allLines.every((l: any) => l.receivedQty >= l.qty)
+          if (fullyReceived) {
+            await exec(`UPDATE PurchaseOrder SET status='RECEIVED', updatedAt=? WHERE id=?`, [t, segs[1]])
+          }
+          return ok({ receiptId, number: grNum })
+        }
+        return err('No valid update')
+      }
+      if (segs[1] && method === 'DELETE') {
+        const po = await queryOne<any>(`SELECT status FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!po) return err('PO not found', 404)
+        if (!['DRAFT','CANCELLED'].includes(po.status)) return err('Hanya PO DRAFT yang bisa dihapus')
+        await exec(`DELETE FROM PurchaseOrderLine WHERE orderId=?`, [segs[1]])
+        await exec(`DELETE FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
     return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)
