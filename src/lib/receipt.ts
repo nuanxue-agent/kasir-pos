@@ -39,6 +39,8 @@ export interface ReceiptData {
   points?: number
   /** Cashier/order note — printed on receipt when present */
   orderNote?: string
+  /** Multiple payment lines for split payment */
+  payments?: { method: string; amount: number }[]
 }
 
 // ── Currency formatter ─────────────────────────────────────────────────────────
@@ -337,12 +339,32 @@ export function buildReceiptLines(data: ReceiptData): ReceiptLine[] {
     lines.push({ type: 'item', left: 'Tax', right: fmt(data.taxAmt, data.currency) })
   lines.push({ type: 'total', left: 'TOTAL', right: fmt(data.total, data.currency), bold: true })
 
-  if (data.paid) {
+  if (data.payments && data.payments.length > 0) {
+    const METHOD_LABELS: Record<string, string> = {
+      CASH: 'TUNAI',
+      CARD: 'KARTU',
+      QRIS: 'QRIS',
+      TRANSFER: 'TRANSFER',
+    }
+    for (const pay of data.payments) {
+      const label = METHOD_LABELS[pay.method] ?? pay.method
+      lines.push({ type: 'item', left: label, right: fmt(pay.amount, data.currency) })
+    }
+    const totalChange = data.payments.reduce(
+      (sum: number, p: { method: string; amount: number; change?: number }) =>
+        sum + (p.change ?? 0),
+      0,
+    )
+    if (totalChange > 0) {
+      lines.push({ type: 'item', left: 'Kembalian', right: fmt(totalChange, data.currency) })
+    }
+  } else if (data.paid) {
+    // legacy single-payment fallback
     lines.push({ type: 'item', left: 'Paid', right: fmt(data.paid, data.currency) })
     lines.push({ type: 'item', left: 'Change', right: fmt(data.change ?? 0, data.currency) })
+    if (data.paymentMethod)
+      lines.push({ type: 'text', text: `Payment: ${data.paymentMethod}`, size: 'small' })
   }
-  if (data.paymentMethod)
-    lines.push({ type: 'text', text: `Payment: ${data.paymentMethod}`, size: 'small' })
   if (data.points)
     lines.push({ type: 'text', text: `Points earned: +${data.points}`, size: 'small' })
 

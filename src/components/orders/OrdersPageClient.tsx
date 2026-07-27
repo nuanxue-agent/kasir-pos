@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation'
 
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Receipt, Calendar, Search, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Receipt, Calendar, Search, Eye, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { exportToCSV } from '@/lib/export'
 import { OrderDetailModal } from './OrderDetailModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,15 +143,52 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
     setSelectedOrder(null)
   }
 
+  function handleExportCSV() {
+    const rows = filteredOrders.map(o => ({
+      'Order #': o.number,
+      Date: formatDate(o.createdAt),
+      Customer: o.customer?.name ?? 'Walk-in',
+      Items: o.items.reduce((s, i) => s + i.qty, 0),
+      Subtotal: o.subtotal,
+      Discount: o.discountAmt,
+      Tax: o.taxAmt,
+      Total: o.total,
+      Status: o.status,
+      'Payment Method': o.payments.map(p => p.method).join(', '),
+    }))
+    exportToCSV(rows, `orders-${new Date().toISOString().slice(0, 10)}`, [
+      'Order #',
+      'Date',
+      'Customer',
+      'Items',
+      'Subtotal',
+      'Discount',
+      'Tax',
+      'Total',
+      'Status',
+      'Payment Method',
+    ])
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Receipt className="h-6 w-6 text-indigo-500" />
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text-1)]">Pesanan</h1>
-          <p className="text-sm text-[var(--text-2)]">Browse and manage all transactions</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Receipt className="h-6 w-6 text-indigo-500" />
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-1)]">Pesanan</h1>
+            <p className="text-sm text-[var(--text-2)]">Browse and manage all transactions</p>
+          </div>
         </div>
+        <button
+          onClick={handleExportCSV}
+          disabled={filteredOrders.length === 0}
+          className="flex items-center gap-2 rounded-lg bg-[var(--bg-muted)] px-3 py-2 text-sm text-[var(--text-2)] transition-colors hover:bg-stone-200 disabled:opacity-40"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </button>
       </div>
 
       {/* Filters */}

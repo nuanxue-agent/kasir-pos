@@ -3,19 +3,44 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Store, Receipt, Package, CheckCircle2, ChevronRight, ArrowRight,
-  ShoppingBag, Sparkles, Globe, Database, Users, BookOpen,
+  Store,
+  Receipt,
+  Package,
+  CheckCircle2,
+  ChevronRight,
+  ArrowRight,
+  ShoppingBag,
+  Sparkles,
+  Globe,
+  Database,
+  Users,
+  BookOpen,
+  ShoppingCart,
+  BarChart3,
+  Heart,
+  UserCheck,
+  Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STORE_TYPES = [
-  { id: 'Retail',           emoji: '🛍️', label: 'Retail',            desc: 'Clothing, electronics, accessories' },
-  { id: 'Food & Beverage',  emoji: '🍜', label: 'Food & Beverage',    desc: 'Restaurant, café, warung' },
-  { id: 'Service',          emoji: '🔧', label: 'Service',            desc: 'Salon, laundry, workshop' },
-  { id: 'Manufacturing',    emoji: '🏭', label: 'Manufacturing',      desc: 'Production, assembly, fabrication' },
-  { id: 'Other',            emoji: '🏪', label: 'Other',              desc: 'Customize later' },
+  { id: 'Retail', emoji: '🛍️', label: 'Retail', desc: 'Clothing, electronics, accessories' },
+  {
+    id: 'Food & Beverage',
+    emoji: '🍜',
+    label: 'Food & Beverage',
+    desc: 'Restaurant, café, warung',
+  },
+  { id: 'Service', emoji: '🔧', label: 'Service', desc: 'Salon, laundry, workshop' },
+  {
+    id: 'Manufacturing',
+    emoji: '🏭',
+    label: 'Manufacturing',
+    desc: 'Production, assembly, fabrication',
+  },
+  { id: 'Other', emoji: '🏪', label: 'Other', desc: 'Customize later' },
 ]
 
 const CURRENCIES = [
@@ -28,29 +53,53 @@ const CURRENCIES = [
 ]
 
 const TIMEZONES = [
-  { value: 'Asia/Jakarta',   label: 'Asia/Jakarta — WIB (UTC+7)' },
-  { value: 'Asia/Makassar',  label: 'Asia/Makassar — WITA (UTC+8)' },
-  { value: 'Asia/Jayapura',  label: 'Asia/Jayapura — WIT (UTC+9)' },
+  { value: 'Asia/Jakarta', label: 'Asia/Jakarta — WIB (UTC+7)' },
+  { value: 'Asia/Makassar', label: 'Asia/Makassar — WITA (UTC+8)' },
+  { value: 'Asia/Jayapura', label: 'Asia/Jayapura — WIT (UTC+9)' },
   { value: 'Asia/Singapore', label: 'Asia/Singapore — SGT (UTC+8)' },
   { value: 'Asia/Kuala_Lumpur', label: 'Asia/Kuala_Lumpur — MYT (UTC+8)' },
-  { value: 'Europe/London',  label: 'Europe/London — GMT/BST' },
-  { value: 'Europe/Berlin',  label: 'Europe/Berlin — CET/CEST (UTC+1/2)' },
+  { value: 'Europe/London', label: 'Europe/London — GMT/BST' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin — CET/CEST (UTC+1/2)' },
   { value: 'America/New_York', label: 'America/New_York — EST/EDT' },
-  { value: 'UTC',            label: 'UTC' },
+  { value: 'UTC', label: 'UTC' },
 ]
 
-const STEPS = [
-  { id: 'store_setup',   label: 'Store Setup' },
-  { id: 'receipt_tax',   label: 'Receipt & Tax' },
-  { id: 'seed_data',     label: 'Seed Data' },
-  { id: 'done',          label: 'Done' },
+const MODULES = [
+  { id: 'pos', icon: ShoppingCart, label: 'POS', desc: 'Point of sale & cashier', color: 'amber' },
+  {
+    id: 'inventory',
+    icon: Package,
+    label: 'Inventory',
+    desc: 'Stock & product management',
+    color: 'blue',
+  },
+  {
+    id: 'accounting',
+    icon: BarChart3,
+    label: 'Accounting',
+    desc: 'GL, P&L, balance sheet',
+    color: 'green',
+  },
+  { id: 'hr', icon: UserCheck, label: 'HR', desc: 'Employees & payroll', color: 'purple' },
+  { id: 'crm', icon: Users, label: 'CRM', desc: 'Customers & pipeline', color: 'rose' },
+  { id: 'loyalty', icon: Heart, label: 'Loyalty', desc: 'Points & rewards program', color: 'pink' },
 ] as const
 
-type StepId = typeof STEPS[number]['id']
+type ModuleId = (typeof MODULES)[number]['id']
 
-const inputCls = 'w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
+const STEPS = [
+  { id: 'store_setup', label: 'Store Info' },
+  { id: 'modules', label: 'Modules' },
+  { id: 'seed_data', label: 'Demo Data' },
+  { id: 'done', label: 'Done' },
+] as const
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+type StepId = (typeof STEPS)[number]['id']
+
+const inputCls =
+  'w-full bg-[var(--bg-card,#fafaf9)] border border-[var(--border,#e7e5e4)] rounded-xl px-4 py-3 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
+
+// ─── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
   userName: string
@@ -58,7 +107,7 @@ interface Props {
   storeId: string
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function OnboardingWizard({ userName, storeName, storeId }: Props) {
   const router = useRouter()
@@ -66,95 +115,92 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1 — Store Setup
+  // Step 1 — Store Info
   const [storeSetup, setStoreSetup] = useState({
     name: storeName,
-    storeType: '' as string,
+    address: '',
+    phone: '',
     currency: 'IDR',
     timezone: 'Asia/Jakarta',
+    storeType: '' as string,
   })
 
-  // Step 2 — Receipt & Tax
-  const [receiptTax, setReceiptTax] = useState({
-    taxRate: 11,
-    receiptNote: '',
-    phone: '',
-    address: '',
-  })
+  // Step 2 — Modules
+  const [modules, setModules] = useState<Set<ModuleId>>(new Set(['pos', 'inventory']))
 
   // Step 3 — Seed Data
-  const [seedData, setSeedData] = useState({
-    products: true,
-    accounts: true,
-    customers: true,
-  })
+  const [seedProducts, setSeedProducts] = useState(true)
 
-  // What was seeded (for summary)
+  // Summary
   const [seededItems, setSeededItems] = useState<string[]>([])
 
   const stepIndex = STEPS.findIndex(s => s.id === step)
 
-  // ─── Navigation ─────────────────────────────────────────────────────────────
+  function toggleModule(id: ModuleId) {
+    setModules(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // ─── Navigation ──────────────────────────────────────────────────────────────
 
   async function handleNext() {
     setSaving(true)
     setError('')
     try {
       if (step === 'store_setup') {
-        // PATCH /api/settings/store — step 1 fields
         const res = await fetch('/api/settings/store', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             storeId,
             name: storeSetup.name,
+            address: storeSetup.address,
+            phone: storeSetup.phone,
             currency: storeSetup.currency,
             timezone: storeSetup.timezone,
           }),
         })
-        if (!res.ok) throw new Error('Failed to save store setup')
-        setStep('receipt_tax')
-
-      } else if (step === 'receipt_tax') {
-        // PATCH /api/settings/store — step 2 fields
+        if (!res.ok) throw new Error('Failed to save store info')
+        setStep('modules')
+      } else if (step === 'modules') {
+        // Save enabled modules to store settings
         const res = await fetch('/api/settings/store', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             storeId,
-            taxRate: receiptTax.taxRate / 100,
-            receiptNote: receiptTax.receiptNote,
-            phone: receiptTax.phone,
-            address: receiptTax.address,
+            modules: Array.from(modules),
           }),
         })
-        if (!res.ok) throw new Error('Failed to save receipt/tax settings')
+        if (!res.ok) throw new Error('Failed to save modules')
         setStep('seed_data')
-
       } else if (step === 'seed_data') {
-        const anySelected = seedData.products || seedData.accounts || seedData.customers
-        if (anySelected) {
+        if (seedProducts) {
           const res = await fetch('/api/onboarding/seed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               storeId,
               storeType: storeSetup.storeType || 'Other',
-              ...seedData,
+              products: true,
+              accounts: modules.has('accounting'),
+              customers: modules.has('crm'),
             }),
           })
           if (!res.ok) throw new Error('Failed to seed data')
-          const json = await res.json() as any
+          const json = (await res.json()) as any
           setSeededItems(json.seeded ?? [])
         }
-        // Mark onboarding complete
         await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ step: 'complete', data: {} }),
         })
         setStep('done')
-
       } else if (step === 'done') {
         router.push('/dashboard')
         router.refresh()
@@ -166,24 +212,25 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
     }
   }
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#fffdf7] flex flex-col">
-
+    <div className="flex min-h-screen flex-col bg-[#fffdf7]">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100 bg-white">
+      <div className="flex items-center justify-between border-b border-stone-100 bg-white px-6 py-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm">
             <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
           </div>
-          <span className="font-bold text-stone-800 text-lg">Lakoo</span>
+          <span className="text-lg font-bold text-stone-800">Lakoo</span>
         </div>
-        <span className="text-xs text-stone-400">Step {stepIndex + 1} of {STEPS.length}</span>
+        <span className="text-xs text-stone-400">
+          Step {stepIndex + 1} of {STEPS.length}
+        </span>
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-stone-100">
+      <div className="h-1.5 bg-stone-100">
         <div
           className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
           style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
@@ -191,76 +238,120 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
       </div>
 
       {/* Step indicators */}
-      <div className="flex items-center justify-center gap-2 pt-5 px-4">
+      <div className="flex items-center justify-center gap-2 px-4 pt-5">
         {STEPS.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2">
-            <div className={cn(
-              'flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all',
-              i < stepIndex  ? 'bg-amber-500 text-white' :
-              i === stepIndex ? 'bg-amber-500 text-white ring-4 ring-amber-100' :
-              'bg-stone-100 text-stone-400'
-            )}>
-              {i < stepIndex ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+            <div
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all',
+                i < stepIndex
+                  ? 'bg-amber-500 text-white'
+                  : i === stepIndex
+                    ? 'bg-amber-500 text-white ring-4 ring-amber-100'
+                    : 'bg-stone-100 text-stone-400',
+              )}
+            >
+              {i < stepIndex ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
             </div>
-            <span className={cn(
-              'text-xs font-medium hidden sm:block',
-              i === stepIndex ? 'text-stone-700' : 'text-stone-400'
-            )}>
+            <span
+              className={cn(
+                'hidden text-xs font-medium sm:block',
+                i === stepIndex ? 'text-stone-700' : 'text-stone-400',
+              )}
+            >
               {s.label}
             </span>
             {i < STEPS.length - 1 && (
-              <div className={cn('w-6 h-px', i < stepIndex ? 'bg-amber-300' : 'bg-stone-200')} />
+              <div className={cn('h-px w-8', i < stepIndex ? 'bg-amber-300' : 'bg-stone-200')} />
             )}
           </div>
         ))}
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-start px-4 py-8 sm:py-10">
+      <div className="flex flex-1 flex-col items-center justify-start px-4 py-8 sm:py-10">
         <div className="w-full max-w-lg">
-
-          {/* ── Step 1: Store Setup ── */}
+          {/* ── Step 1: Store Info ── */}
           {step === 'store_setup' && (
             <div className="space-y-6">
               <div className="text-center">
-                <div className="text-3xl mb-2">👋</div>
-                <h1 className="text-2xl font-bold text-stone-800">Welcome, {userName.split(' ')[0]}!</h1>
-                <p className="text-stone-500 mt-1.5 text-sm">Let's set up your store in a few steps.</p>
+                <div className="mb-2 text-3xl">👋</div>
+                <h1 className="text-2xl font-bold text-stone-800">
+                  Welcome, {userName.split(' ')[0]}!
+                </h1>
+                <p className="mt-1.5 text-sm text-stone-500">
+                  Let's set up your store in a few steps.
+                </p>
               </div>
 
-              <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="space-y-4 rounded-2xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card,#fff)] p-5 shadow-sm">
                 {/* Store name */}
                 <div>
-                  <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Store Name *</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-stone-500">
+                    Store Name *
+                  </label>
                   <input
                     value={storeSetup.name}
                     onChange={e => setStoreSetup(s => ({ ...s, name: e.target.value }))}
                     className={inputCls}
-                    placeholder="My Awesome Store"
+                    placeholder="Warung Saya"
+                  />
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-stone-500">
+                    Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={storeSetup.address}
+                    onChange={e => setStoreSetup(s => ({ ...s, address: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Jl. Merdeka No. 1, Jakarta"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-stone-500">Phone</label>
+                  <input
+                    type="tel"
+                    value={storeSetup.phone}
+                    onChange={e => setStoreSetup(s => ({ ...s, phone: e.target.value }))}
+                    className={inputCls}
+                    placeholder="+62 21 1234 5678"
                   />
                 </div>
 
                 {/* Store type */}
                 <div>
-                  <label className="text-xs font-semibold text-stone-500 mb-2 block">Store Type</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <label className="mb-2 block text-xs font-semibold text-stone-500">
+                    Store Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {STORE_TYPES.map(t => (
                       <button
                         key={t.id}
                         type="button"
                         onClick={() => setStoreSetup(s => ({ ...s, storeType: t.id }))}
                         className={cn(
-                          'flex flex-col items-start gap-1 p-3 rounded-xl border-2 text-left transition-all active:scale-[0.98]',
+                          'flex flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-all active:scale-[0.98]',
                           storeSetup.storeType === t.id
                             ? 'border-amber-400 bg-amber-50'
-                            : 'border-stone-100 bg-stone-50 hover:border-stone-200'
+                            : 'border-stone-100 bg-stone-50 hover:border-stone-200',
                         )}
                       >
                         <span className="text-xl">{t.emoji}</span>
-                        <p className={cn('text-xs font-semibold leading-tight', storeSetup.storeType === t.id ? 'text-amber-700' : 'text-stone-700')}>
+                        <p
+                          className={cn(
+                            'text-xs leading-tight font-semibold',
+                            storeSetup.storeType === t.id ? 'text-amber-700' : 'text-stone-700',
+                          )}
+                        >
                           {t.label}
                         </p>
-                        <p className="text-[10px] text-stone-400 leading-snug">{t.desc}</p>
+                        <p className="text-[10px] leading-snug text-stone-400">{t.desc}</p>
                       </button>
                     ))}
                   </div>
@@ -269,26 +360,34 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
                 {/* Currency & Timezone */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Currency</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-stone-500">
+                      Currency
+                    </label>
                     <select
                       value={storeSetup.currency}
                       onChange={e => setStoreSetup(s => ({ ...s, currency: e.target.value }))}
                       className={inputCls}
                     >
                       {CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.label}</option>
+                        <option key={c.code} value={c.code}>
+                          {c.label}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Timezone</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-stone-500">
+                      Timezone
+                    </label>
                     <select
                       value={storeSetup.timezone}
                       onChange={e => setStoreSetup(s => ({ ...s, timezone: e.target.value }))}
                       className={inputCls}
                     >
                       {TIMEZONES.map(tz => (
-                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -305,122 +404,71 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
             </div>
           )}
 
-          {/* ── Step 2: Receipt & Tax ── */}
-          {step === 'receipt_tax' && (
+          {/* ── Step 2: Modules ── */}
+          {step === 'modules' && (
             <div className="space-y-6">
               <div className="text-center">
-                <Receipt className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                <h1 className="text-2xl font-bold text-stone-800">Receipt & Tax</h1>
-                <p className="text-stone-500 mt-1.5 text-sm">Configure your tax rate and receipt details.</p>
-              </div>
-
-              <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm space-y-4">
-                {/* Tax rate */}
-                <div>
-                  <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
-                    Tax Rate (%) <span className="text-stone-400 font-normal">— 0 to 30</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={30}
-                    step={0.5}
-                    value={receiptTax.taxRate}
-                    onChange={e => setReceiptTax(r => ({ ...r, taxRate: Number(e.target.value) }))}
-                    className={inputCls}
-                  />
-                  <p className="text-[11px] text-stone-400 mt-1">Indonesia default: 11% (PPN)</p>
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-md shadow-amber-200">
+                  <Layers className="h-6 w-6 text-white" />
                 </div>
-
-                {/* Receipt header */}
-                <div>
-                  <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Receipt Header Message</label>
-                  <textarea
-                    rows={2}
-                    value={receiptTax.receiptNote}
-                    onChange={e => setReceiptTax(r => ({ ...r, receiptNote: e.target.value }))}
-                    className={inputCls}
-                    placeholder="Thank you for shopping with us!"
-                  />
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Store Phone</label>
-                  <input
-                    type="tel"
-                    value={receiptTax.phone}
-                    onChange={e => setReceiptTax(r => ({ ...r, phone: e.target.value }))}
-                    className={inputCls}
-                    placeholder="+62 21 1234 5678"
-                  />
-                </div>
-
-                {/* Address */}
-                <div>
-                  <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Store Address</label>
-                  <textarea
-                    rows={2}
-                    value={receiptTax.address}
-                    onChange={e => setReceiptTax(r => ({ ...r, address: e.target.value }))}
-                    className={inputCls}
-                    placeholder="Jl. Merdeka No. 1, Jakarta"
-                  />
-                </div>
-              </div>
-
-              {error && <ErrorBanner message={error} />}
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep('store_setup')}
-                  className="px-5 py-3 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 transition-all"
-                >
-                  Back
-                </button>
-                <NextButton onClick={handleNext} disabled={saving} saving={saving} flex1 />
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 3: Seed Data ── */}
-          {step === 'seed_data' && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <Database className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                <h1 className="text-2xl font-bold text-stone-800">Seed Data</h1>
-                <p className="text-stone-500 mt-1.5 text-sm">
-                  Optionally pre-populate your store with demo data to get started faster.
+                <h1 className="text-2xl font-bold text-stone-800">Choose Modules</h1>
+                <p className="mt-1.5 text-sm text-stone-500">
+                  Select the features you want to enable. You can always change this later.
                 </p>
               </div>
 
-              <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm space-y-3">
-                <SeedOption
-                  icon={Package}
-                  title="Add sample products"
-                  desc={`5 demo products matching your store type (${storeSetup.storeType || 'General'})`}
-                  checked={seedData.products}
-                  onChange={v => setSeedData(s => ({ ...s, products: v }))}
-                />
-                <SeedOption
-                  icon={BookOpen}
-                  title="Set up Chart of Accounts"
-                  desc="20 default GL accounts (assets, liabilities, equity, revenue, expenses)"
-                  checked={seedData.accounts}
-                  onChange={v => setSeedData(s => ({ ...s, accounts: v }))}
-                />
-                <SeedOption
-                  icon={Users}
-                  title="Add sample customers"
-                  desc="3 demo customers with loyalty points"
-                  checked={seedData.customers}
-                  onChange={v => setSeedData(s => ({ ...s, customers: v }))}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                {MODULES.map(m => {
+                  const active = modules.has(m.id)
+                  const Icon = m.icon
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => toggleModule(m.id)}
+                      className={cn(
+                        'relative flex flex-col items-start gap-2 rounded-2xl border-2 p-4 text-left transition-all active:scale-[0.97]',
+                        active
+                          ? 'border-amber-400 bg-amber-50 shadow-sm shadow-amber-100'
+                          : 'border-[var(--border,#e7e5e4)] bg-[var(--bg-card,#fafaf9)] hover:border-stone-300',
+                      )}
+                      aria-pressed={active}
+                    >
+                      {active && (
+                        <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500">
+                          <CheckCircle2 className="h-3 w-3 text-white" />
+                        </span>
+                      )}
+                      <div
+                        className={cn(
+                          'flex h-9 w-9 items-center justify-center rounded-xl',
+                          active ? 'bg-amber-100' : 'bg-stone-100',
+                        )}
+                      >
+                        <Icon
+                          className={cn('h-5 w-5', active ? 'text-amber-600' : 'text-stone-400')}
+                        />
+                      </div>
+                      <div>
+                        <p
+                          className={cn(
+                            'text-sm font-bold',
+                            active ? 'text-amber-800' : 'text-stone-700',
+                          )}
+                        >
+                          {m.label}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{m.desc}</p>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
 
               <p className="text-center text-xs text-stone-400">
-                All demo data can be deleted later from the dashboard.
+                {modules.size === 0
+                  ? 'Select at least one module to continue.'
+                  : `${modules.size} module${modules.size > 1 ? 's' : ''} selected`}
               </p>
 
               {error && <ErrorBanner message={error} />}
@@ -428,8 +476,105 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep('receipt_tax')}
-                  className="px-5 py-3 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 transition-all"
+                  onClick={() => setStep('store_setup')}
+                  className="rounded-xl border border-[var(--border,#e7e5e4)] px-5 py-3 text-sm font-medium text-stone-600 transition-all hover:bg-stone-50"
+                >
+                  Back
+                </button>
+                <NextButton
+                  onClick={handleNext}
+                  disabled={modules.size === 0 || saving}
+                  saving={saving}
+                  flex1
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 3: Demo Data ── */}
+          {step === 'seed_data' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-md shadow-amber-200">
+                  <Database className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-2xl font-bold text-stone-800">Demo Products</h1>
+                <p className="mt-1.5 text-sm text-stone-500">
+                  Seed your store with sample products to explore the POS right away.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card,#fff)] p-5 shadow-sm">
+                {/* Yes/No toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        'flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
+                        seedProducts ? 'bg-amber-100' : 'bg-stone-100',
+                      )}
+                    >
+                      <Package
+                        className={cn(
+                          'h-5 w-5',
+                          seedProducts ? 'text-amber-600' : 'text-stone-400',
+                        )}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-stone-800">Add sample products</p>
+                      <p className="mt-0.5 text-xs text-stone-400">
+                        13 demo products across categories
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={seedProducts}
+                    onClick={() => setSeedProducts(v => !v)}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:ring-2 focus:ring-amber-400 focus:ring-offset-1 focus:outline-none',
+                      seedProducts ? 'bg-amber-500' : 'bg-stone-200',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-transform',
+                        seedProducts ? 'translate-x-5' : 'translate-x-0',
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {seedProducts && (
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-stone-100 pt-4 text-center">
+                    {[
+                      { emoji: '🍚', label: 'Makanan', count: 5 },
+                      { emoji: '🥤', label: 'Minuman', count: 5 },
+                      { emoji: '🍿', label: 'Snack', count: 3 },
+                    ].map(cat => (
+                      <div key={cat.label} className="rounded-xl bg-amber-50 p-2.5">
+                        <div className="text-xl">{cat.emoji}</div>
+                        <p className="mt-1 text-[11px] font-semibold text-stone-700">{cat.label}</p>
+                        <p className="text-[10px] text-stone-400">{cat.count} items</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-center text-xs text-stone-400">
+                Demo data can be deleted anytime from the dashboard.
+              </p>
+
+              {error && <ErrorBanner message={error} />}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('modules')}
+                  className="rounded-xl border border-[var(--border,#e7e5e4)] px-5 py-3 text-sm font-medium text-stone-600 transition-all hover:bg-stone-50"
                 >
                   Back
                 </button>
@@ -446,26 +591,21 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
 
           {/* ── Step 4: Done ── */}
           {step === 'done' && (
-            <div className="text-center space-y-6">
+            <div className="space-y-6 text-center">
               <div>
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto shadow-xl shadow-amber-200">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-xl shadow-amber-200">
                   <Sparkles className="h-10 w-10 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-stone-800 mt-5">Your store is ready! 🎉</h1>
-                <p className="text-stone-500 mt-2 text-sm leading-relaxed max-w-sm mx-auto">
+                <h1 className="mt-5 text-2xl font-bold text-stone-800">Your store is ready! 🎉</h1>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-stone-500">
                   Setup complete. Here's what was configured:
                 </p>
               </div>
 
-              {/* Summary */}
-              <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm text-left space-y-3">
+              <div className="space-y-3 rounded-2xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card,#fff)] p-5 text-left shadow-sm">
                 <SummaryRow icon={Store} label="Store name" value={storeSetup.name} />
-                {storeSetup.storeType && (
-                  <SummaryRow
-                    icon={Globe}
-                    label="Store type"
-                    value={STORE_TYPES.find(t => t.id === storeSetup.storeType)?.label ?? storeSetup.storeType}
-                  />
+                {storeSetup.address && (
+                  <SummaryRow icon={Globe} label="Address" value={storeSetup.address} />
                 )}
                 <SummaryRow
                   icon={Globe}
@@ -473,39 +613,44 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
                   value={`${storeSetup.currency} · ${storeSetup.timezone}`}
                 />
                 <SummaryRow
-                  icon={Receipt}
-                  label="Tax rate"
-                  value={`${receiptTax.taxRate}%`}
+                  icon={Layers}
+                  label="Modules enabled"
+                  value={Array.from(modules)
+                    .map(m => MODULES.find(x => x.id === m)?.label ?? m)
+                    .join(', ')}
                 />
                 {seededItems.length > 0 && (
-                  <SummaryRow
-                    icon={Database}
-                    label="Seeded"
-                    value={seededItems.join(', ')}
-                  />
+                  <SummaryRow icon={Database} label="Seeded" value={seededItems.join(', ')} />
                 )}
               </div>
 
-              <button
-                onClick={handleNext}
-                disabled={saving}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-base shadow-lg shadow-amber-200 hover:shadow-amber-300 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40"
+              <a
+                href="/dashboard"
+                onClick={e => {
+                  e.preventDefault()
+                  router.push('/dashboard')
+                  router.refresh()
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-4 text-base font-bold text-white shadow-lg shadow-amber-200 transition-all hover:shadow-amber-300 active:scale-[0.98]"
               >
-                {saving ? 'Loading…' : <>Go to Dashboard <ArrowRight className="h-5 w-5" /></>}
-              </button>
+                Go to Dashboard <ArrowRight className="h-5 w-5" />
+              </a>
             </div>
           )}
-
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Sub-components ────────────────────────────────────────────────────────────
 
 function NextButton({
-  onClick, disabled, saving, label, flex1,
+  onClick,
+  disabled,
+  saving,
+  label,
+  flex1,
 }: {
   onClick: () => void
   disabled: boolean
@@ -519,61 +664,38 @@ function NextButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-sm shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2',
-        flex1 ? 'flex-1' : 'w-full'
+        'flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-semibold text-white shadow-md shadow-amber-200 transition-all hover:shadow-amber-300 disabled:cursor-not-allowed disabled:opacity-40',
+        flex1 ? 'flex-1' : 'w-full',
       )}
     >
       {saving
-        ? (label?.replace('…', '') ? label : 'Saving…')
-        : (label ?? <>Next <ChevronRight className="h-4 w-4" /></>)
-      }
+        ? (label ?? 'Saving…')
+        : (label ?? (
+            <>
+              Next <ChevronRight className="h-4 w-4" />
+            </>
+          ))}
     </button>
   )
 }
 
-function SeedOption({
-  icon: Icon, title, desc, checked, onChange,
+function SummaryRow({
+  icon: Icon,
+  label,
+  value,
 }: {
   icon: React.ElementType
-  title: string
-  desc: string
-  checked: boolean
-  onChange: (v: boolean) => void
+  label: string
+  value: string
 }) {
   return (
-    <label className={cn(
-      'flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all',
-      checked ? 'border-amber-300 bg-amber-50' : 'border-stone-100 bg-stone-50 hover:border-stone-200'
-    )}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={e => onChange(e.target.checked)}
-        className="mt-0.5 accent-amber-500 w-4 h-4 shrink-0"
-      />
-      <div className={cn(
-        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-        checked ? 'bg-amber-100' : 'bg-stone-100'
-      )}>
-        <Icon className={cn('h-4 w-4', checked ? 'text-amber-600' : 'text-stone-400')} />
-      </div>
-      <div>
-        <p className={cn('text-sm font-semibold', checked ? 'text-stone-800' : 'text-stone-500')}>{title}</p>
-        <p className="text-xs text-stone-400 mt-0.5">{desc}</p>
-      </div>
-    </label>
-  )
-}
-
-function SummaryRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
-  return (
     <div className="flex items-start gap-3">
-      <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 mt-0.5">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50">
         <Icon className="h-3.5 w-3.5 text-amber-500" />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-xs text-stone-400">{label}</p>
-        <p className="text-sm font-medium text-stone-700 truncate">{value}</p>
+        <p className="truncate text-sm font-medium text-stone-700">{value}</p>
       </div>
     </div>
   )
@@ -581,7 +703,7 @@ function SummaryRow({ icon: Icon, label, value }: { icon: React.ElementType; lab
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+    <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-500">
       {message}
     </p>
   )

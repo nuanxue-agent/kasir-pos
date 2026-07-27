@@ -12,10 +12,12 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Download,
 } from 'lucide-react'
 import StockAdjustModal from './StockAdjustModal'
 import StockLogsModal from './StockLogsModal'
 import { toast } from '@/components/ui/Toaster'
+import { exportToCSV } from '@/lib/export'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 interface Product {
@@ -274,6 +276,27 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
     setExpandedRow(prev => (prev === productId ? null : productId))
   }
 
+  const handleExportCSV = () => {
+    const rows = products.map(p => ({
+      Name: p.name,
+      SKU: p.sku ?? '',
+      Category: p.category?.name ?? '',
+      Stock: p.stock,
+      'Low Stock Alert': p.lowStock,
+      Price: p.price,
+      Status: p.stock === 0 ? 'OUT' : p.stock <= p.lowStock ? 'LOW' : 'OK',
+    }))
+    exportToCSV(rows, `inventory-${new Date().toISOString().slice(0, 10)}`, [
+      'Name',
+      'SKU',
+      'Category',
+      'Stock',
+      'Low Stock Alert',
+      'Price',
+      'Status',
+    ])
+  }
+
   // ── CSV Import ──────────────────────────────────────────────────────────────
   const handleCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -352,6 +375,15 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
           <p className="mt-1 text-sm text-[var(--text-3)]">Track and manage product stock levels</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Export CSV button */}
+          <button
+            onClick={handleExportCSV}
+            disabled={products.length === 0}
+            className="flex items-center gap-2 rounded-lg bg-[var(--bg-muted)] px-3 py-2 text-sm text-[var(--text-2)] transition-colors hover:bg-stone-200 disabled:opacity-40"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
           {/* CSV Import button */}
           <button
             onClick={() => csvInputRef.current?.click()}

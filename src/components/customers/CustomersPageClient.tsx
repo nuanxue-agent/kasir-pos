@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, Search, Loader2, Star } from 'lucide-react'
+import { Users, UserPlus, Search, Loader2, Star, Download } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { exportToCSV } from '@/lib/export'
 import { CustomerFormModal } from './CustomerFormModal'
 import { CustomerDetailModal } from './CustomerDetailModal'
 
@@ -70,6 +71,29 @@ export function CustomersPageClient({ storeId, currency, userRole }: CustomersPa
     fetchCustomers()
   }
 
+  const handleExportCSV = () => {
+    const rows = customers.map(c => ({
+      Name: c.name,
+      Phone: c.phone ?? '',
+      Email: c.email ?? '',
+      Address: c.address ?? '',
+      Points: c.points,
+      Orders: c.totalOrders,
+      'Total Spent': c.totalSpent,
+      Joined: formatDate(c.createdAt),
+    }))
+    exportToCSV(rows, `customers-${new Date().toISOString().slice(0, 10)}`, [
+      'Name',
+      'Phone',
+      'Email',
+      'Address',
+      'Points',
+      'Orders',
+      'Total Spent',
+      'Joined',
+    ])
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -85,13 +109,23 @@ export function CustomersPageClient({ storeId, currency, userRole }: CustomersPa
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowFormModal(true)}
-          className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-white transition-colors hover:bg-amber-600"
-        >
-          <UserPlus className="h-4 w-4" />
-          Add Customer
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={customers.length === 0}
+            className="flex items-center gap-2 rounded-lg bg-[var(--bg-muted)] px-3 py-2 text-sm text-[var(--text-2)] transition-colors hover:bg-stone-200 disabled:opacity-40"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+          <button
+            onClick={() => setShowFormModal(true)}
+            className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-white transition-colors hover:bg-amber-600"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add Customer
+          </button>
+        </div>
       </div>
 
       {/* Search */}
