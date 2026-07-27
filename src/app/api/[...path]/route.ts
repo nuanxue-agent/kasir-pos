@@ -9,17 +9,73 @@ import {
   resolveGiftCardStatus,
 } from '@/lib/gift-cards'
 
-function ok(data: any, status = 200) {
-  return NextResponse.json(data, { status })
+// ─── Validation helpers ────────────────────────────────────────────────────────
+
+export class ValidationError extends Error {
+  code: string
+  status: number
+  constructor(message: string, code = 'VALIDATION_ERROR', status = 400) {
+    super(message)
+    this.name = 'ValidationError'
+    this.code = code
+    this.status = status
+  }
 }
-function err(msg: string, status = 400) {
-  return NextResponse.json({ error: msg }, { status })
+
+export function validateRequired(obj: Record<string, any>, fields: string[]): void {
+  for (const field of fields) {
+    if (obj[field] === undefined || obj[field] === null || obj[field] === '') {
+      throw new ValidationError(`Field '${field}' is required`, 'MISSING_FIELD')
+    }
+  }
 }
-function okCached(data: any, cacheControl: string, status = 200) {
-  return NextResponse.json(data, {
-    status,
-    headers: { 'Cache-Control': cacheControl },
-  })
+
+export function validatePositive(value: any, name: string): void {
+  const num = Number(value)
+  if (isNaN(num) || num <= 0) {
+    throw new ValidationError(`'${name}' must be a positive number`, 'INVALID_VALUE')
+  }
+}
+
+export function validateDate(value: any, name: string): void {
+  if (!value || typeof value !== 'string') {
+    throw new ValidationError(`'${name}' must be a valid ISO date string`, 'INVALID_DATE')
+  }
+  const d = new Date(value)
+  if (isNaN(d.getTime()) || !/^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/.test(value)) {
+    throw new ValidationError(`'${name}' must be a valid ISO date string`, 'INVALID_DATE')
+  }
+}
+
+// ─── Response helpers ──────────────────────────────────────────────────────────
+
+function makeHeaders(requestId: string, startMs: number): Record<string, string> {
+  return {
+    'X-Request-ID': requestId,
+    'X-Response-Time': `${Date.now() - startMs}ms`,
+  }
+}
+
+function ok(data: any, status = 200, requestId?: string, startMs?: number) {
+  const headers = requestId && startMs !== undefined ? makeHeaders(requestId, startMs) : undefined
+  return NextResponse.json(data, { status, headers })
+}
+function err(msg: string, status = 400, code = 'ERROR', requestId?: string, startMs?: number) {
+  const headers = requestId && startMs !== undefined ? makeHeaders(requestId, startMs) : {}
+  return NextResponse.json({ error: msg, code, requestId: requestId ?? null }, { status, headers })
+}
+function okCached(
+  data: any,
+  cacheControl: string,
+  status = 200,
+  requestId?: string,
+  startMs?: number,
+) {
+  const headers: Record<string, string> = { 'Cache-Control': cacheControl }
+  if (requestId && startMs !== undefined) {
+    Object.assign(headers, makeHeaders(requestId, startMs))
+  }
+  return NextResponse.json(data, { status, headers })
 }
 
 // ─── In-memory rate limiter ────────────────────────────────────────────────────
@@ -151,6 +207,8 @@ export async function DELETE(
 }
 
 async function handle(req: NextRequest, method: string, segs: string[]) {
+  const requestId = crypto.randomUUID()
+  const startMs = Date.now()
   const url = new URL(req.url)
   const sp = url.searchParams
 
@@ -160,7 +218,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
   try {
     const session = await auth()
-    if (!session?.user) return err('Unauthorized', 401)
+    if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED', requestId, startMs)
     const user = session.user as any
     const defaultStoreId = user.stores?.[0]?.id
 
@@ -168,7 +226,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     // Resolve storeId once for all routes. Public endpoints (register/login)
     // are handled in separate route files and never reach here.
     const storeId: string = url.searchParams.get('storeId') ?? defaultStoreId
-    if (!storeId) return err('storeId required', 400)
+    if (!storeId) return err('storeId required', 400, 'MISSING_FIELD', requestId, startMs)
 
     // ─── PRODUCTS ─────────────────────────────────────────────────────────────
     if (segs[0] === 'products') {
@@ -193,7 +251,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         }
         if (method === 'POST') {
           const b: any = await req.json()
-          if (!b.name || b.price === undefined) return err('name and price are required')
+          validateRequired(b, ['name', 'price'])
+          validatePositive(b.price, 'price')
           const pid = newId()
           const t = nowISO()
           await exec(
@@ -249,6 +308,125 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           return ok({ success: true })
         }
       }
+    }
+
+    // ─── PRODUCTS/TEMPLATE ───────────────────────────────────────────────────
+    if (segs[0] === 'products' && segs[1] === 'template' && method === 'GET') {
+      const csvContent =
+        'name,sku,price,cost,stock,categoryName\n' +
+        'Kopi Arabica,SKU-001,25000,15000,100,Minuman\n' +
+        'Teh Hijau,SKU-002,18000,10000,50,Minuman\n'
+      return new NextResponse(csvContent, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="product_import_template.csv"',
+        },
+      })
+    }
+
+    // ─── PRODUCTS/IMPORT ─────────────────────────────────────────────────────
+    if (segs[0] === 'products' && segs[1] === 'import' && method === 'POST') {
+      const body: any = await req.json()
+      const rows: Array<{
+        name: string
+        price: number | null
+        cost: number | null
+        sku: string
+        categoryName: string
+        stock: number | null
+      }> = Array.isArray(body.rows) ? body.rows : []
+
+      if (rows.length === 0) return err('No rows provided', 400)
+      if (rows.length > 1000) return err('Maximum 1000 rows per import', 400)
+
+      let created = 0
+      let updated = 0
+      const errors: Array<{ row: number; message: string }> = []
+      const t = nowISO()
+
+      // Pre-fetch all categories for this store so we can resolve by name
+      const existingCategories = (await query(`SELECT id, name FROM Category WHERE storeId = ?`, [
+        storeId,
+      ])) as Array<{ id: string; name: string }>
+      const categoryByName = new Map<string, string>(
+        existingCategories.map(c => [c.name.toLowerCase(), c.id]),
+      )
+
+      // Pre-fetch existing product SKUs
+      const existingProducts = (await query(
+        `SELECT id, sku FROM Product WHERE storeId = ? AND sku IS NOT NULL`,
+        [storeId],
+      )) as Array<{ id: string; sku: string }>
+      const skuToId = new Map<string, string>(existingProducts.map(p => [p.sku, p.id]))
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        try {
+          if (!row.name) {
+            errors.push({ row: i + 1, message: 'Missing name' })
+            continue
+          }
+          if (row.price === null || row.price === undefined || row.price < 0) {
+            errors.push({ row: i + 1, message: 'Invalid price' })
+            continue
+          }
+
+          // Resolve categoryId from name (case-insensitive)
+          let categoryId: string | null = null
+          if (row.categoryName) {
+            categoryId = categoryByName.get(row.categoryName.toLowerCase()) ?? null
+          }
+
+          const price = Number(row.price)
+          const cost = Number(row.cost) || 0
+          const stock = Number(row.stock) || 0
+
+          if (row.sku && skuToId.has(row.sku)) {
+            // Update existing product
+            const pid = skuToId.get(row.sku)!
+            await exec(
+              `UPDATE Product SET name=?, price=?, cost=?, categoryId=?, stock=?, updatedAt=?
+               WHERE id=? AND storeId=?`,
+              [row.name, price, cost, categoryId, stock, t, pid, storeId],
+            )
+            updated++
+          } else {
+            // Create new product
+            const pid = newId()
+            await exec(
+              `INSERT INTO Product (id,storeId,name,price,cost,sku,categoryId,trackStock,stock,lowStock,active,createdAt,updatedAt)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              [
+                pid,
+                storeId,
+                row.name,
+                price,
+                cost,
+                row.sku || null,
+                categoryId,
+                1,
+                stock,
+                5,
+                1,
+                t,
+                t,
+              ],
+            )
+            if (stock > 0) {
+              await exec(
+                `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+                [newId(), pid, 'INITIAL', stock, 'Imported', t],
+              )
+            }
+            created++
+          }
+        } catch (e: any) {
+          errors.push({ row: i + 1, message: e?.message ?? 'Unknown error' })
+        }
+      }
+
+      return ok({ created, updated, errors: errors.length, errorDetails: errors })
     }
 
     // ─── PRODUCTS/RECENT ──────────────────────────────────────────────────────
@@ -344,8 +522,11 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         }
         if (method === 'POST') {
           const b: any = await req.json()
-          if (!b.items?.length) return err('Order must have at least one item')
-          if (!b.payments?.length) return err('Order must have at least one payment')
+          validateRequired(b, ['items', 'payments'])
+          if (!b.items?.length)
+            throw new ValidationError('Order must have at least one item', 'MISSING_ITEMS')
+          if (!b.payments?.length)
+            throw new ValidationError('Order must have at least one payment', 'MISSING_PAYMENTS')
           const oid = newId()
           const t = nowISO()
           const number = `INV-${Date.now()}`
@@ -587,7 +768,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         }
         if (method === 'POST') {
           const b: any = await req.json()
-          if (!b.name) return err('name is required')
+          validateRequired(b, ['name'])
           const cid = newId()
           const t = nowISO()
           await exec(
@@ -3749,9 +3930,24 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
-    return err('Not found', 404)
+    return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
-    return err('Internal server error', 500)
+    if (e instanceof ValidationError) {
+      return err(e.message, e.status, e.code, requestId, startMs)
+    }
+    const isProd = process.env.NODE_ENV === 'production'
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+        requestId,
+        ...(isProd ? {} : { detail: e?.message }),
+      },
+      {
+        status: 500,
+        headers: makeHeaders(requestId, startMs),
+      },
+    )
   }
 }

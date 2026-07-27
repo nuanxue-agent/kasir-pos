@@ -84,6 +84,7 @@ interface Customer {
   id: string
   name: string
   phone: string | null
+  email?: string | null
   points: number
 }
 
@@ -498,14 +499,22 @@ export default function POSPageClient({
       }).catch(() => {})
       setSelectedTable(null)
     }
-    setReceiptData(order)
+    setReceiptData({
+      ...order,
+      customerPhone: selectedCustomer?.phone ?? null,
+      customerEmail: selectedCustomer?.email ?? null,
+      customerName: selectedCustomer?.name ?? null,
+    })
   }
 
   const handleReceiptClose = (orderNumber: string) => {
     setReceiptData(null)
     const earned = (receiptData as any)?.pointsEarned
     const suffix = earned ? ` (+${earned} pts earned)` : ''
-    setSuccessMsg(`Order ${orderNumber} paid!${suffix}`)
+    const customer = selectedCustomer
+    const contactSuffix =
+      customer?.phone || customer?.email ? ` · ${customer.phone ?? customer.email}` : ''
+    setSuccessMsg(`Order ${orderNumber} paid!${suffix}${contactSuffix}`)
     setTimeout(() => setSuccessMsg(''), 3500)
   }
 

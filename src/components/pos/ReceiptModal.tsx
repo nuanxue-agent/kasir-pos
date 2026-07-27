@@ -1,6 +1,7 @@
 'use client'
 
-import { X, Printer } from 'lucide-react'
+import { useState } from 'react'
+import { Printer, X, Share2, Copy, Check } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,12 @@ export interface ReceiptData {
   taxAmt: number
   total: number
   discountAmt?: number
+  /** Customer phone — used for WhatsApp sharing */
+  customerPhone?: string | null
+  /** Customer email — used for email sharing */
+  customerEmail?: string | null
+  /** Customer name — shown after checkout */
+  customerName?: string | null
 }
 
 interface ReceiptModalProps {
@@ -55,6 +62,48 @@ const METHOD_LABELS: Record<string, string> = {
   TRANSFER: 'Bank Transfer',
 }
 
+/** Build a plain-text receipt for sharing / clipboard */
+function buildShareText(
+  receipt: ReceiptData,
+  storeName: string,
+  currency: string,
+  taxRate: number,
+): string {
+  const dateObj = new Date(receipt.createdAt)
+  const dateStr = dateObj.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+  const timeStr = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+
+  const lines: string[] = []
+  lines.push(`🧾 ${storeName}`)
+  lines.push('─'.repeat(28))
+  lines.push(`No. ${receipt.number}`)
+  lines.push(`${dateStr} ${timeStr}`)
+  if (receipt.customerName) lines.push(`Customer: ${receipt.customerName}`)
+  lines.push('─'.repeat(28))
+  lines.push('📦 Items:')
+  for (const item of receipt.items) {
+    lines.push(`  ${item.name}`)
+    lines.push(`  ${item.qty} × ${fmt(item.price, currency)} = ${fmt(item.subtotal, currency)}`)
+  }
+  lines.push('─'.repeat(28))
+  lines.push(`Subtotal: ${fmt(receipt.subtotal, currency)}`)
+  if ((receipt.discountAmt ?? 0) > 0) lines.push(`Diskon: -${fmt(receipt.discountAmt!, currency)}`)
+  if (taxRate > 0 && receipt.taxAmt > 0)
+    lines.push(`Pajak (${(taxRate * 100).toFixed(0)}%): ${fmt(receipt.taxAmt, currency)}`)
+  lines.push(`💰 TOTAL: ${fmt(receipt.total, currency)}`)
+  for (const p of receipt.payments) {
+    lines.push(`  ${METHOD_LABELS[p.method] ?? p.method}: ${fmt(p.amount, currency)}`)
+    if (p.change > 0) lines.push(`  Kembalian: ${fmt(p.change, currency)}`)
+  }
+  lines.push('─'.repeat(28))
+  lines.push('Terima kasih! 🙏')
+  return lines.join('\n')
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ReceiptModal({
@@ -65,6 +114,8 @@ export default function ReceiptModal({
   receiptNote,
   onClose,
 }: ReceiptModalProps) {
+  const [copied, setCopied] = useState(false)
+
   const dateObj = new Date(receipt.createdAt)
   const dateStr = dateObj.toLocaleDateString('id-ID', {
     day: '2-digit',
@@ -77,6 +128,28 @@ export default function ReceiptModal({
   })
 
   const primaryPayment = receipt.payments[0]
+
+  const shareText = buildShareText(receipt, storeName, currency, taxRate)
+  const encodedText = encodeURIComponent(shareText)
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: `Receipt ${receipt.number}`, text: shareText })
+        return
+      } catch {
+        // fall through to clipboard
+      }
+    }
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard unavailable — silent fail
+    }
+  }
 
   return (
     <>
@@ -153,6 +226,12 @@ export default function ReceiptModal({
                   <span className="text-[var(--text-2)]">Time</span>
                   <span>{timeStr}</span>
                 </div>
+                {receipt.customerName && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-2)]">Customer</span>
+                    <span>{receipt.customerName}</span>
+                  </div>
+                )}
               </div>
 
               <div className="my-2 border-t border-dashed border-stone-400" />
@@ -250,19 +329,67 @@ export default function ReceiptModal({
           </div>
 
           {/* Action buttons — hidden on print */}
-          <div className="no-print flex gap-3 border-t border-white/5 px-5 py-4">
+          <div className="no-print flex flex-col gap-2 border-t border-white/5 px-5 py-4">
+            {/* Row 1: Print + Close */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => window.print()}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-opacity hover:opacity-90"
+              >
+                <Printer className="h-4 w-4" />
+                Print Receipt
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] py-2.5 text-sm font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-1)]"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Row 2: WhatsApp + Email (conditional on customer contact) */}
+            {(receipt.customerPhone || receipt.customerEmail) && (
+              <div className="flex gap-2">
+                {receipt.customerPhone && (
+                  <a
+                    href={`https://wa.me/?text=${encodedText}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-600/40 bg-emerald-600/10 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-600/20"
+                    aria-label="Send receipt via WhatsApp"
+                  >
+                    📲 WhatsApp
+                  </a>
+                )}
+                {receipt.customerEmail && (
+                  <a
+                    href={`mailto:${receipt.customerEmail}?subject=Receipt%20${encodeURIComponent(receipt.number)}&body=${encodedText}`}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-sky-600/40 bg-sky-600/10 py-2 text-sm font-medium text-sky-400 transition-colors hover:bg-sky-600/20"
+                    aria-label="Send receipt via email"
+                  >
+                    📧 Email
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Row 3: Share / Copy */}
             <button
-              onClick={() => window.print()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-opacity hover:opacity-90"
+              onClick={handleShare}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] py-2 text-sm font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-1)]"
+              aria-label="Share receipt"
             >
-              <Printer className="h-4 w-4" />
-              Print Receipt
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] py-2.5 text-sm font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-1)]"
-            >
-              Close
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 text-emerald-400" />
+                  <span className="text-emerald-400">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="h-4 w-4" />
+                  Share receipt
+                </>
+              )}
             </button>
           </div>
         </div>

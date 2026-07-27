@@ -36,6 +36,10 @@ export interface ReceiptData {
   currency: string
   paymentMethod?: string
   customerName?: string
+  /** Customer phone number — used for WhatsApp sharing */
+  customerPhone?: string
+  /** Customer email address — used for email sharing */
+  customerEmail?: string
   points?: number
   /** Cashier/order note — printed on receipt when present */
   orderNote?: string
@@ -375,4 +379,52 @@ export function buildReceiptLines(data: ReceiptData): ReceiptLine[] {
   lines.push({ type: 'text', text: 'Thank you!', align: 'center', bold: true })
 
   return lines
+}
+
+// ── Plain-text receipt (for sharing) ──────────────────────────────────────────
+
+export function buildReceiptText(data: ReceiptData): string {
+  const lines: string[] = []
+  lines.push(`🧾 ${data.storeName}`)
+  if (data.storeAddress) lines.push(data.storeAddress)
+  if (data.storePhone) lines.push(data.storePhone)
+  lines.push('─'.repeat(28))
+  lines.push(`No. ${data.orderNumber}`)
+  lines.push(data.date)
+  if (data.customerName) lines.push(`Customer: ${data.customerName}`)
+  lines.push('─'.repeat(28))
+  lines.push('📦 Items:')
+  for (const item of data.items) {
+    lines.push(`  ${item.name}`)
+    lines.push(
+      `  ${item.qty} × ${fmt(item.price, data.currency)} = ${fmt(item.subtotal, data.currency)}`,
+    )
+  }
+  lines.push('─'.repeat(28))
+  lines.push(`Subtotal: ${fmt(data.subtotal, data.currency)}`)
+  if (data.discountAmt && data.discountAmt > 0)
+    lines.push(`Diskon: -${fmt(data.discountAmt, data.currency)}`)
+  if (data.taxAmt && data.taxAmt > 0) lines.push(`Pajak: ${fmt(data.taxAmt, data.currency)}`)
+  lines.push(`💰 TOTAL: ${fmt(data.total, data.currency)}`)
+  if (data.paymentMethod) lines.push(`Pembayaran: ${data.paymentMethod}`)
+  if (data.payments && data.payments.length > 0) {
+    for (const p of data.payments) {
+      lines.push(`  ${p.method}: ${fmt(p.amount, data.currency)}`)
+    }
+  }
+  lines.push('─'.repeat(28))
+  if (data.receiptNote) lines.push(data.receiptNote)
+  lines.push('Terima kasih! 🙏')
+  return lines.join('\n')
+}
+
+// ── WhatsApp message builder ──────────────────────────────────────────────────
+
+/**
+ * Build a WhatsApp-ready message for the given receipt.
+ * Returns the URL-encoded string suitable for use in wa.me/?text=<result>.
+ */
+export function buildWhatsAppMessage(data: ReceiptData): string {
+  const text = buildReceiptText(data)
+  return encodeURIComponent(text)
 }
