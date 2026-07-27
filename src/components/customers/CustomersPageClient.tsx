@@ -112,7 +112,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
           placeholder="Search by name, phone, or email..."
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
         />
       </div>
 
@@ -163,7 +163,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                     <tr
                       key={customer.id}
                       onClick={() => handleRowClick(customer)}
-                      className="hover:bg-slate-700/50 cursor-pointer transition-colors"
+                      className="hover:bg-stone-200/50 cursor-pointer transition-colors"
                     >
                       <td className="px-4 py-3 text-sm font-medium text-slate-100">
                         {customer.name}
@@ -209,7 +209,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                       'px-3 py-1 rounded text-sm font-medium transition-colors',
                       page === 1
                         ? 'bg-stone-100 text-slate-600 cursor-not-allowed'
-                        : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                        : 'bg-stone-200 text-slate-200 hover:bg-stone-300'
                     )}
                   >
                     Previous
@@ -221,7 +221,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                       'px-3 py-1 rounded text-sm font-medium transition-colors',
                       page === pages
                         ? 'bg-stone-100 text-slate-600 cursor-not-allowed'
-                        : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                        : 'bg-stone-200 text-slate-200 hover:bg-stone-300'
                     )}
                   >
                     Next

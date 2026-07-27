@@ -92,13 +92,13 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-white">{d.name}</p>
-                  {!d.active && <span className="text-xs bg-slate-700 text-stone-500 px-2 py-0.5 rounded-full">Inactive</span>}
+                  {!d.active && <span className="text-xs bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">Inactive</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-stone-500">
                   {d.code && (
                     <button
                       onClick={() => copyCode(d.code!, d.id)}
-                      className="flex items-center gap-1 font-mono bg-slate-700 px-2 py-0.5 rounded hover:bg-slate-600 transition-colors"
+                      className="flex items-center gap-1 font-mono bg-stone-200 px-2 py-0.5 rounded hover:bg-stone-300 transition-colors"
                     >
                       {copiedId === d.id ? <Check size={10} className="text-green-400" /> : <Copy size={10} />}
                       {d.code}
@@ -113,7 +113,7 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => { setEditing(d); setShowForm(true) }}
-                  className="p-2 text-stone-500 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                  className="p-2 text-stone-500 hover:text-white hover:bg-stone-200 rounded-lg transition-colors"
                 >
                   <Pencil size={15} />
                 </button>
@@ -186,7 +186,7 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-md border border-stone-200 p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white">{discount ? 'Edit Discount' : 'New Discount'}</h2>
+        <h2 className="text-lg font-semibold text-stone-800">{discount ? 'Edit Discount' : 'New Discount'}</h2>
 
         <div className="space-y-3">
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -219,7 +219,7 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
         <div className="flex gap-3 pt-2">
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-white text-sm transition-colors">Cancel</button>
           <button onClick={submit} disabled={loading || !form.name}
-            className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-500 disabled:bg-slate-700 text-white text-sm font-medium transition-colors">
+            className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-500 disabled:bg-stone-200 text-white text-sm font-medium transition-colors">
             {loading ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -228,4 +228,4 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
   )
 }
 
-const ic = 'w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+const ic = 'w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400'

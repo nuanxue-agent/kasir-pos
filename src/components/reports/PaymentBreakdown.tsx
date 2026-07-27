@@ -50,13 +50,13 @@ export function PaymentBreakdown({ data, currency }: PaymentBreakdownProps) {
                 <span className="text-stone-500 text-sm">{item._count.id} txn{item._count.id !== 1 ? 's' : ''}</span>
               </div>
               <div className="text-right">
-                <span className="text-white font-medium text-sm">{formatCurrency(amount, currency)}</span>
+                <span className="text-stone-800 font-medium text-sm">{formatCurrency(amount, currency)}</span>
                 <span className="text-stone-500 text-xs ml-2">{pct}%</span>
               </div>
             </div>
 
             {/* Progress bar */}
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-2 bg-stone-200 rounded-full overflow-hidden">
               <div
                 className={`h-full ${style.color} rounded-full transition-all duration-500`}
                 style={{ width: `${pct}%` }}
@@ -69,7 +69,7 @@ export function PaymentBreakdown({ data, currency }: PaymentBreakdownProps) {
       {/* Total */}
       <div className="pt-3 mt-3 border-t border-stone-200 flex items-center justify-between">
         <span className="text-stone-500 text-sm">Total</span>
-        <span className="text-white font-semibold">{formatCurrency(total, currency)}</span>
+        <span className="text-stone-800 font-semibold">{formatCurrency(total, currency)}</span>
       </div>
     </div>
   )

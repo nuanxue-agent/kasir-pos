@@ -45,9 +45,9 @@ export function SalesChart({ data, currency }: SalesChartProps) {
     const label = props.label as string | undefined
     if (!active || !payload?.length) return null
     return (
-      <div className="bg-white border border-slate-600 rounded-lg p-3 shadow-xl">
+      <div className="bg-white border border-stone-200 rounded-lg p-3 shadow-xl">
         <p className="text-stone-500 text-xs mb-1.5">{label}</p>
-        <p className="text-white font-semibold">{formatCurrency(payload[0].value, currency)}</p>
+        <p className="text-stone-800 font-semibold">{formatCurrency(payload[0].value, currency)}</p>
         <p className="text-stone-500 text-xs mt-0.5">{payload[0].payload.orders} orders</p>
       </div>
     )

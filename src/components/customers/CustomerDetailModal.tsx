@@ -262,8 +262,8 @@ export function CustomerDetailModal({
                       type="number"
                       placeholder="e.g. 50 or -20"
                       className={cn(
-                        'flex-1 px-3 py-2 bg-white border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm',
-                        errors.delta ? 'border-red-500' : 'border-slate-600'
+                        'flex-1 px-3 py-2 bg-white border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm',
+                        errors.delta ? 'border-red-500' : 'border-stone-200'
                       )}
                     />
                     <button
@@ -276,7 +276,7 @@ export function CustomerDetailModal({
                     <button
                       type="button"
                       onClick={() => { setShowPointsForm(false); reset() }}
-                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-stone-600 rounded-lg text-sm transition-colors"
+                      className="px-3 py-2 bg-stone-200 hover:bg-stone-300 text-stone-600 rounded-lg text-sm transition-colors"
                     >
                       Cancel
                     </button>
@@ -320,7 +320,7 @@ export function CustomerDetailModal({
                       </thead>
                       <tbody className="divide-y divide-slate-700">
                         {customer.orders.map((order) => (
-                          <tr key={order.id} className="hover:bg-slate-700/40 transition-colors">
+                          <tr key={order.id} className="hover:bg-stone-200/40 transition-colors">
                             <td className="px-4 py-2.5 text-sm font-medium text-slate-100">
                               {order.number}
                             </td>
@@ -370,7 +370,7 @@ export function CustomerDetailModal({
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowPointsForm((v) => !v) }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-slate-700 text-stone-600 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 Adjust Points

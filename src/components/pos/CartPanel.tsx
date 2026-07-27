@@ -34,7 +34,7 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
     <div className="flex flex-col h-full bg-white border-l border-stone-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
-        <h2 className="text-sm font-semibold text-white">Current Order</h2>
+        <h2 className="text-sm font-semibold text-stone-800">Current Order</h2>
         {items.length > 0 && (
           <button
             onClick={clearCart}
@@ -58,7 +58,7 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
               <div key={item.id} className="px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{item.name}</p>
+                    <p className="text-sm text-stone-700 truncate">{item.name}</p>
                     {item.variantName && (
                       <p className="text-xs text-stone-500">{item.variantName}</p>
                     )}
@@ -75,19 +75,19 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateQty(item.id, item.qty - 1)}
-                      className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white transition-colors"
+                      className="w-6 h-6 rounded bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-stone-700 transition-colors"
                     >
                       <Minus size={12} />
                     </button>
-                    <span className="text-sm text-white w-6 text-center">{item.qty}</span>
+                    <span className="text-sm text-stone-700 w-6 text-center">{item.qty}</span>
                     <button
                       onClick={() => updateQty(item.id, item.qty + 1)}
-                      className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white transition-colors"
+                      className="w-6 h-6 rounded bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-stone-700 transition-colors"
                     >
                       <Plus size={12} />
                     </button>
                   </div>
-                  <span className="text-sm font-medium text-white">{fmt(item.subtotal)}</span>
+                  <span className="text-sm font-medium text-stone-700">{fmt(item.subtotal)}</span>
                 </div>
               </div>
             ))}
@@ -103,7 +103,7 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
             onChange={e => setNote(e.target.value)}
             placeholder="Add order note..."
             rows={2}
-            className="w-full bg-stone-100 text-sm text-white placeholder-stone-400 rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full bg-stone-50 text-sm text-stone-800 placeholder-stone-400 rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
           />
         </div>
       )}
@@ -127,7 +127,7 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
               <span>{fmt(taxAmt(taxRate))}</span>
             </div>
           )}
-          <div className="flex justify-between text-base font-bold text-white pt-1 border-t border-stone-200">
+          <div className="flex justify-between text-base font-bold text-stone-800 pt-1 border-t border-stone-200">
             <span>Total</span>
             <span>{fmt(total(taxRate))}</span>
           </div>
@@ -142,8 +142,8 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
           className={cn(
             'w-full py-3 rounded-lg font-semibold text-sm transition-all',
             items.length === 0
-              ? 'bg-slate-700 text-stone-500 cursor-not-allowed'
-              : 'bg-amber-500 hover:bg-amber-500 text-white shadow-lg shadow-indigo-900/30 active:scale-98'
+              ? 'bg-stone-200 text-stone-500 cursor-not-allowed'
+              : 'bg-amber-500 hover:bg-amber-500 text-white shadow-lg shadow-amber-500/20 active:scale-98'
           )}
         >
           <div className="flex items-center justify-center gap-2">

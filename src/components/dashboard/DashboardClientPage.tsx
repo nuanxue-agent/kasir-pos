@@ -193,11 +193,11 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
                     className="flex items-center justify-between px-5 py-3 hover:bg-stone-50 transition-colors"
                   >
                     <div>
-                      <p className="text-sm font-medium text-white">#{order.number}</p>
+                      <p className="text-sm font-medium text-stone-700">#{order.number}</p>
                       <p className="text-xs text-stone-400 mt-0.5">{formatDate(order.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <p className="text-sm font-semibold text-white">
+                      <p className="text-sm font-semibold text-stone-800">
                         {formatCurrency(order.total, currency)}
                       </p>
                       <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${style.pill}`}>
@@ -249,7 +249,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
                     <div className="w-7 h-7 rounded-lg bg-stone-50 border border-stone-200 flex items-center justify-center shrink-0">
                       <Package className="h-3.5 w-3.5 text-stone-400" />
                     </div>
-                    <p className="text-sm text-white truncate">{p.name}</p>
+                    <p className="text-sm text-stone-700 truncate">{p.name}</p>
                   </div>
                   <span
                     className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-lg shrink-0 ${

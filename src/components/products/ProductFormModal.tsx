@@ -192,7 +192,7 @@ export default function ProductFormModal({
                 type="text"
                 {...register('name')}
                 className={cn(
-                  'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+                  'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
                   errors.name ? 'border-red-300' : 'border-gray-200'
                 )}
                 placeholder="e.g. Blue T-Shirt"
@@ -209,7 +209,7 @@ export default function ProductFormModal({
                 id="description"
                 {...register('description')}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                 placeholder="Optional product description"
               />
             </div>
@@ -224,7 +224,7 @@ export default function ProductFormModal({
                   id="sku"
                   type="text"
                   {...register('sku')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                   placeholder="e.g. TSHIRT-BLU-M"
                 />
               </div>
@@ -236,7 +236,7 @@ export default function ProductFormModal({
                   id="barcode"
                   type="text"
                   {...register('barcode')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                   placeholder="e.g. 1234567890123"
                 />
               </div>
@@ -254,7 +254,7 @@ export default function ProductFormModal({
                   step="0.01"
                   {...register('price', { valueAsNumber: true })}
                   className={cn(
-                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
                     errors.price ? 'border-red-300' : 'border-gray-200'
                   )}
                   placeholder="0"
@@ -271,7 +271,7 @@ export default function ProductFormModal({
                   step="0.01"
                   {...register('cost', { valueAsNumber: true })}
                   className={cn(
-                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
                     errors.cost ? 'border-red-300' : 'border-gray-200'
                   )}
                   placeholder="0"
@@ -288,7 +288,7 @@ export default function ProductFormModal({
               <select
                 id="categoryId"
                 {...register('categoryId')}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent appearance-none bg-white"
               >
                 <option value="">Uncategorized</option>
                 {categories.map((cat) => (
@@ -305,7 +305,7 @@ export default function ProductFormModal({
                 id="trackStock"
                 type="checkbox"
                 {...register('trackStock')}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-amber-400"
               />
               <label htmlFor="trackStock" className="text-sm font-medium text-gray-700">
                 Track Stock
@@ -324,7 +324,7 @@ export default function ProductFormModal({
                     type="number"
                     {...register('stock', { valueAsNumber: true })}
                     className={cn(
-                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
                       errors.stock ? 'border-red-300' : 'border-gray-200'
                     )}
                     placeholder="0"
@@ -340,7 +340,7 @@ export default function ProductFormModal({
                     type="number"
                     {...register('lowStock', { valueAsNumber: true })}
                     className={cn(
-                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
                       errors.lowStock ? 'border-red-300' : 'border-gray-200'
                     )}
                     placeholder="5"
@@ -356,7 +356,7 @@ export default function ProductFormModal({
                 id="active"
                 type="checkbox"
                 {...register('active')}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-amber-400"
               />
               <label htmlFor="active" className="text-sm font-medium text-gray-700">
                 Active (visible in POS)

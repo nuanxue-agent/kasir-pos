@@ -102,8 +102,8 @@ export default function CheckoutModal({
       <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-stone-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
-          <h2 className="text-lg font-semibold text-white">Checkout</h2>
-          <button onClick={onClose} className="text-stone-500 hover:text-white transition-colors">
+          <h2 className="text-lg font-semibold text-stone-800">Checkout</h2>
+          <button onClick={onClose} className="text-stone-500 hover:text-stone-800 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -124,7 +124,7 @@ export default function CheckoutModal({
                 <span>Tax ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt(taxRate))}</span>
               </div>
             )}
-            <div className="flex justify-between text-lg font-bold text-white pt-2 border-t border-stone-200">
+            <div className="flex justify-between text-lg font-bold text-stone-800 pt-2 border-t border-stone-200">
               <span>Total</span><span>{fmt(orderTotal)}</span>
             </div>
           </div>
@@ -141,7 +141,7 @@ export default function CheckoutModal({
                     'flex flex-col items-center gap-1.5 py-3 rounded-lg border transition-all text-sm',
                     method === id
                       ? 'border-indigo-500 bg-amber-500/10 text-amber-600'
-                      : 'border-stone-200 bg-stone-100 text-stone-500 hover:border-slate-600'
+                      : 'border-stone-200 bg-stone-100 text-stone-500 hover:border-stone-200'
                   )}
                 >
                   <Icon size={18} className={method === id ? 'text-amber-600' : color} />
@@ -160,7 +160,7 @@ export default function CheckoutModal({
                 value={cashGiven}
                 onChange={e => setCashGiven(e.target.value)}
                 placeholder={fmt(orderTotal)}
-                className="w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
               {/* Quick amounts */}
               <div className="flex gap-2 mt-2">
@@ -194,7 +194,7 @@ export default function CheckoutModal({
                 value={reference}
                 onChange={e => setReference(e.target.value)}
                 placeholder="e.g. last 4 digits, ref number"
-                className="w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           )}
@@ -207,7 +207,7 @@ export default function CheckoutModal({
           <button
             onClick={handleCheckout}
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-stone-500 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-stone-200 disabled:text-stone-500 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
               <span>Processing...</span>

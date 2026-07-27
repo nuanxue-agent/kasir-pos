@@ -71,30 +71,30 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
       />
 
       {/* Modal */}
-      <div className="relative bg-gray-800 rounded-xl border border-gray-700 shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+      <div className="relative bg-stone-100 rounded-xl border border-stone-200 shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <History className="w-5 h-5" />
             Stock History
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-stone-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Product Info */}
-        <div className="px-6 py-3 bg-gray-900/50 border-b border-gray-700">
+        <div className="px-6 py-3 bg-stone-50 border-b border-stone-200">
           <div className="text-white font-medium">{product.name}</div>
           <div className="flex items-center gap-4 mt-0.5">
             {product.sku && (
               <div className="text-gray-400 text-sm">SKU: {product.sku}</div>
             )}
             <div className="text-sm text-gray-400">
-              Current: <span className="text-white font-semibold">{product.stock}</span>
+              Current: <span className="text-stone-800 font-semibold">{product.stock}</span>
             </div>
             <div className="text-sm text-gray-400">
               {total} log{total !== 1 ? 's' : ''}
@@ -148,7 +148,7 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-3 border-t border-gray-700 flex items-center justify-between">
+          <div className="px-6 py-3 border-t border-stone-200 flex items-center justify-between">
             <div className="text-sm text-gray-400">
               Page {page} of {totalPages}
             </div>

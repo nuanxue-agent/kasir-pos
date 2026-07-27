@@ -385,7 +385,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                   <span>-{fmt(pointsDiscount, currency)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-base font-bold text-white pt-1 border-t border-stone-200">
+              <div className="flex justify-between text-base font-bold text-stone-800 pt-1 border-t border-stone-200">
                 <span>Total</span><span>{fmt(total, currency)}</span>
               </div>
             </div>
@@ -659,7 +659,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
       <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
           <h2 className="text-base font-semibold text-stone-800">Payment</h2>
-          <button onClick={onClose} className="text-stone-400 hover:text-white transition-colors"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-800 transition-colors"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="p-6 space-y-5">

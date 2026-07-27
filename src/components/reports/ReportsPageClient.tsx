@@ -111,7 +111,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
     <div className="p-8 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white">Reports</h1>
+        <h1 className="text-3xl font-bold text-stone-800">Reports</h1>
         <p className="text-stone-500 mt-1">Sales analytics and performance metrics</p>
       </div>
 
@@ -125,7 +125,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 dateRange === btn.value
                   ? 'bg-amber-500 text-white'
-                  : 'bg-slate-700 text-stone-600 hover:bg-slate-600'
+                  : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
               }`}
             >
               {btn.label}
@@ -141,7 +141,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="bg-slate-700 text-white rounded-lg px-3 py-2 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="bg-stone-200 text-white rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
             <div>
@@ -150,7 +150,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="bg-slate-700 text-white rounded-lg px-3 py-2 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="bg-stone-200 text-white rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           </div>
@@ -174,7 +174,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-stone-500">Total Revenue</p>
-                  <p className="text-2xl font-semibold text-white mt-0.5">
+                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
                     {formatCurrency(data?.summary.totalRevenue ?? 0, currency)}
                   </p>
                 </div>
@@ -188,7 +188,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-stone-500">Total Orders</p>
-                  <p className="text-2xl font-semibold text-white mt-0.5">
+                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
                     {data?.summary.totalOrders ?? 0}
                   </p>
                 </div>
@@ -202,7 +202,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-stone-500">Avg Order Value</p>
-                  <p className="text-2xl font-semibold text-white mt-0.5">
+                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
                     {formatCurrency(data?.summary.avgOrderValue ?? 0, currency)}
                   </p>
                 </div>
@@ -216,7 +216,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-stone-500">New Customers</p>
-                  <p className="text-2xl font-semibold text-white mt-0.5">
+                  <p className="text-2xl font-semibold text-stone-800 mt-0.5">
                     {data?.summary.newCustomers ?? 0}
                   </p>
                 </div>
@@ -230,10 +230,10 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Chart */}
         <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Revenue Trend</h3>
+          <h3 className="text-lg font-semibold text-stone-800 mb-4">Revenue Trend</h3>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-600 border-t-indigo-500" />
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-indigo-500" />
             </div>
           ) : (
             <SalesChart data={data?.dailySales ?? []} currency={currency} />
@@ -242,10 +242,10 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
 
         {/* Top Products Chart */}
         <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Top 5 Products</h3>
+          <h3 className="text-lg font-semibold text-stone-800 mb-4">Top 5 Products</h3>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-600 border-t-indigo-500" />
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-indigo-500" />
             </div>
           ) : (
             <TopProductsChart data={data?.topProducts.slice(0, 5) ?? []} currency={currency} />
@@ -257,10 +257,10 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Payment Breakdown */}
         <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Payment Methods</h3>
+          <h3 className="text-lg font-semibold text-stone-800 mb-4">Payment Methods</h3>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-600 border-t-indigo-500" />
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-indigo-500" />
             </div>
           ) : (
             <PaymentBreakdown data={data?.paymentBreakdown ?? []} currency={currency} />
@@ -269,11 +269,11 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
 
         {/* Recent Orders Table */}
         <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Recent Orders</h3>
+          <h3 className="text-lg font-semibold text-stone-800 mb-4">Recent Orders</h3>
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-12 bg-slate-700 rounded animate-pulse" />
+                <div key={i} className="h-12 bg-stone-200 rounded animate-pulse" />
               ))}
             </div>
           ) : (

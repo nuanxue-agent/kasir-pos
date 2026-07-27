@@ -124,7 +124,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               setSearch(e.target.value)
               setPage(1)
             }}
-            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         
@@ -135,7 +135,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors',
               filter === 'all'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                : 'bg-stone-100 text-gray-400 hover:bg-gray-700'
             )}
           >
             All
@@ -146,7 +146,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2',
               filter === 'low'
                 ? 'bg-orange-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                : 'bg-stone-100 text-gray-400 hover:bg-gray-700'
             )}
           >
             <AlertTriangle className="w-4 h-4" />
@@ -158,7 +158,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors',
               filter === 'out'
                 ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                : 'bg-stone-100 text-gray-400 hover:bg-gray-700'
             )}
           >
             Out of Stock
@@ -167,11 +167,11 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       </div>
 
       {/* Table */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+      <div className="bg-stone-100 rounded-lg border border-stone-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-900 border-b border-gray-700">
+              <tr className="bg-stone-50 border-b border-stone-200">
                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400">Product</th>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400">SKU</th>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400">Category</th>
@@ -198,7 +198,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                 products.map((product) => {
                   const status = getStockStatus(product)
                   return (
-                    <tr key={product.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                    <tr key={product.id} className="border-b border-stone-200 hover:bg-gray-700/50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-white">{product.name}</div>
                         <div className="text-sm text-gray-400">{formatCurrency(product.price)}</div>
@@ -210,7 +210,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                         {product.category?.name || '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-lg font-semibold text-white">
+                        <span className="text-lg font-semibold text-stone-800">
                           {product.stock}
                         </span>
                       </td>
@@ -253,7 +253,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
         {/* Pagination */}
         {!loading && products.length > 0 && (
-          <div className="px-4 py-3 bg-gray-900 border-t border-gray-700 flex items-center justify-between">
+          <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
             <div className="text-sm text-gray-400">
               Showing {products.length} of {total} products
             </div>

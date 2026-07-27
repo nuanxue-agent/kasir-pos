@@ -141,8 +141,8 @@ export function CustomerFormModal({
               type="text"
               placeholder="Customer name"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
-                errors.name ? 'border-red-500' : 'border-slate-600'
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition',
+                errors.name ? 'border-red-500' : 'border-stone-200'
               )}
             />
             {errors.name && (
@@ -160,8 +160,8 @@ export function CustomerFormModal({
               type="tel"
               placeholder="+62 812 3456 7890"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
-                errors.phone ? 'border-red-500' : 'border-slate-600'
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition',
+                errors.phone ? 'border-red-500' : 'border-stone-200'
               )}
             />
             {errors.phone && (
@@ -179,8 +179,8 @@ export function CustomerFormModal({
               type="email"
               placeholder="customer@example.com"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
-                errors.email ? 'border-red-500' : 'border-slate-600'
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition',
+                errors.email ? 'border-red-500' : 'border-stone-200'
               )}
             />
             {errors.email && (
@@ -198,8 +198,8 @@ export function CustomerFormModal({
               rows={3}
               placeholder="Customer address"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none',
-                errors.address ? 'border-red-500' : 'border-slate-600'
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition resize-none',
+                errors.address ? 'border-red-500' : 'border-stone-200'
               )}
             />
             {errors.address && (
@@ -212,7 +212,7 @@ export function CustomerFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-stone-100 hover:bg-slate-700 text-stone-600 rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors"
             >
               Cancel
             </button>
