@@ -868,6 +868,177 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── Employees ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'employees') {
+      if (!segs[1] && method === 'GET') {
+        const search = url.searchParams.get('search') ?? ''
+        const dept = url.searchParams.get('department') ?? ''
+        let q = `SELECT * FROM Employee WHERE storeId=? AND active=1`
+        const params: any[] = [storeId]
+        if (search) { q += ` AND (name LIKE ? OR position LIKE ? OR nik LIKE ?)`; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+        if (dept) { q += ` AND department=?`; params.push(dept) }
+        q += ` ORDER BY name`
+        return ok(await query(q, params))
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.name || b.name.trim().length < 2) return err('Nama karyawan minimal 2 karakter')
+        if (!b.position || b.position.trim().length < 2) return err('Posisi harus diisi')
+        if (b.baseSalary == null || Number(b.baseSalary) < 0) return err('Gaji pokok tidak boleh negatif')
+        if (!b.joinDate) return err('Tanggal bergabung harus diisi')
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO Employee (id,storeId,userId,name,nik,position,department,baseSalary,employmentStatus,employmentType,joinDate,phone,email,address,bankName,bankAccount,bankAccountName,notes,active,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+          [id, storeId, b.userId ?? null, b.name.trim(), b.nik ?? null, b.position.trim(), b.department ?? null,
+           Number(b.baseSalary), b.employmentStatus ?? 'ACTIVE', b.employmentType ?? 'FULL_TIME',
+           b.joinDate, b.phone ?? null, b.email ?? null, b.address ?? null,
+           b.bankName ?? null, b.bankAccount ?? null, b.bankAccountName ?? null, b.notes ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'GET') {
+        const emp = await queryOne(`SELECT * FROM Employee WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!emp) return err('Employee not found', 404)
+        return ok(emp)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const allowed = new Set(['name','nik','position','department','baseSalary','employmentStatus','employmentType','joinDate','endDate','phone','email','address','bankName','bankAccount','bankAccountName','notes','active'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Employee SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+      if (segs[1] && method === 'DELETE') {
+        await exec(`UPDATE Employee SET active=0, employmentStatus='TERMINATED', updatedAt=? WHERE id=? AND storeId=?`, [nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ── Attendance ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'attendance') {
+      if (!segs[1] && method === 'GET') {
+        const employeeId = url.searchParams.get('employeeId') ?? ''
+        const from = url.searchParams.get('from') ?? ''
+        const to = url.searchParams.get('to') ?? ''
+        let q = `SELECT a.*, e.name as employeeName, e.position FROM Attendance a JOIN Employee e ON a.employeeId=e.id WHERE a.storeId=?`
+        const params: any[] = [storeId]
+        if (employeeId) { q += ` AND a.employeeId=?`; params.push(employeeId) }
+        if (from) { q += ` AND a.date >= ?`; params.push(from) }
+        if (to) { q += ` AND a.date <= ?`; params.push(to) }
+        q += ` ORDER BY a.date DESC, e.name`
+        return ok(await query(q, params))
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.employeeId || !b.date) return err('employeeId and date required')
+        // Calculate late minutes
+        let lateMinutes = 0
+        if (b.checkIn && b.scheduleStart) {
+          const [ch, cm] = b.checkIn.split(':').map(Number)
+          const [sh, sm] = b.scheduleStart.split(':').map(Number)
+          lateMinutes = Math.max(0, (ch * 60 + cm) - (sh * 60 + sm))
+        }
+        const status = !b.checkIn ? 'ABSENT' : lateMinutes > 15 ? 'LATE' : 'PRESENT'
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT OR REPLACE INTO Attendance (id,storeId,employeeId,date,checkIn,checkOut,status,lateMinutes,overtimeMinutes,note,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [id, storeId, b.employeeId, b.date, b.checkIn ?? null, b.checkOut ?? null, b.status ?? status, lateMinutes, b.overtimeMinutes ?? 0, b.note ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const allowed = new Set(['checkIn','checkOut','status','lateMinutes','overtimeMinutes','note'])
+        const cols = filterCols(b, allowed)
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Attendance SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ── Payroll ────────────────────────────────────────────────────────────────
+    if (segs[0] === 'payroll') {
+      if (!segs[1] && method === 'GET') {
+        const runs = await query(`SELECT * FROM PayrollRun WHERE storeId=? ORDER BY period DESC LIMIT 24`, [storeId])
+        return ok(runs)
+      }
+      if (segs[1] === 'payslips' && method === 'GET') {
+        const runId = url.searchParams.get('runId')
+        const employeeId = url.searchParams.get('employeeId')
+        let q = `SELECT p.*, e.name as employeeName, e.position FROM Payslip p JOIN Employee e ON p.employeeId=e.id WHERE p.storeId=?`
+        const params: any[] = [storeId]
+        if (runId) { q += ` AND p.runId=?`; params.push(runId) }
+        if (employeeId) { q += ` AND p.employeeId=?`; params.push(employeeId) }
+        return ok(await query(q, params))
+      }
+      if (!segs[1] && method === 'POST') {
+        // Generate payroll run for a period
+        const b = await req.json() as any
+        if (!b.period) return err('Period harus diisi (format: YYYY-MM)')
+        const employees = await query<any>(`SELECT * FROM Employee WHERE storeId=? AND active=1 AND employmentStatus='ACTIVE'`, [storeId])
+        if ((employees as any[]).length === 0) return err('Tidak ada karyawan aktif')
+        const t = nowISO(); const runId = newId()
+        let totalGross = 0; let totalDed = 0; let totalNet = 0
+
+        // Calculate working days for the period
+        const [yr, mo] = b.period.split('-').map(Number)
+        const firstDay = `${b.period}-01`
+        const lastDay = new Date(yr, mo, 0).toISOString().slice(0, 10)
+
+        await exec(
+          `INSERT INTO PayrollRun (id,storeId,userId,period,status,totalGross,totalDeductions,totalNet,note,createdAt,updatedAt) VALUES (?,?,?,?,'DRAFT',0,0,0,?,?,?)`,
+          [runId, storeId, user.id, b.period, b.note ?? null, t, t]
+        )
+
+        for (const emp of employees as any[]) {
+          const allowances = JSON.parse(emp.allowances ?? '[]') as any[]
+          const gross = emp.baseSalary + allowances.reduce((s: number, a: any) => s + a.amount, 0)
+
+          // Auto calculate BPJS + PPh21
+          const bpjsHealth = Math.round(Math.min(gross, 12_000_000) * 0.01)
+          const bpjsEmployment = Math.round(gross * 0.02)
+          const annualGross = gross * 12
+          const pkp = Math.max(0, annualGross - 54_000_000)
+          let pph21Monthly = 0
+          if (pkp > 0) {
+            let annualTax = pkp <= 60_000_000 ? pkp * 0.05 : 3_000_000 + (pkp - 60_000_000) * 0.15
+            pph21Monthly = Math.round(annualTax / 12)
+          }
+          const deductions = [
+            { name: 'BPJS Kesehatan', amount: bpjsHealth },
+            { name: 'BPJS Ketenagakerjaan (JHT)', amount: bpjsEmployment },
+            ...(pph21Monthly > 0 ? [{ name: 'PPh 21', amount: pph21Monthly }] : []),
+            ...JSON.parse(emp.deductions ?? '[]'),
+          ]
+          const totalDeduct = deductions.reduce((s: number, d: any) => s + d.amount, 0)
+          const net = Math.max(0, gross - totalDeduct)
+
+          totalGross += gross; totalDed += totalDeduct; totalNet += net
+
+          await exec(
+            `INSERT INTO Payslip (id,runId,employeeId,storeId,period,baseSalary,allowances,deductions,grossSalary,totalDeductions,netSalary,workedDays,workingDays,status,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [newId(), runId, emp.id, storeId, b.period, emp.baseSalary, JSON.stringify(allowances), JSON.stringify(deductions), gross, totalDeduct, net, 0, 0, 'DRAFT', t, t]
+          )
+        }
+        await exec(`UPDATE PayrollRun SET totalGross=?, totalDeductions=?, totalNet=?, updatedAt=? WHERE id=?`,
+          [totalGross, totalDed, totalNet, t, runId])
+        return ok({ runId, totalGross, totalNet, employeeCount: (employees as any[]).length }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        await exec(`UPDATE PayrollRun SET status=?, paidAt=?, updatedAt=? WHERE id=? AND storeId=?`,
+          [b.status, b.status === 'PAID' ? nowISO() : null, nowISO(), segs[1], storeId])
+        if (b.status === 'PAID') {
+          await exec(`UPDATE Payslip SET status='PAID', paidAt=?, updatedAt=? WHERE runId=?`,
+            [nowISO(), nowISO(), segs[1]])
+        }
+        return ok({ success: true })
+      }
+    }
+
     return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)

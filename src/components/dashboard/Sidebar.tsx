@@ -55,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Manajemen',
     minRole: 'MANAGER',
     items: [
+      { label: 'SDM & Penggajian', href: '/dashboard/hr', icon: UserCog },
       { label: 'Staf',        href: '/dashboard/staff',  icon: UserCog },
       { label: 'Toko',        href: '/dashboard/stores', icon: Store },
     ],
