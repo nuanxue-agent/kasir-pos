@@ -7,11 +7,14 @@ import { z } from 'zod'
 import { X, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
+import BarcodeDisplay from './BarcodeDisplay'
 import {
   generateCombinations,
   type VariantAttribute,
   type VariantCombination,
 } from '@/lib/variants'
+
+// Watch SKU for live barcode preview
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -129,6 +132,7 @@ export default function ProductFormModal({
 
   const trackStock = watch('trackStock')
   const imageUrl = watch('image')
+  const skuValue = watch('sku')
 
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true)
@@ -355,6 +359,20 @@ export default function ProductFormModal({
                 </div>
               )}
             </div>
+
+            {/* Barcode preview */}
+            {skuValue && skuValue.trim() !== '' && (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-stone-700">
+                  Barcode (SKU)
+                </label>
+                <BarcodeDisplay
+                  sku={skuValue.trim()}
+                  productName={watch('name')}
+                  showPrintButton={true}
+                />
+              </div>
+            )}
 
             {/* Track Stock */}
             <div className="flex items-center gap-2">

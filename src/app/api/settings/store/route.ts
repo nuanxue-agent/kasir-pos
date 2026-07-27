@@ -1,3 +1,4 @@
+// API route: PATCH /api/settings/store
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
@@ -19,6 +20,11 @@ const schema = z.object({
   primaryColor: z.string().optional(),
   receiptHeader: z.string().optional(),
   receiptFooter: z.string().optional(),
+  // Integration fields
+  apiKey: z.string().optional(),
+  webhookUrl: z.string().optional(),
+  // Payment methods (JSON string)
+  paymentMethods: z.string().optional(),
 })
 
 function ok(data: unknown) {
@@ -54,6 +60,9 @@ export async function PATCH(req: NextRequest) {
       primaryColor,
       receiptHeader,
       receiptFooter,
+      apiKey,
+      webhookUrl,
+      paymentMethods,
     } = parsed.data
 
     // Verify user has access to this store
@@ -110,6 +119,18 @@ export async function PATCH(req: NextRequest) {
     if (receiptFooter !== undefined) {
       fields.push('receiptFooter = ?')
       params.push(receiptFooter || null)
+    }
+    if (apiKey !== undefined) {
+      fields.push('apiKey = ?')
+      params.push(apiKey || null)
+    }
+    if (webhookUrl !== undefined) {
+      fields.push('webhookUrl = ?')
+      params.push(webhookUrl || null)
+    }
+    if (paymentMethods !== undefined) {
+      fields.push('paymentMethods = ?')
+      params.push(paymentMethods || null)
     }
 
     if (fields.length === 0) return ok({ success: true })

@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { formatCurrency, cn } from '@/lib/utils'
-import { Package, Plus, Pencil, Trash2, Search, Filter, AlertTriangle } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, Search, Filter, AlertTriangle, Upload } from 'lucide-react'
 import ProductFormModal from './ProductFormModal'
+import ImportWizardModal from './ImportWizardModal'
 
 interface Product {
   id: string
@@ -47,10 +48,14 @@ export default function ProductsPageClient({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
+  // Derive existing SKUs for the import wizard
+  const existingSKUs = new Set(products.map(p => p.sku).filter(Boolean) as string[])
+
   // Filter products
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = products.filter(p => {
     const matchesSearch =
       !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,7 +78,7 @@ export default function ProductsPageClient({
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
 
-      setProducts((prev) => prev.filter((p) => p.id !== id))
+      setProducts(prev => prev.filter(p => p.id !== id))
       showToast('Product deleted successfully')
     } catch (error) {
       showToast('Failed to delete product', 'error')
@@ -90,8 +95,8 @@ export default function ProductsPageClient({
       })
       if (!res.ok) throw new Error('Failed to update')
 
-      const updated = await res.json() as any
-      setProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)))
+      const updated = (await res.json()) as any
+      setProducts(prev => prev.map(p => (p.id === product.id ? updated : p)))
       showToast(`Product ${updated.active ? 'activated' : 'deactivated'}`)
     } catch (error) {
       showToast('Failed to update product', 'error')
@@ -99,52 +104,59 @@ export default function ProductsPageClient({
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-1)]">Produk</h1>
-          <p className="text-sm text-[var(--text-2)] mt-0.5">
-            Manage your product catalog
-          </p>
+          <p className="mt-0.5 text-sm text-[var(--text-2)]">Manage your product catalog</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingProduct(null)
-            setShowModal(true)
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-500 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Product
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-amber-400 hover:text-amber-600"
+          >
+            <Upload className="h-4 w-4" />
+            Import Produk
+          </button>
+          <button
+            onClick={() => {
+              setEditingProduct(null)
+              setShowModal(true)
+            }}
+            className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
+          >
+            <Plus className="h-4 w-4" />
+            Add Product
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row">
           {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
+          <div className="relative flex-1">
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               type="text"
               placeholder="Search by name or SKU..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+              onChange={e => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] py-2 pr-4 pl-10 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none"
             />
           </div>
 
           {/* Category filter */}
           <div className="relative sm:w-64">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
+            <Filter className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
             <select
               value={selectedCategory ?? ''}
-              onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 appearance-none bg-[var(--bg-card)]"
+              onChange={e => setSelectedCategory(e.target.value || null)}
+              className="w-full appearance-none rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2 pr-4 pl-10 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none"
             >
               <option value="">Semua Kategori</option>
-              {categories.map((cat) => (
+              {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
@@ -155,10 +167,10 @@ export default function ProductsPageClient({
       </div>
 
       {/* Products table */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
         {filteredProducts.length === 0 ? (
           <div className="py-12 text-center">
-            <Package className="h-12 w-12 text-stone-300 mx-auto mb-3" />
+            <Package className="mx-auto mb-3 h-12 w-12 text-stone-300" />
             <p className="text-sm text-[var(--text-2)]">
               {search || selectedCategory ? 'No products match your filters' : 'No products yet'}
             </p>
@@ -168,37 +180,37 @@ export default function ProductsPageClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--bg-subtle)] text-left">
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">
+                  <th className="px-5 py-3 text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     Product
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">
+                  <th className="px-5 py-3 text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     SKU
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">
+                  <th className="px-5 py-3 text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     Category
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-right">
+                  <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     Price
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-center">
+                  <th className="px-5 py-3 text-center text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     Stock
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-center">
+                  <th className="px-5 py-3 text-center text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     Status
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-right">
+                  <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-[var(--text-2)] uppercase">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-[var(--bg-subtle)]/50 transition-colors">
+                {filteredProducts.map(product => (
+                  <tr key={product.id} className="transition-colors hover:bg-[var(--bg-subtle)]/50">
                     <td className="px-5 py-3">
                       <div>
                         <p className="font-medium text-[var(--text-1)]">{product.name}</p>
                         {product.description && (
-                          <p className="text-xs text-[var(--text-3)] mt-0.5 truncate max-w-xs">
+                          <p className="mt-0.5 max-w-xs truncate text-xs text-[var(--text-3)]">
                             {product.description}
                           </p>
                         )}
@@ -210,7 +222,7 @@ export default function ProductsPageClient({
                     <td className="px-5 py-3">
                       {product.category ? (
                         <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                          className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
                           style={{
                             backgroundColor: product.category.color
                               ? `${product.category.color}20`
@@ -221,7 +233,7 @@ export default function ProductsPageClient({
                           {product.category.name}
                         </span>
                       ) : (
-                        <span className="text-[var(--text-3)] italic text-xs">Uncategorized</span>
+                        <span className="text-xs text-[var(--text-3)] italic">Uncategorized</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-right font-medium text-[var(--text-1)]">
@@ -237,7 +249,7 @@ export default function ProductsPageClient({
                                 ? product.stock === 0
                                   ? 'text-red-600'
                                   : 'text-orange-600'
-                                : 'text-[var(--text-1)]'
+                                : 'text-[var(--text-1)]',
                             )}
                           >
                             {product.stock}
@@ -247,17 +259,17 @@ export default function ProductsPageClient({
                           )}
                         </div>
                       ) : (
-                        <span className="text-[var(--text-3)] text-xs italic">N/A</span>
+                        <span className="text-xs text-[var(--text-3)] italic">N/A</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-center">
                       <button
                         onClick={() => handleToggleActive(product)}
                         className={cn(
-                          'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium transition-colors',
+                          'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium transition-colors',
                           product.active
                             ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                            : 'bg-[var(--bg-muted)] text-[var(--text-2)] hover:bg-stone-200'
+                            : 'bg-[var(--bg-muted)] text-[var(--text-2)] hover:bg-stone-200',
                         )}
                       >
                         {product.active ? 'Active' : 'Inactive'}
@@ -270,14 +282,14 @@ export default function ProductsPageClient({
                             setEditingProduct(product)
                             setShowModal(true)
                           }}
-                          className="p-1.5 text-[var(--text-3)] hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          className="rounded p-1.5 text-[var(--text-3)] transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(product.id)}
-                          className="p-1.5 text-[var(--text-3)] hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="rounded p-1.5 text-[var(--text-3)] transition-colors hover:bg-red-50 hover:text-red-600"
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -292,6 +304,24 @@ export default function ProductsPageClient({
         )}
       </div>
 
+      {/* Import wizard */}
+      {showImportModal && (
+        <ImportWizardModal
+          storeId={storeId}
+          existingSKUs={existingSKUs}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={result => {
+            showToast(
+              `Import selesai: ${result.created} dibuat, ${result.updated} diperbarui${result.errors > 0 ? `, ${result.errors} dilewati` : ''}`,
+              'success',
+            )
+            setShowImportModal(false)
+            // Reload products from server by reloading the page
+            window.location.reload()
+          }}
+        />
+      )}
+
       {/* Modal */}
       {showModal && (
         <ProductFormModal
@@ -302,12 +332,12 @@ export default function ProductsPageClient({
             setShowModal(false)
             setEditingProduct(null)
           }}
-          onSuccess={(product) => {
+          onSuccess={product => {
             if (editingProduct) {
-              setProducts((prev) => prev.map((p) => (p.id === product.id ? product : p)))
+              setProducts(prev => prev.map(p => (p.id === product.id ? product : p)))
               showToast('Product updated successfully')
             } else {
-              setProducts((prev) => [...prev, product])
+              setProducts(prev => [...prev, product])
               showToast('Product created successfully')
             }
             setShowModal(false)
@@ -320,8 +350,8 @@ export default function ProductsPageClient({
       {toast && (
         <div
           className={cn(
-            'fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white transition-opacity z-50',
-            toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+            'fixed right-6 bottom-6 z-50 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-opacity',
+            toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600',
           )}
         >
           {toast.message}
