@@ -193,7 +193,7 @@ export default function PembayaranModal({
                 type="text"
                 value={reference}
                 onKembalian={e => setReference(e.target.value)}
-                placeholder="e.g. last 4 digits, ref number"
+                placeholder="Contoh: 4 digit terakhir, nomor ref"
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>

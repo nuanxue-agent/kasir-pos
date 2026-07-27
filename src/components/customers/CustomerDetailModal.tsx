@@ -262,7 +262,7 @@ export function CustomerDetailModal({
                       type="number"
                       placeholder="e.g. 50 or -20"
                       className={cn(
-                        'flex-1 px-3 py-2 bg-white border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm',
+                        'flex-1 px-3 py-2 bg-white border rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm',
                         errors.delta ? 'border-red-500' : 'border-stone-200'
                       )}
                     />

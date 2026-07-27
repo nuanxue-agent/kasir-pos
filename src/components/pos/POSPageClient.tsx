@@ -236,7 +236,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Cari produk…"
-              className="w-full pl-9 pr-4 py-2 rounded-lg bg-stone-50 border border-stone-200 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/20"
+              className="w-full pl-9 pr-4 py-2 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
             />
           </div>
           <div className="flex rounded-lg border border-stone-200 overflow-hidden">
@@ -523,7 +523,7 @@ function CustomerSearch({ storeId, onSelect, onClose }: {
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder="Search customer name or phone…"
-          className="flex-1 bg-transparent text-xs text-white placeholder-white/30 focus:outline-none"
+          className="flex-1 bg-transparent text-xs text-stone-800 placeholder-stone-400 focus:outline-none"
         />
         <button onClick={onClose} className="text-stone-400 hover:text-stone-600 transition-colors">
           <X className="h-3.5 w-3.5" />
