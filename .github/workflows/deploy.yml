@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare Pages
+name: Deploy to Vercel
 
 on:
   push:
@@ -7,10 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      deployments: write
-
     steps:
       - uses: actions/checkout@v4
 
@@ -21,17 +17,9 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
-      - name: Build for Cloudflare Pages
-        run: npm_config_legacy_peer_deps=true npx @cloudflare/next-on-pages
+      - name: Deploy to Vercel
+        run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --yes
         env:
-          NODE_ENV: production
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-
-      - name: Deploy to Cloudflare Pages
-        run: npx wrangler@4.10.0 pages deploy .vercel/output/static --project-name=kasir-pos --branch=master --commit-dirty=true
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: bccfd906f27fd0a0406bcc9307e6f8ac
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
