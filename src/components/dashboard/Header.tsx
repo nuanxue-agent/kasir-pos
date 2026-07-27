@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import {
   Bell,
   ChevronDown,
@@ -11,6 +12,8 @@ import {
   LogOut,
   Menu,
   Settings,
+  AlertTriangle,
+  Package,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/permissions'
@@ -29,6 +32,14 @@ interface HeaderProps {
   currentStoreId?: string
   onStoreChange?: (storeId: string) => void
   onMenuToggle: () => void
+}
+
+interface LowStockProduct {
+  id: string
+  name: string
+  stock: number
+  lowStock: number
+  sku?: string | null
 }
 
 const ROLE_LABELS: Record<UserRole, { label: string; className: string }> = {
@@ -90,6 +101,19 @@ export function Header({
 
   const currentStore = stores.find((s) => s.id === currentStoreId) ?? stores[0]
   const roleStyle = ROLE_LABELS[userRole] ?? ROLE_LABELS.CASHIER
+
+  const storeId = currentStore?.id
+  const { data: lowStockItems = [] } = useQuery<LowStockProduct[]>({
+    queryKey: ['low-stock-alerts', storeId],
+    queryFn: () =>
+      storeId
+        ? fetch(`/api/inventory?storeId=${storeId}&lowStockOnly=true`).then(r => r.json())
+        : Promise.resolve([]),
+    enabled: !!storeId,
+    refetchInterval: 60_000, // refresh every minute
+    staleTime: 30_000,
+  })
+  const alertCount = lowStockItems.length
 
   const pageTitle = PAGE_TITLES[pathname] ?? 'Dashboard'
 
@@ -175,19 +199,72 @@ export function Header({
             className="relative p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
             aria-label="Notifications"
           >
-            <Bell className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+            <Bell style={{ width: 18, height: 18 }} />
+            {alertCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-amber-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none">
+                {alertCount > 9 ? '9+' : alertCount}
+              </span>
+            )}
+            {alertCount === 0 && (
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+            )}
           </button>
 
           {notifOpen && (
-            <div className="absolute top-full right-0 mt-1.5 w-72 bg-[#0d0d14] rounded-xl border border-white/10 shadow-2xl shadow-black/50 z-50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/5">
+            <div className="absolute top-full right-0 mt-1.5 w-80 bg-[#0d0d14] rounded-xl border border-white/10 shadow-2xl shadow-black/50 z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                 <p className="text-sm font-semibold text-white">Notifications</p>
+                {alertCount > 0 && (
+                  <span className="text-xs text-amber-400 font-medium">{alertCount} alert{alertCount !== 1 ? 's' : ''}</span>
+                )}
               </div>
-              <div className="py-8 text-center">
-                <Bell className="h-7 w-7 text-white/10 mx-auto mb-2" />
-                <p className="text-xs text-white/30">No new notifications</p>
-              </div>
+
+              {alertCount === 0 ? (
+                <div className="py-8 text-center">
+                  <Bell className="h-7 w-7 text-white/10 mx-auto mb-2" />
+                  <p className="text-xs text-white/30">No new notifications</p>
+                </div>
+              ) : (
+                <>
+                  <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/10">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <p className="text-xs text-amber-400 font-medium">Low stock warning</p>
+                    </div>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
+                    {lowStockItems.map((p) => (
+                      <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                          <Package className="h-4 w-4 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{p.name}</p>
+                          {p.sku && <p className="text-xs text-white/30">{p.sku}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={cn(
+                            'text-sm font-bold',
+                            p.stock === 0 ? 'text-red-400' : 'text-amber-400'
+                          )}>
+                            {p.stock === 0 ? 'Out' : p.stock}
+                          </p>
+                          <p className="text-[10px] text-white/30">/ {p.lowStock} min</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-4 py-3 border-t border-white/5">
+                    <Link
+                      href="/dashboard/inventory"
+                      onClick={() => setNotifOpen(false)}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+                    >
+                      View all inventory →
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
