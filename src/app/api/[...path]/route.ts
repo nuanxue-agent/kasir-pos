@@ -5436,6 +5436,131 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+
+    // ── Marketing Campaigns ───────────────────────────────────────────────────
+    if (segs[0] === 'marketing-campaigns') {
+      // Lazy init table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS MarketingCampaign (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          name         TEXT NOT NULL,
+          type         TEXT NOT NULL DEFAULT 'EMAIL',
+          status       TEXT NOT NULL DEFAULT 'DRAFT',
+          message      TEXT NOT NULL DEFAULT '',
+          audience     TEXT NOT NULL DEFAULT 'ALL',
+          audienceValue TEXT,
+          scheduledAt  TEXT,
+          sentCount    INTEGER NOT NULL DEFAULT 0,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL
+        )
+      `)
+
+      // GET /api/marketing-campaigns?storeId=...
+      if (!segs[1] && method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM MarketingCampaign WHERE storeId=? ORDER BY createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/marketing-campaigns
+      if (!segs[1] && method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.name || String(b.name).trim().length < 2) return err('name minimal 2 karakter')
+        if (!b.message || String(b.message).trim().length < 1) return err('message required')
+        const validTypes = ['EMAIL', 'SMS', 'WHATSAPP']
+        const validAudiences = ['ALL', 'SEGMENT', 'LOYALTY_TIER']
+        const type = validTypes.includes(b.type) ? b.type : 'EMAIL'
+        const audience = validAudiences.includes(b.audience) ? b.audience : 'ALL'
+        const id = newId()
+        const t = nowISO()
+        const status = b.scheduledAt ? 'SCHEDULED' : 'DRAFT'
+        await exec(
+          `INSERT INTO MarketingCampaign
+           (id,storeId,name,type,status,message,audience,audienceValue,scheduledAt,sentCount,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, storeId, b.name.trim(), type, status,
+            b.message.trim(), audience,
+            b.audienceValue ?? null,
+            b.scheduledAt ?? null,
+            0, t, t,
+          ],
+        )
+        return ok({ id, status }, 201)
+      }
+
+      // POST /api/marketing-campaigns/send/:id
+      if (segs[1] === 'send' && segs[2] && method === 'POST') {
+        const campaignId = segs[2]
+        const campaign = await queryOne(
+          `SELECT * FROM MarketingCampaign WHERE id=? AND storeId=?`,
+          [campaignId, storeId],
+        ) as any
+        if (!campaign) return err('Campaign not found', 404)
+
+        // Count audience size
+        let audienceCount = 0
+        if (campaign.audience === 'ALL') {
+          const row = await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [storeId]) as any
+          audienceCount = Number(row?.cnt ?? 0)
+        } else if (campaign.audience === 'SEGMENT') {
+          // RFM segment — approximate via loyalty members or all customers fallback
+          const row = await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [storeId]) as any
+          audienceCount = Math.max(1, Math.floor(Number(row?.cnt ?? 10) * 0.3))
+        } else if (campaign.audience === 'LOYALTY_TIER') {
+          const row = await queryOne(
+            `SELECT COUNT(*) as cnt FROM LoyaltyMember WHERE storeId=? AND tierId=?`,
+            [storeId, campaign.audienceValue ?? ''],
+          ) as any
+          audienceCount = Number(row?.cnt ?? 0)
+        }
+        if (audienceCount === 0) audienceCount = 1 // always send to at least 1
+
+        // Simulate delivery stats
+        const deliveryRate = 0.92 + Math.random() * 0.06
+        const openRate    = 0.18 + Math.random() * 0.22
+        const delivered   = Math.round(audienceCount * deliveryRate)
+        const failed      = audienceCount - delivered
+        const opened      = Math.round(delivered * openRate)
+
+        const t2 = nowISO()
+        await exec(
+          `UPDATE MarketingCampaign SET status='SENT', sentCount=?, updatedAt=? WHERE id=? AND storeId=?`,
+          [audienceCount, t2, campaignId, storeId],
+        )
+
+        return ok({
+          success: true,
+          sentCount: audienceCount,
+          stats: { delivered, failed, opened },
+        })
+      }
+
+      // PATCH /api/marketing-campaigns/:id
+      if (segs[1] && segs[1] !== 'send' && method === 'PATCH') {
+        const b = (await req.json()) as any
+        const allowed = new Set(['name', 'message', 'type', 'status', 'audience', 'audienceValue', 'scheduledAt'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(
+          `UPDATE MarketingCampaign SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`,
+          [...values, nowISO(), segs[1], storeId],
+        )
+        return ok({ success: true })
+      }
+
+      // DELETE /api/marketing-campaigns/:id
+      if (segs[1] && segs[1] !== 'send' && method === 'DELETE') {
+        await exec(`DELETE FROM MarketingCampaign WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)

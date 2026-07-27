@@ -63,10 +63,10 @@ export default function QuickSalePage() {
       fetch(`/api/products?storeId=${storeId}&active=true`).then(r => r.ok ? r.json() : { data: [] }),
       fetch(`/api/categories?storeId=${storeId}`).then(r => r.ok ? r.json() : { data: [] }),
     ])
-      .then(([prods, cats]) => {
-        setProducts(Array.isArray(prods.data) ? prods.data : Array.isArray(prods) ? prods : [])
-        setCategories(Array.isArray(cats.data) ? cats.data : Array.isArray(cats) ? cats : [])
-        if (prods.currency) setCurrency(prods.currency)
+      .then(([prods, cats]: [any, any]) => {
+          setProducts(Array.isArray(prods.data) ? prods.data : Array.isArray(prods) ? prods : [])
+          setCategories(Array.isArray(cats.data) ? cats.data : Array.isArray(cats) ? cats : [])
+          if (prods.currency) setCurrency(prods.currency)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
