@@ -37,14 +37,17 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/pos':        'Kasir (POS)',
   '/dashboard/products':   'Produk',
   '/dashboard/categories': 'Kategori',
+  '/dashboard/variants':   'Varian Produk',
   '/dashboard/orders':     'Pesanan',
   '/dashboard/customers':  'Pelanggan',
   '/dashboard/discounts':  'Diskon',
-  '/dashboard/inventory':  'Stok',
+  '/dashboard/inventory':  'Stok & Inventori',
   '/dashboard/reports':    'Laporan',
   '/dashboard/staff':      'Staf',
   '/dashboard/stores':     'Toko',
   '/dashboard/settings':   'Pengaturan',
+  '/dashboard/expenses':   'Pengeluaran',
+  '/dashboard/shifts':     'Shift & Kas',
   '/admin/tenants':        'Tenant',
 }
 
