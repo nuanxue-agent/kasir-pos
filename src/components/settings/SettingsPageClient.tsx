@@ -5,8 +5,19 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
-  Save, Store, Receipt, Globe, LayoutGrid,
-  ShoppingCart, Boxes, Users, Percent, BarChart3, CheckCircle2,
+  Save,
+  Store,
+  Receipt,
+  Globe,
+  LayoutGrid,
+  ShoppingCart,
+  Boxes,
+  Users,
+  Percent,
+  BarChart3,
+  CheckCircle2,
+  Palette,
+  ImageIcon,
 } from 'lucide-react'
 import { toast } from '@/components/ui/Toaster'
 
@@ -15,20 +26,64 @@ const schema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
-  taxRate: z.preprocess((v) => parseFloat(String(v)), z.number().min(0).max(100)),
+  taxRate: z.preprocess(v => parseFloat(String(v)), z.number().min(0).max(100)),
   currency: z.string().min(1),
   receiptNote: z.string().optional(),
   timezone: z.string().optional(),
+  // Branding
+  receiptHeader: z.string().optional(),
+  receiptFooter: z.string().optional(),
+  primaryColor: z.string().optional(),
+  logoUrl: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
 
 const ALL_MODULES = [
-  { key: 'pos',        label: 'Kasir (POS)',        desc: 'Terminal kasir untuk catat penjualan',      icon: ShoppingCart, required: false },
-  { key: 'inventory',  label: 'Stok & Inventori',   desc: 'Kelola stok dan notifikasi stok menipis',   icon: Boxes,        required: false },
-  { key: 'customers',  label: 'Pelanggan & Poin',   desc: 'Database pelanggan dan poin loyalitas',     icon: Users,        required: false },
-  { key: 'discounts',  label: 'Diskon & Promo',     desc: 'Buat kode diskon dan promo otomatis',       icon: Percent,      required: false },
-  { key: 'reports',    label: 'Laporan',            desc: 'Laporan omzet, produk terlaris, dan lainnya', icon: BarChart3,  required: true  },
+  {
+    key: 'pos',
+    label: 'Kasir (POS)',
+    desc: 'Terminal kasir untuk catat penjualan',
+    icon: ShoppingCart,
+    required: false,
+  },
+  {
+    key: 'inventory',
+    label: 'Stok & Inventori',
+    desc: 'Kelola stok dan notifikasi stok menipis',
+    icon: Boxes,
+    required: false,
+  },
+  {
+    key: 'customers',
+    label: 'Pelanggan & Poin',
+    desc: 'Database pelanggan dan poin loyalitas',
+    icon: Users,
+    required: false,
+  },
+  {
+    key: 'discounts',
+    label: 'Diskon & Promo',
+    desc: 'Buat kode diskon dan promo otomatis',
+    icon: Percent,
+    required: false,
+  },
+  {
+    key: 'reports',
+    label: 'Laporan',
+    desc: 'Laporan omzet, produk terlaris, dan lainnya',
+    icon: BarChart3,
+    required: true,
+  },
+]
+
+const COLOR_SWATCHES = [
+  { label: 'Amber', value: '#f59e0b', bg: 'bg-amber-400', ring: 'ring-amber-400' },
+  { label: 'Orange', value: '#f97316', bg: 'bg-orange-500', ring: 'ring-orange-500' },
+  { label: 'Green', value: '#22c55e', bg: 'bg-green-500', ring: 'ring-green-500' },
+  { label: 'Blue', value: '#3b82f6', bg: 'bg-blue-500', ring: 'ring-blue-500' },
+  { label: 'Violet', value: '#7c3aed', bg: 'bg-violet-600', ring: 'ring-violet-600' },
+  { label: 'Rose', value: '#f43f5e', bg: 'bg-rose-500', ring: 'ring-rose-500' },
 ]
 
 interface SettingsPageClientProps {
@@ -43,6 +98,11 @@ interface SettingsPageClientProps {
     receiptNote?: string | null
     timezone: string
     modules?: string[]
+    // Branding
+    logoUrl?: string | null
+    primaryColor?: string | null
+    receiptHeader?: string | null
+    receiptFooter?: string | null
   }
 }
 
@@ -50,10 +110,18 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [modules, setModules] = useState<string[]>(
-    store.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
+    store.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports'],
   )
+  const [primaryColor, setPrimaryColor] = useState(store.primaryColor ?? '#f59e0b')
+  const [logoPreview, setLogoPreview] = useState(store.logoUrl ?? '')
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
       name: store.name,
@@ -64,13 +132,17 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
       currency: store.currency,
       receiptNote: store.receiptNote ?? '',
       timezone: store.timezone,
+      receiptHeader: store.receiptHeader ?? '',
+      receiptFooter: store.receiptFooter ?? '',
+      primaryColor: store.primaryColor ?? '#f59e0b',
+      logoUrl: store.logoUrl ?? '',
     },
   })
 
+  const logoUrlValue = watch('logoUrl')
+
   function toggleModule(key: string) {
-    setModules(prev =>
-      prev.includes(key) ? prev.filter(m => m !== key) : [...prev, key]
-    )
+    setModules(prev => (prev.includes(key) ? prev.filter(m => m !== key) : [...prev, key]))
   }
 
   const onSubmit = async (data: FormData) => {
@@ -85,6 +157,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           ...data,
           taxRate: data.taxRate / 100,
           modules: JSON.stringify(modules),
+          primaryColor,
         }),
       })
       if (!res.ok) throw new Error('Gagal menyimpan')
@@ -98,17 +171,18 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Pengaturan Toko</h1>
-        <p className="text-[var(--text-2)] mt-1 text-sm">Konfigurasi informasi dan preferensi toko kamu</p>
+        <h1 className="text-xl font-bold text-[var(--text-1)] sm:text-2xl">Pengaturan Toko</h1>
+        <p className="mt-1 text-sm text-[var(--text-2)]">
+          Konfigurasi informasi dan preferensi toko kamu
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
         {/* ── Store Info ── */}
-        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm">
+        <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
             <Store className="h-4 w-4 text-amber-500" />
             Informasi Toko
           </div>
@@ -129,14 +203,21 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* ── Tax & Currency ── */}
-        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm">
+        <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
             <Globe className="h-4 w-4 text-amber-500" />
             Pajak & Mata Uang
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Tarif Pajak (%)" error={errors.taxRate?.message}>
-              <input type="number" step="0.1" min="0" max="100" {...register('taxRate')} className={inputCls} />
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                {...register('taxRate')}
+                className={inputCls}
+              />
             </Field>
             <Field label="Mata Uang" error={errors.currency?.message}>
               <select {...register('currency')} className={inputCls}>
@@ -159,8 +240,8 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* ── Receipt ── */}
-        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm">
+        <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
             <Receipt className="h-4 w-4 text-amber-500" />
             Struk
           </div>
@@ -174,14 +255,107 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           </Field>
         </section>
 
+        {/* ── Branding ── */}
+        <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
+            <Palette className="h-4 w-4 text-amber-500" />
+            Branding
+          </div>
+
+          {/* Receipt header */}
+          <Field label="Header Struk (nama toko di struk)" error={errors.receiptHeader?.message}>
+            <input
+              {...register('receiptHeader')}
+              placeholder={watch('name') || 'Nama toko Anda'}
+              className={inputCls}
+            />
+          </Field>
+
+          {/* Receipt footer */}
+          <Field label="Footer / Catatan Bawah Struk" error={errors.receiptFooter?.message}>
+            <textarea
+              {...register('receiptFooter')}
+              rows={2}
+              placeholder="Contoh: Barang yang sudah dibeli tidak dapat dikembalikan."
+              className={inputCls}
+            />
+          </Field>
+
+          {/* Primary color picker */}
+          <div>
+            <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">
+              Warna Utama
+            </label>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {COLOR_SWATCHES.map(swatch => (
+                <button
+                  key={swatch.value}
+                  type="button"
+                  title={swatch.label}
+                  onClick={() => {
+                    setPrimaryColor(swatch.value)
+                    setValue('primaryColor', swatch.value)
+                  }}
+                  className={`h-8 w-8 rounded-full ${swatch.bg} transition-all hover:scale-110 focus:outline-none ${
+                    primaryColor === swatch.value ? `ring-2 ring-offset-2 ${swatch.ring}` : ''
+                  }`}
+                  aria-label={`Pilih warna ${swatch.label}`}
+                />
+              ))}
+              {/* Current color preview */}
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-[var(--border)]"
+                style={{ backgroundColor: primaryColor }}
+                title={primaryColor}
+              />
+              <span className="font-mono text-xs text-[var(--text-3)]">{primaryColor}</span>
+            </div>
+          </div>
+
+          {/* Logo URL */}
+          <Field label="URL Logo" error={errors.logoUrl?.message}>
+            <input
+              {...register('logoUrl')}
+              type="url"
+              placeholder="https://example.com/logo.png"
+              className={inputCls}
+              onChange={e => {
+                setValue('logoUrl', e.target.value)
+                setLogoPreview(e.target.value)
+              }}
+            />
+          </Field>
+          {logoUrlValue && (
+            <div className="mt-2 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrlValue}
+                alt="Logo preview"
+                className="h-14 w-14 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] object-contain p-1"
+                onError={e => {
+                  ;(e.target as HTMLImageElement).style.display = 'none'
+                }}
+              />
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-3)]">
+                <ImageIcon className="h-3.5 w-3.5" />
+                Preview logo
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-[var(--text-3)]">
+            Upload logo akan tersedia segera. Untuk sementara masukkan URL gambar.
+          </p>
+        </section>
+
         {/* ── Modules ── */}
-        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm mb-1">
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
             <LayoutGrid className="h-4 w-4 text-amber-500" />
             Fitur yang Diaktifkan
           </div>
-          <p className="text-xs text-[var(--text-3)] mb-4">
-            Pilih fitur yang sesuai dengan kebutuhan bisnis kamu. Fitur yang dinonaktifkan akan disembunyikan dari tampilan.
+          <p className="mb-4 text-xs text-[var(--text-3)]">
+            Pilih fitur yang sesuai dengan kebutuhan bisnis kamu. Fitur yang dinonaktifkan akan
+            disembunyikan dari tampilan.
           </p>
           <div className="space-y-2">
             {ALL_MODULES.map(({ key, label, desc, icon: Icon, required }) => {
@@ -192,25 +366,41 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   type="button"
                   disabled={required}
                   onClick={() => !required && toggleModule(key)}
-                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                  className={`flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all ${
                     enabled
-                      ? 'bg-amber-50 border-amber-200'
-                      : 'bg-[var(--bg-subtle)] border-[var(--border)] opacity-60'
+                      ? 'border-amber-200 bg-amber-50'
+                      : 'border-[var(--border)] bg-[var(--bg-subtle)] opacity-60'
                   } ${required ? 'cursor-default' : 'cursor-pointer hover:border-amber-300'}`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${enabled ? 'bg-amber-100' : 'bg-[var(--bg-muted)]'}`}>
-                    <Icon className={`h-4 w-4 ${enabled ? 'text-amber-600' : 'text-[var(--text-3)]'}`} />
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${enabled ? 'bg-amber-100' : 'bg-[var(--bg-muted)]'}`}
+                  >
+                    <Icon
+                      className={`h-4 w-4 ${enabled ? 'text-amber-600' : 'text-[var(--text-3)]'}`}
+                    />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm font-semibold ${enabled ? 'text-[var(--text-1)]' : 'text-[var(--text-2)]'}`}>{label}</p>
-                      {required && <span className="text-[10px] text-[var(--text-3)] bg-[var(--bg-muted)] px-1.5 py-0.5 rounded-full">Wajib</span>}
+                      <p
+                        className={`text-sm font-semibold ${enabled ? 'text-[var(--text-1)]' : 'text-[var(--text-2)]'}`}
+                      >
+                        {label}
+                      </p>
+                      {required && (
+                        <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-3)]">
+                          Wajib
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-[var(--text-3)] mt-0.5 truncate">{desc}</p>
+                    <p className="mt-0.5 truncate text-xs text-[var(--text-3)]">{desc}</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                    enabled ? 'bg-amber-500 border-amber-500' : 'border-stone-300 bg-[var(--bg-card)]'
-                  }`}>
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                      enabled
+                        ? 'border-amber-500 bg-amber-500'
+                        : 'border-stone-300 bg-[var(--bg-card)]'
+                    }`}
+                  >
                     {enabled && <CheckCircle2 className="h-3 w-3 text-white" />}
                   </div>
                 </button>
@@ -219,13 +409,17 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           </div>
         </section>
 
-        {error && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>}
+        {error && (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-500">
+            {error}
+          </p>
+        )}
 
         <div className="flex items-center gap-4">
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 disabled:from-stone-200 disabled:to-stone-200 disabled:text-[var(--text-3)] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all"
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-200 transition-all hover:shadow-amber-300 disabled:from-stone-200 disabled:to-stone-200 disabled:text-[var(--text-3)]"
           >
             <Save className="h-4 w-4" />
             {saving ? 'Menyimpan…' : 'Simpan Pengaturan'}
@@ -236,14 +430,23 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   )
 }
 
-const inputCls = 'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
+const inputCls =
+  'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string
+  error?: string
+  children: React.ReactNode
+}) {
   return (
     <div>
-      <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">{label}</label>
       {children}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   )
 }

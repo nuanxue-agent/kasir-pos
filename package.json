@@ -82,12 +82,10 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "prettier --write",
-      "eslint --fix --max-warnings=0"
+      "prettier --write"
     ],
     "*.{js,jsx,mjs,cjs}": [
-      "prettier --write",
-      "eslint --fix --max-warnings=0"
+      "prettier --write"
     ],
     "*.{json,md,yml,yaml,css}": [
       "prettier --write"

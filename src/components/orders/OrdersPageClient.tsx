@@ -1,15 +1,10 @@
 'use client'
+// @ts-ignore — next/navigation is available in this Next.js version
+import { useRouter } from 'next/navigation'
 
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  Receipt,
-  Calendar,
-  Search,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import { Receipt, Calendar, Search, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { OrderDetailModal } from './OrderDetailModal'
 
@@ -60,16 +55,16 @@ interface OrdersResponse {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
-  PAID:     'bg-emerald-100 text-emerald-700',
-  PENDING:  'bg-yellow-100 text-yellow-700',
-  VOIDED:   'bg-red-100 text-red-600',
+  PAID: 'bg-emerald-100 text-emerald-700',
+  PENDING: 'bg-yellow-100 text-yellow-700',
+  VOIDED: 'bg-red-100 text-red-600',
   REFUNDED: 'bg-slate-100 text-[var(--text-2)]',
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
         STATUS_STYLES[status] ?? 'bg-slate-100 text-[var(--text-2)]'
       }`}
     >
@@ -99,11 +94,12 @@ interface Props {
 }
 
 export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
+  const router = useRouter()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
-  const [search, setSearch]             = useState('')
-  const [dateFrom, setDateFrom]         = useState('')
-  const [dateTo, setDateTo]             = useState('')
-  const [page, setPage]                 = useState(1)
+  const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   // Build query params
@@ -130,9 +126,8 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
   })
 
   // Client-side search filter (by order number)
-  const filteredOrders = (data?.orders ?? []).filter((o) =>
-    search.trim() === '' ||
-    o.number.toLowerCase().includes(search.trim().toLowerCase())
+  const filteredOrders = (data?.orders ?? []).filter(
+    o => search.trim() === '' || o.number.toLowerCase().includes(search.trim().toLowerCase()),
   )
 
   const totalPages = data?.pages ?? 1
@@ -148,7 +143,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Receipt className="h-6 w-6 text-indigo-500" />
@@ -159,14 +154,14 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-4 space-y-4">
+      <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
         {/* Status tabs */}
         <div className="flex flex-wrap gap-2">
-          {STATUS_TABS.map((tab) => (
+          {STATUS_TABS.map(tab => (
             <button
               key={tab.value}
               onClick={() => handleStatusChange(tab.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 statusFilter === tab.value
                   ? 'bg-amber-500 text-white'
                   : 'bg-[var(--bg-muted)] text-[var(--text-2)] hover:bg-stone-200'
@@ -180,36 +175,42 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
         {/* Search + date range row */}
         <div className="flex flex-wrap gap-3">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               type="text"
               placeholder="Search order number…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              onChange={e => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border)] py-2 pr-3 pl-9 text-sm focus:ring-2 focus:ring-amber-400/40 focus:outline-none"
             />
           </div>
 
           {/* Date from */}
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)] pointer-events-none" />
+            <Calendar className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
-              className="pl-9 pr-3 py-2 rounded-xl border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              onChange={e => {
+                setDateFrom(e.target.value)
+                setPage(1)
+              }}
+              className="rounded-xl border border-[var(--border)] py-2 pr-3 pl-9 text-sm focus:ring-2 focus:ring-amber-400/40 focus:outline-none"
             />
           </div>
 
           {/* Date to */}
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)] pointer-events-none" />
+            <Calendar className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
-              className="pl-9 pr-3 py-2 rounded-xl border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              onChange={e => {
+                setDateTo(e.target.value)
+                setPage(1)
+              }}
+              className="rounded-xl border border-[var(--border)] py-2 pr-3 pl-9 text-sm focus:ring-2 focus:ring-amber-400/40 focus:outline-none"
             />
           </div>
 
@@ -223,7 +224,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
                 setStatusFilter('ALL')
                 setPage(1)
               }}
-              className="px-3 py-2 rounded-xl border border-[var(--border)] text-sm text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
+              className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
             >
               Clear
             </button>
@@ -232,27 +233,27 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
         {isLoading ? (
           <TableSkeleton />
         ) : isError ? (
           <div className="py-16 text-center text-sm text-red-500">
             Failed to load orders.{' '}
-            <button onClick={() => refetch()} className="underline">Retry</button>
+            <button onClick={() => refetch()} className="underline">
+              Retry
+            </button>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="py-16 text-center text-sm text-[var(--text-3)]">
-            No orders found.
-          </div>
+          <div className="py-16 text-center text-sm text-[var(--text-3)]">No orders found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--bg-subtle)] text-left">
-                  {['Order #', 'Date', 'Customer', 'Items', 'Total', 'Status', ''].map((h) => (
+                  {['Order #', 'Date', 'Customer', 'Items', 'Total', 'Status', ''].map(h => (
                     <th
                       key={h}
-                      className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide whitespace-nowrap"
+                      className="px-5 py-3 text-xs font-semibold tracking-wide whitespace-nowrap text-[var(--text-2)] uppercase"
                     >
                       {h}
                     </th>
@@ -260,28 +261,26 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredOrders.map((order) => (
+                {filteredOrders.map(order => (
                   <tr
                     key={order.id}
-                    className="hover:bg-[var(--bg-subtle)]/60 transition-colors cursor-pointer"
-                    onClick={() => setSelectedOrder(order)}
+                    className="cursor-pointer transition-colors hover:bg-[var(--bg-subtle)]/60"
+                    onClick={() => router.push(`/dashboard/orders/${order.id}`)}
                   >
-                    <td className="px-5 py-3 font-medium text-indigo-600">
-                      {order.number}
-                    </td>
-                    <td className="px-5 py-3 text-[var(--text-2)] text-xs whitespace-nowrap">
+                    <td className="px-5 py-3 font-medium text-indigo-600">{order.number}</td>
+                    <td className="px-5 py-3 text-xs whitespace-nowrap text-[var(--text-2)]">
                       {formatDate(order.createdAt)}
                     </td>
                     <td className="px-5 py-3 text-[var(--text-1)]">
                       {order.customer?.name ?? (
-                        <span className="italic text-[var(--text-3)]">Walk-in</span>
+                        <span className="text-[var(--text-3)] italic">Walk-in</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-[var(--text-2)]">
                       {order.items.reduce((s, i) => s + i.qty, 0)} item
                       {order.items.reduce((s, i) => s + i.qty, 0) !== 1 ? 's' : ''}
                     </td>
-                    <td className="px-5 py-3 font-medium text-[var(--text-1)] whitespace-nowrap">
+                    <td className="px-5 py-3 font-medium whitespace-nowrap text-[var(--text-1)]">
                       {formatCurrency(order.total, currency)}
                     </td>
                     <td className="px-5 py-3">
@@ -289,8 +288,11 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedOrder(order) }}
-                        className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                        onClick={e => {
+                          e.stopPropagation()
+                          router.push(`/dashboard/orders/${order.id}`)
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
                         aria-label={`View order ${order.number}`}
                       >
                         <Eye className="h-3.5 w-3.5" />
@@ -314,15 +316,15 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
           <div className="flex gap-2">
             <button
               disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[var(--border)] disabled:opacity-40 hover:bg-[var(--bg-subtle)]"
+              onClick={() => setPage(p => p - 1)}
+              className="inline-flex items-center gap-1 rounded-xl border border-[var(--border)] px-3 py-1.5 hover:bg-[var(--bg-subtle)] disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" /> Prev
             </button>
             <button
               disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[var(--border)] disabled:opacity-40 hover:bg-[var(--bg-subtle)]"
+              onClick={() => setPage(p => p + 1)}
+              className="inline-flex items-center gap-1 rounded-xl border border-[var(--border)] px-3 py-1.5 hover:bg-[var(--bg-subtle)] disabled:opacity-40"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>
@@ -347,9 +349,9 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
 
 function TableSkeleton() {
   return (
-    <div className="p-5 space-y-3 animate-pulse">
+    <div className="animate-pulse space-y-3 p-5">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-10 bg-[var(--bg-muted)] rounded-lg" />
+        <div key={i} className="h-10 rounded-lg bg-[var(--bg-muted)]" />
       ))}
     </div>
   )

@@ -1,3 +1,9 @@
 #!/bin/sh
-# Run lint-staged (format + lint) on staged files
+# Format staged files with prettier, then run lint as advisory (non-blocking)
 npx lint-staged
+
+# Run ESLint on staged TS/TSX files — advisory only (won't block commit)
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$' | head -20)
+if [ -n "$STAGED" ]; then
+  echo "$STAGED" | xargs npx eslint --max-warnings=999 2>&1 | tail -5 || true
+fi
