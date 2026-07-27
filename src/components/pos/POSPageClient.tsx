@@ -107,6 +107,9 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
   })
   const [showHeldOrders, setShowHeldOrders] = useState(false)
 
+  // Notes state
+  const [orderNote, setOrderNote] = useState('')
+
   // Manual discount state
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
   const [discountValue, setDiscountValue] = useState('')
@@ -311,6 +314,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
     setRedeemPoints(false)
     setShowCustomerSearch(false)
     setDiscountValue('')
+    setOrderNote('')
     setReceiptData(order)
   }
 
@@ -567,8 +571,21 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
           )}
         </div>
 
+        {/* Order note (Catatan) */}
+          {cart.length > 0 && (
+          <div className="px-4 pb-2">
+            <textarea
+              value={orderNote}
+              onChange={e => setOrderNote(e.target.value)}
+              placeholder="Catatan pesanan…"
+              rows={2}
+              className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 resize-none"
+            />
+          </div>
+          )}
+
         {/* Customer selector + Summary + Checkout */}
-        {cart.length > 0 && (
+          {cart.length > 0 && (
           <div className="border-t border-stone-100 p-4 space-y-3">
             {/* Customer section */}
             {!selectedCustomer ? (
@@ -717,21 +734,22 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
       {/* ── Checkout Modal ── */}
       {showCheckout && (
         <CheckoutModal
-            storeId={storeId}
-            taxRate={taxRate}
-            currency={currency}
-            staffId={staffId}
-            cart={cart}
-            subtotal={subtotal}
-            taxAmt={taxAmt}
-            total={total}
-            customerId={selectedCustomer?.id}
-            pointsRedeemed={pointsRedeemed}
-            pointsDiscount={pointsDiscount}
-            manualDiscountAmt={manualDiscountAmt()}
-            onClose={() => setShowCheckout(false)}
-            onSuccess={handleOrderSuccess}
-          />
+          storeId={storeId}
+          taxRate={taxRate}
+          currency={currency}
+          staffId={staffId}
+          cart={cart}
+          subtotal={subtotal}
+          taxAmt={taxAmt}
+          total={total}
+          customerId={selectedCustomer?.id}
+          pointsRedeemed={pointsRedeemed}
+          pointsDiscount={pointsDiscount}
+          manualDiscountAmt={manualDiscountAmt()}
+          note={orderNote}
+          onClose={() => setShowCheckout(false)}
+          onSuccess={handleOrderSuccess}
+        />
         )}
 
         {/* ── Receipt Modal ── */}
@@ -919,58 +937,87 @@ const PAYMENT_METHODS = [
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]
 
-function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, pointsDiscount, manualDiscountAmt, onClose, onSuccess }: {
+interface PaymentLine {
+  method: PaymentMethod
+  amount: string // string so input is controlled
+}
+
+function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, pointsDiscount, manualDiscountAmt, note, onClose, onSuccess }: {
   storeId: string; taxRate: number; currency: string; staffId: string
   cart: CartItem[]; subtotal: number; taxAmt: number; total: number
   customerId?: string; pointsRedeemed?: number; pointsDiscount?: number; manualDiscountAmt?: number
+  note?: string
   onClose: () => void; onSuccess: (order: ReceiptData) => void
 }) {
-    const [method, setMethod] = useState<PaymentMethod>('CASH')
-    const [cashGiven, setCashGiven] = useState('')
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
+  const [payments, setPayments] = useState<PaymentLine[]>([{ method: 'CASH', amount: '' }])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-    const cashAmount = parseFloat(cashGiven) || 0
-    const change = method === 'CASH' ? Math.max(0, cashAmount - total) : 0
-    const canPay = method !== 'CASH' || cashAmount >= total
+  const totalPaid = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+  const canPay = totalPaid >= total && payments.every(p => (parseFloat(p.amount) || 0) > 0)
 
-    const quickAmounts = [
-      Math.ceil(total / 10000) * 10000,
-      Math.ceil(total / 50000) * 50000,
-      Math.ceil(total / 100000) * 100000,
-    ].filter((v, i, a) => a.indexOf(v) === i && v >= total).slice(0, 3)
+  // Change only applies to the cash portion
+  const cashPaid = payments.filter(p => p.method === 'CASH').reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+  const change = Math.max(0, totalPaid - total)
+  const hasCash = payments.some(p => p.method === 'CASH')
 
-    const handlePay = async () => {
-      if (!canPay) { setError('Cash given is less than total'); return }
-      setLoading(true); setError('')
-      try {
-        const res = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            storeId, userId: staffId,
-            customerId: customerId ?? null,
-            pointsRedeemed: pointsRedeemed ?? 0,
-            items: cart.map(i => ({
-              productId: i.productId, name: i.name,
-              price: i.price, qty: i.qty, discount: 0,
-              subtotal: i.subtotal,
-            })),
-            payments: [{ method, amount: method === 'CASH' ? cashAmount : total, change }],
-            subtotal, taxAmt, total, discountAmt: (pointsDiscount ?? 0) + (manualDiscountAmt ?? 0),
-          }),
-        })
-        const data = await res.json() as any
-        if (!res.ok) { setError(data.error || 'Payment failed'); return }
-        onSuccess(data as ReceiptData)
-      } catch {
-        setError('Network error. Please try again.')
-        } finally {
-          setLoading(false)
-        }
-        }
+  const quickAmounts = (lineTotal: number) => [
+    Math.ceil(lineTotal / 10000) * 10000,
+    Math.ceil(lineTotal / 50000) * 50000,
+    Math.ceil(lineTotal / 100000) * 100000,
+  ].filter((v, i, a) => a.indexOf(v) === i && v >= lineTotal).slice(0, 3)
 
-        return (
+  const updateLine = (idx: number, field: keyof PaymentLine, value: string) => {
+    setPayments(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p))
+  }
+
+  const addLine = () => {
+    setPayments(prev => [...prev, { method: 'QRIS', amount: '' }])
+  }
+
+  const removeLine = (idx: number) => {
+    setPayments(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const handlePay = async () => {
+    if (!canPay) { setError('Total paid must cover the order total'); return }
+    if (payments.some(p => (parseFloat(p.amount) || 0) <= 0)) {
+      setError('Each payment line must have an amount greater than 0'); return
+    }
+    setLoading(true); setError('')
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId, userId: staffId,
+          customerId: customerId ?? null,
+          pointsRedeemed: pointsRedeemed ?? 0,
+          note: note ?? '',
+          items: cart.map(i => ({
+            productId: i.productId, name: i.name,
+            price: i.price, qty: i.qty, discount: 0,
+            subtotal: i.subtotal,
+          })),
+          payments: payments.map(p => ({
+            method: p.method,
+            amount: parseFloat(p.amount) || 0,
+            change: p.method === 'CASH' ? Math.max(0, (parseFloat(p.amount) || 0) - (total - (totalPaid - (parseFloat(p.amount) || 0)))) : 0,
+          })),
+          subtotal, taxAmt, total, discountAmt: (pointsDiscount ?? 0) + (manualDiscountAmt ?? 0),
+        }),
+      })
+      const data = await res.json() as any
+      if (!res.ok) { setError(data.error || 'Payment failed'); return }
+      onSuccess(data as ReceiptData)
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
@@ -978,7 +1025,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
           <button onClick={onClose} className="text-stone-400 hover:text-stone-800 transition-colors"><X className="h-5 w-5" /></button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {/* Order summary */}
           <div className="bg-stone-50 rounded-xl p-4 space-y-1.5">
             <div className="flex justify-between text-sm text-stone-500"><span>Subtotal</span><span>{fmt(subtotal, currency)}</span></div>
@@ -998,49 +1045,85 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
             <div className="flex justify-between text-base font-bold text-stone-800 pt-1.5 border-t border-stone-200"><span>Total</span><span>{fmt(total, currency)}</span></div>
           </div>
 
-          {/* Payment method */}
-          <div className="grid grid-cols-4 gap-2">
-            {PAYMENT_METHODS.map(m => (
-              <button
-                key={m.id}
-                onClick={() => setMethod(m.id)}
-                className={cn('flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all',
-                  method === m.id ? 'border-amber-500/60 bg-amber-500/15 text-white' : 'border-stone-200 bg-stone-50 text-stone-400 hover:text-stone-700 hover:border-stone-300'
-                )}
-              >
-                <m.icon className={cn('h-5 w-5', method === m.id ? m.color : '')} />
-                {m.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Cash input */}
-          {method === 'CASH' && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-stone-500 uppercase tracking-wider">Cash Given</label>
-              <input
-                type="number"
-                value={cashGiven}
-                onChange={e => setCashGiven(e.target.value)}
-                placeholder={fmt(total, currency)}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800 text-sm focus:outline-none focus:border-amber-400/60"
-              />
-              <div className="flex gap-2">
-                {quickAmounts.map(a => (
-                  <button key={a} onClick={() => setCashGiven(String(a))}
-                    className="flex-1 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-xs text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors">
-                    {fmt(a, currency)}
-                  </button>
-                ))}
-              </div>
-              {cashAmount >= total && (
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-stone-500">Kembalian</span>
-                  <span className="text-emerald-600">{fmt(change, currency)}</span>
-                </div>
+          {/* Split payment lines */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider">Metode Pembayaran</p>
+              {payments.length < 4 && (
+                <button
+                  onClick={addLine}
+                  className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Tambah pembayaran
+                </button>
               )}
             </div>
-          )}
+
+            {payments.map((line, idx) => (
+              <div key={idx} className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-2">
+                {/* Method selector row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="grid grid-cols-4 gap-1.5 flex-1">
+                    {PAYMENT_METHODS.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => updateLine(idx, 'method', m.id)}
+                        className={cn('flex flex-col items-center gap-1 py-2 rounded-lg border text-[10px] font-medium transition-all',
+                          line.method === m.id ? 'border-amber-500/60 bg-amber-500/15 text-amber-700' : 'border-stone-200 bg-white text-stone-400 hover:text-stone-700 hover:border-stone-300'
+                        )}
+                      >
+                        <m.icon className={cn('h-4 w-4', line.method === m.id ? m.color : '')} />
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {payments.length > 1 && (
+                    <button onClick={() => removeLine(idx)} className="text-stone-300 hover:text-red-400 transition-colors shrink-0">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Amount input */}
+                <input
+                  type="number"
+                  value={line.amount}
+                  onChange={e => updateLine(idx, 'amount', e.target.value)}
+                  placeholder={fmt(payments.length === 1 ? total : 0, currency)}
+                  className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:border-amber-400/60"
+                />
+
+                {/* Quick amounts for single-line cash */}
+                {line.method === 'CASH' && payments.length === 1 && (
+                  <div className="flex gap-2">
+                    {quickAmounts(total).map(a => (
+                      <button key={a} onClick={() => updateLine(idx, 'amount', String(a))}
+                        className="flex-1 py-1 rounded-lg bg-white border border-stone-200 text-[10px] text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors">
+                        {fmt(a, currency)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Running total */}
+            <div className="flex justify-between text-sm px-1">
+              <span className="text-stone-500">Dibayar</span>
+              <span className={cn('font-semibold', totalPaid >= total ? 'text-emerald-600' : 'text-red-400')}>
+                {fmt(totalPaid, currency)} / {fmt(total, currency)}
+              </span>
+            </div>
+
+            {/* Change (cash portion) */}
+            {totalPaid >= total && hasCash && change > 0 && (
+              <div className="flex justify-between text-sm font-medium px-1">
+                <span className="text-stone-500">Kembalian</span>
+                <span className="text-emerald-600">{fmt(change, currency)}</span>
+              </div>
+            )}
+          </div>
 
           {error && <p className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
 
