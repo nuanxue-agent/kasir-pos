@@ -7,6 +7,8 @@ import { formatCurrency } from '@/lib/utils'
 import { SalesChart } from './SalesChart'
 import { TopProductsChart } from './TopProductsChart'
 import { PaymentBreakdown } from './PaymentBreakdown'
+import { ExportButton } from '@/components/ExportButton'
+import type { ExportColumn } from '@/lib/export'
 
 interface ReportsPageClientProps {
   storeId: string
@@ -59,6 +61,14 @@ const RANGE_BTNS: { value: DateRange; label: string }[] = [
   { value: 'custom',    label: 'Kustom' },
 ]
 
+const REPORT_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'date',      label: 'Tanggal' },
+  { key: 'revenue',   label: 'Pendapatan' },
+  { key: 'orders',    label: 'Pesanan' },
+  { key: 'expenses',  label: 'Pengeluaran' },
+  { key: 'netProfit', label: 'Laba Bersih' },
+]
+
 export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageClientProps) {
   const [dateRange, setDateRange] = useState<DateRange>('today')
   const [customFrom, setCustomFrom] = useState('')
@@ -77,6 +87,14 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       return res.json()
     },
   })
+
+  const reportExportRows = (data?.dailySales ?? []).map((s) => ({
+    date:      s.date,
+    revenue:   s.total,
+    orders:    s.orders,
+    expenses:  data?.totalExpenses ?? 0,
+    netProfit: data?.netProfit ?? 0,
+  }))
 
   const skeleton = (h = 'h-28') => (
     <div className={`${h} bg-stone-50 animate-pulse rounded-2xl border border-stone-100`} />
@@ -121,7 +139,27 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
             </div>
           </div>
         )}
-      </div>
+        <div className="flex gap-2 flex-wrap">
+          <ExportButton
+            type="pdf"
+            label="Ekspor PDF"
+            data={reportExportRows}
+            columns={REPORT_EXPORT_COLUMNS}
+            filename={`laporan-${from.slice(0, 10)}-${to.slice(0, 10)}`}
+            title="Laporan Penjualan"
+            currency={currency}
+          />
+          <ExportButton
+            type="excel"
+            label="Ekspor Excel"
+            data={reportExportRows}
+            columns={REPORT_EXPORT_COLUMNS}
+            filename={`laporan-${from.slice(0, 10)}-${to.slice(0, 10)}`}
+            title="Laporan Penjualan"
+            currency={currency}
+          />
+        </div>
+        </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

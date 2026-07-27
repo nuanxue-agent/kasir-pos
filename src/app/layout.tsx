@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const messages = (await import(`../../messages/${locale}.json`)).default
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />

@@ -1095,6 +1095,89 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── LOYALTY TIERS ────────────────────────────────────────────────────────
+    if (segs[0] === 'loyalty-tiers') {
+      if (!segs[1]) {
+        if (method === 'GET') {
+          return ok(await query(
+            `SELECT * FROM LoyaltyTier WHERE storeId=? ORDER BY minPoints ASC`, [storeId]
+          ))
+        }
+        if (method === 'POST') {
+          const b = await req.json() as any
+          if (!b.name || b.name.trim().length < 1) return err('name is required')
+          const id = newId(); const t = nowISO()
+          await exec(
+            `INSERT INTO LoyaltyTier (id,storeId,name,minPoints,discount,color,icon,createdAt) VALUES (?,?,?,?,?,?,?,?)`,
+            [id, storeId, b.name.trim(), Number(b.minPoints ?? 0), Number(b.discount ?? 0), b.color ?? '#f59e0b', b.icon ?? '⭐', t]
+          )
+          return ok({ id }, 201)
+        }
+      }
+      if (segs[1]) {
+        const tid = segs[1]
+        if (method === 'PATCH') {
+          const b = await req.json() as any
+          const allowed = new Set(['name', 'minPoints', 'discount', 'color', 'icon'])
+          const cols = filterCols(b, allowed)
+          if (Object.keys(cols).length === 0) return err('No valid fields')
+          const { setClauses, values } = buildUpdate(cols)
+          await exec(`UPDATE LoyaltyTier SET ${setClauses} WHERE id=? AND storeId=?`, [...values, tid, storeId])
+          return ok({ success: true })
+        }
+        if (method === 'DELETE') {
+          await exec(`DELETE FROM LoyaltyTier WHERE id=? AND storeId=?`, [tid, storeId])
+          return ok({ success: true })
+        }
+      }
+    }
+
+    // ─── LOYALTY MEMBERS ──────────────────────────────────────────────────────
+    if (segs[0] === 'loyalty-members' && method === 'GET') {
+      const search = sp.get('q') ?? ''
+      const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') ?? '50')))
+      const offset = Math.max(0, parseInt(sp.get('offset') ?? '0'))
+      let sql = `SELECT id, name, phone, email, points, createdAt FROM Customer WHERE storeId=?`
+      const p: any[] = [storeId]
+      if (search) { sql += ` AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)`; p.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+      sql += ` ORDER BY points DESC LIMIT ? OFFSET ?`; p.push(limit, offset)
+      return ok(await query(sql, p))
+    }
+
+    // ─── LOYALTY REDEMPTIONS ──────────────────────────────────────────────────
+    if (segs[0] === 'loyalty-redemptions' && method === 'GET') {
+      const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') ?? '50')))
+      const offset = Math.max(0, parseInt(sp.get('offset') ?? '0'))
+      return ok(await query(
+        `SELECT r.*, c.name as customerName FROM LoyaltyRedemption r
+         LEFT JOIN Customer c ON r.customerId = c.id
+         WHERE r.storeId=? ORDER BY r.createdAt DESC LIMIT ? OFFSET ?`,
+        [storeId, limit, offset]
+      ))
+    }
+
+    // ─── LOYALTY REDEEM ───────────────────────────────────────────────────────
+    if (segs[0] === 'loyalty-redeem' && method === 'POST') {
+      const b = await req.json() as any
+      if (!b.customerId) return err('customerId is required')
+      if (!b.pointsRedeemed || Number(b.pointsRedeemed) <= 0) return err('pointsRedeemed must be > 0')
+      const customer = await queryOne<any>(`SELECT id, points FROM Customer WHERE id=? AND storeId=?`, [b.customerId, storeId])
+      if (!customer) return err('Customer not found', 404)
+      const pts = Number(b.pointsRedeemed)
+      if (customer.points < pts) return err('Insufficient points', 400)
+      const discountGiven = Number(b.discountGiven ?? 0)
+      const id = newId(); const t = nowISO()
+      await exec(
+        `INSERT INTO LoyaltyRedemption (id,storeId,customerId,orderId,pointsRedeemed,discountGiven,createdAt) VALUES (?,?,?,?,?,?,?)`,
+        [id, storeId, b.customerId, b.orderId ?? null, pts, discountGiven, t]
+      )
+      await exec(
+        `UPDATE Customer SET points = MAX(0, points - ?), updatedAt=? WHERE id=? AND storeId=?`,
+        [pts, t, b.customerId, storeId]
+      )
+      return ok({ id, pointsRedeemed: pts, discountGiven }, 201)
+    }
+
     return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)

@@ -61,3 +61,48 @@ body {
   animation: scan-line 2s ease-in-out infinite;
   position: absolute;
 }
+
+/* ── RTL Support ─────────────────────────────────────────────────────────── */
+
+/* Sidebar mirrors to the right in RTL */
+[dir='rtl'] aside {
+  border-right: none;
+  border-left: 1px solid rgb(231 229 228); /* stone-200 */
+}
+
+/* Flip chevrons and directional icons */
+[dir='rtl'] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* Text alignment overrides */
+[dir='rtl'] .text-left { text-align: right; }
+[dir='rtl'] .text-right { text-align: left; }
+
+/* Spacing/margin mirrors */
+[dir='rtl'] .ml-auto { margin-left: unset; margin-right: auto; }
+[dir='rtl'] .mr-auto { margin-right: unset; margin-left: auto; }
+[dir='rtl'] .pl-4 { padding-left: unset; padding-right: 1rem; }
+[dir='rtl'] .pr-4 { padding-right: unset; padding-left: 1rem; }
+[dir='rtl'] .pl-3 { padding-left: unset; padding-right: 0.75rem; }
+[dir='rtl'] .pr-3 { padding-right: unset; padding-left: 0.75rem; }
+
+/* Gap/flex direction stays — Flexbox handles RTL automatically in most cases */
+
+/* Rounded corner swaps for sidebar */
+[dir='rtl'] .rounded-l-xl { border-radius: 0 0.75rem 0.75rem 0; }
+[dir='rtl'] .rounded-r-xl { border-radius: 0.75rem 0 0 0.75rem; }
+
+/* Form inputs */
+[dir='rtl'] input,
+[dir='rtl'] textarea,
+[dir='rtl'] select {
+  text-align: right;
+}
+
+/* Number/currency inputs stay LTR even in RTL mode */
+[dir='rtl'] input[type='number'],
+[dir='rtl'] input[type='tel'] {
+  direction: ltr;
+  text-align: right;
+}

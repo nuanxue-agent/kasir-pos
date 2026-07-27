@@ -8,6 +8,18 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { ExportButton } from '@/components/ExportButton'
+import type { ExportColumn } from '@/lib/export'
+
+const PAYROLL_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'name',               label: 'Nama' },
+  { key: 'position',           label: 'Jabatan' },
+  { key: 'baseSalary',         label: 'Gaji Pokok' },
+  { key: 'bpjsKesehatan',      label: 'BPJS Kesehatan' },
+  { key: 'bpjsKetenagarjaan',  label: 'BPJS Ketenagakerjaan' },
+  { key: 'pph21',              label: 'PPh 21' },
+  { key: 'netPay',             label: 'Gaji Bersih' },
+]
 
 interface HRPageClientProps { storeId: string; currency: string }
 
@@ -170,19 +182,49 @@ export default function HRPageClient({ storeId, currency }: HRPageClientProps) {
   const activeCount = (employees as any[]).filter((e: any) => e.employmentStatus === 'ACTIVE').length
   const totalSalary = (employees as any[]).filter((e: any) => e.employmentStatus === 'ACTIVE').reduce((s: number, e: any) => s + (e.baseSalary ?? 0), 0)
 
+  const payrollExportRows = (employees as any[]).map((e: any) => ({
+    name:              e.name,
+    position:          e.position ?? '',
+    baseSalary:        e.baseSalary ?? 0,
+    bpjsKesehatan:     e.bpjsKesehatan ?? 0,
+    bpjsKetenagarjaan: e.bpjsKetenagarjaan ?? 0,
+    pph21:             e.pph21 ?? 0,
+    netPay:            e.netPay ?? e.baseSalary ?? 0,
+  }))
+
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 pb-24 lg:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-stone-800">SDM & Penggajian</h1>
           <p className="text-stone-400 text-sm mt-0.5">Karyawan, absensi, dan gaji</p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Tambah Karyawan</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <ExportButton
+            type="pdf"
+            label="Ekspor PDF"
+            data={payrollExportRows}
+            columns={PAYROLL_EXPORT_COLUMNS}
+            filename={`penggajian-${new Date().toISOString().slice(0, 7)}`}
+            title="Laporan Penggajian"
+            currency={currency}
+          />
+          <ExportButton
+            type="excel"
+            label="Ekspor Excel"
+            data={payrollExportRows}
+            columns={PAYROLL_EXPORT_COLUMNS}
+            filename={`penggajian-${new Date().toISOString().slice(0, 7)}`}
+            title="Laporan Penggajian"
+            currency={currency}
+          />
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Tambah Karyawan</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Tag, Receipt,
   Users, Percent, Boxes, BarChart3, UserCog, Store,
   Building2, Settings, LogOut, X, ShoppingBag,
-  TrendingDown, Clock, GitFork, FileText, Truck,
+  TrendingDown, Clock, GitFork, FileText, Truck, Heart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
@@ -39,6 +39,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Pesanan',     href: '/dashboard/orders',    icon: Receipt },
       { label: 'Pelanggan',   href: '/dashboard/customers', icon: Users },
       { label: 'Diskon',      href: '/dashboard/discounts', icon: Percent },
+      { label: 'Loyalitas',   href: '/dashboard/loyalty',   icon: Heart },
     ],
   },
   {

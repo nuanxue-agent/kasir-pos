@@ -7,6 +7,8 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import POFormModal from './POFormModal'
 import PODetailModal from './PODetailModal'
+import { ExportButton } from '@/components/ExportButton'
+import type { ExportColumn } from '@/lib/export'
 
 interface PurchaseOrdersPageClientProps {
   storeId: string
@@ -33,6 +35,14 @@ const STATUS_TABS: { value: string; label: string }[] = [
   { value: 'CANCELLED', label: 'Dibatalkan' },
 ]
 
+const PO_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'number',       label: 'No. PO' },
+  { key: 'supplierName', label: 'Supplier' },
+  { key: 'orderDate',    label: 'Tgl. Order' },
+  { key: 'status',       label: 'Status' },
+  { key: 'total',        label: 'Total' },
+]
+
 export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }: PurchaseOrdersPageClientProps) {
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
@@ -50,21 +60,49 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
     !search || o.number.toLowerCase().includes(search.toLowerCase()) || o.supplierName?.toLowerCase().includes(search.toLowerCase())
   )
 
+  const poExportRows = (data?.orders ?? []).map((o: any) => ({
+    number:       o.number,
+    supplierName: o.supplierName ?? '',
+    orderDate:    o.orderDate ? new Date(o.orderDate).toLocaleDateString('id-ID') : '',
+    status:       STATUS_CONFIG[o.status as POStatus]?.label ?? o.status,
+    total:        o.total ?? 0,
+  }))
+
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 pb-24 lg:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Purchase Orders</h1>
           <p className="text-stone-400 text-sm mt-0.5">Kelola pembelian dari supplier</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Buat PO</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <ExportButton
+            type="pdf"
+            label="Ekspor PDF"
+            data={poExportRows}
+            columns={PO_EXPORT_COLUMNS}
+            filename={`purchase-orders-${new Date().toISOString().slice(0, 10)}`}
+            title="Purchase Orders"
+            currency={currency}
+          />
+          <ExportButton
+            type="excel"
+            label="Ekspor Excel"
+            data={poExportRows}
+            columns={PO_EXPORT_COLUMNS}
+            filename={`purchase-orders-${new Date().toISOString().slice(0, 10)}`}
+            title="Purchase Orders"
+            currency={currency}
+          />
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Buat PO</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
