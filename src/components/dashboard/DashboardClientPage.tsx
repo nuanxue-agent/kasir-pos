@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ShoppingCart,
@@ -323,6 +324,18 @@ export default function DashboardClientPage({
   })
   const activeShift = (shiftData as any) ?? null
 
+  // Live indicator: track seconds since last successful refetch
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [secondsAgo, setSecondsAgo] = useState(0)
+
+  useEffect(() => {
+    if (!lastUpdated) return
+    const id = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [lastUpdated])
+
   // Today's summary
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-summary', storeId],
@@ -330,8 +343,16 @@ export default function DashboardClientPage({
       fetch(`/api/reports/summary?storeId=${storeId}&from=${todayStart()}&to=${todayEnd()}`).then(
         r => r.json(),
       ),
+    refetchInterval: 30_000,
   })
 
+  // Track last-updated timestamp whenever summary data changes
+  useEffect(() => {
+    if (data !== undefined) {
+      setLastUpdated(new Date())
+      setSecondsAgo(0)
+    }
+  }, [data])
   // Yesterday for comparison
   const { data: yesterday } = useQuery({
     queryKey: ['dashboard-summary-yesterday', storeId],
@@ -423,6 +444,17 @@ export default function DashboardClientPage({
             <span className="text-[11px] font-semibold tracking-widest text-amber-600 capitalize uppercase">
               {dateLabel}
             </span>
+            {/* Live badge */}
+            <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </span>
+              Live
+            </span>
+            {lastUpdated && (
+              <span className="text-[10px] text-[var(--text-3)]">Updated {secondsAgo}s ago</span>
+            )}
           </div>
           <h1 className="text-xl font-bold text-[var(--text-1)] sm:text-2xl">
             {getGreeting()}
