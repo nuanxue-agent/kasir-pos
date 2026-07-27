@@ -7,7 +7,8 @@ const SESSION_COOKIE = 'kasir_session'
 const ALG = { name: 'HMAC', hash: 'SHA-256' }
 
 async function getKey() {
-  const secret = process.env.NEXTAUTH_SECRET ?? 'kasir-default-secret'
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) throw new Error('NEXTAUTH_SECRET environment variable is not set')
   const enc = new TextEncoder().encode(secret)
   return crypto.subtle.importKey('raw', enc, ALG, false, ['sign', 'verify'])
 }
