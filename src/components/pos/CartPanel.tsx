@@ -101,10 +101,10 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
           <textarea
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder="Tambah catatan pesanan...
+            placeholder="Tambah catatan pesanan..."
             rows={2}
             className="w-full bg-stone-50 text-sm text-stone-800 placeholder-stone-400 rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
-          />
+            />
         </div>
       )}
 
