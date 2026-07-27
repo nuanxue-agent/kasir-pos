@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2 } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, ScanBarcode } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -13,6 +13,7 @@ interface Product {
   stock: number
   trackStock: boolean
   sku?: string | null
+  barcode?: string | null
   category?: { id: string; name: string; color?: string | null; icon?: string | null } | null
   variants: Array<{ id: string; name: string; price?: number | null; stock: number }>
 }
@@ -55,6 +56,13 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
   const [cart, setCart] = useState<CartItem[]>([])
   const [showCheckout, setShowCheckout] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+  const [scannerMsg, setScannerMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
+  // Refs for barcode scanner buffer (not state — we don't want re-renders per keystroke)
+  const barcodeBuffer = useRef('')
+  const lastKeyTime = useRef(0)
+  const bufferStartTime = useRef(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const filtered = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
@@ -107,6 +115,85 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
     setTimeout(() => setSuccessMsg(''), 3500)
   }
 
+  // ─── Barcode Scanner ───────────────────────────────────────────────────────
+  // Barcode scanners emit keystrokes very rapidly then press Enter.
+  // We accumulate chars typed < 50ms apart; if Enter arrives with 4+ chars
+  // all within 200ms, we treat it as a barcode scan.
+
+  const showScannerMsg = useCallback((text: string, ok: boolean) => {
+    setScannerMsg({ text, ok })
+    setTimeout(() => setScannerMsg(null), 2000)
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip when search input is focused — don't interfere with manual typing
+      if (document.activeElement === searchInputRef.current) return
+      // Skip when any other input/textarea/select is focused
+      const tag = (document.activeElement as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+      const now = Date.now()
+
+      if (e.key === 'Enter') {
+        const buf = barcodeBuffer.current
+        const elapsed = now - bufferStartTime.current
+        // Valid scan: 4+ chars, all arrived within 200ms
+        if (buf.length >= 4 && elapsed <= 200) {
+          const product = products.find(p => p.barcode && p.barcode === buf)
+          if (product) {
+            if (!product.trackStock || product.stock > 0) {
+              // Use functional addToCart logic inline to access latest products ref
+              setCart(prev => {
+                const existing = prev.find(i => i.productId === product.id)
+                if (existing) {
+                  return prev.map(i => i.productId === product.id
+                    ? { ...i, qty: i.qty + 1, subtotal: (i.qty + 1) * i.price }
+                    : i
+                  )
+                }
+                return [...prev, {
+                  id: `${product.id}-${Date.now()}`,
+                  productId: product.id,
+                  name: product.name,
+                  price: product.price,
+                  qty: 1,
+                  subtotal: product.price,
+                }]
+              })
+              showScannerMsg(`Added: ${product.name}`, true)
+            } else {
+              showScannerMsg(`Out of stock: ${product.name}`, false)
+            }
+          } else {
+            showScannerMsg('Barcode not found', false)
+          }
+        }
+        // Always clear buffer on Enter
+        barcodeBuffer.current = ''
+        lastKeyTime.current = 0
+        bufferStartTime.current = 0
+        return
+      }
+
+      // Only accumulate printable single characters
+      if (e.key.length !== 1) return
+
+      const timeSinceLast = now - lastKeyTime.current
+      if (lastKeyTime.current === 0 || timeSinceLast > 50) {
+        // Too slow — reset buffer (manual typing or gap between scans)
+        barcodeBuffer.current = e.key
+        bufferStartTime.current = now
+      } else {
+        barcodeBuffer.current += e.key
+      }
+      lastKeyTime.current = now
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [products, showScannerMsg])
+
   return (
     <div className="flex h-screen bg-[#0a0a0f] overflow-hidden">
       {/* ── Left: Product Grid ── */}
@@ -116,11 +203,16 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
             <input
+              ref={searchInputRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search products…"
               className="w-full pl-9 pr-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
             />
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <ScanBarcode className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-[11px] font-medium text-emerald-400">Scanner ready</span>
           </div>
           <div className="flex rounded-lg border border-white/10 overflow-hidden">
             <button onClick={() => setViewMode('grid')} className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white/5 text-white/40 hover:text-white')}>
@@ -263,6 +355,19 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
       {successMsg && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl shadow-emerald-500/20 text-sm font-semibold z-50 flex items-center gap-2">
           <span>✓</span> {successMsg}
+        </div>
+      )}
+
+      {/* ── Scanner flash message ── */}
+      {scannerMsg && (
+        <div className={cn(
+          'fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold z-50 flex items-center gap-2 transition-all',
+          scannerMsg.ok
+            ? 'bg-indigo-600 text-white shadow-indigo-500/20'
+            : 'bg-red-600/90 text-white shadow-red-500/20'
+        )}>
+          <ScanBarcode className="h-4 w-4" />
+          {scannerMsg.text}
         </div>
       )}
     </div>
