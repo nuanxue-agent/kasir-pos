@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run full test suite before pushing
+echo "Running tests before push..."
+npx vitest run
