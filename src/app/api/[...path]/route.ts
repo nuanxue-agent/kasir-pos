@@ -694,6 +694,121 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok({ success: true, status: 'VOIDED' })
       }
 
+      // ── POST /api/orders/:id/refund — partial or full refund, restores stock ──
+      if (segs.length === 3 && segs[2] === 'refund' && method === 'POST') {
+        const oid = segs[1]
+        // Only OWNER and MANAGER may refund
+        const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
+        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+        if (order.status !== 'PAID') return err('Only PAID orders can be refunded', 400)
+
+        const allItems = await query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid])
+
+        // Parse optional partial-refund body
+        let body: { items?: { id: string; qty: number }[] } = {}
+        try {
+          const text = await req.text()
+          if (text.trim()) body = JSON.parse(text)
+        } catch {
+          // empty body = full refund
+        }
+
+        const t = nowISO()
+        const stmts: Array<{ sql: string; params: any[] }> = [
+          {
+            sql: `UPDATE "Order" SET status = 'REFUNDED', updatedAt = ? WHERE id = ?`,
+            params: [t, oid],
+          },
+        ]
+
+        // Build qty-to-refund map: partial overrides, default = full qty
+        const refundQtyMap: Record<string, number> = {}
+        for (const item of allItems) {
+          refundQtyMap[item.id] = item.qty // default: full
+        }
+        if (body.items?.length) {
+          for (const ri of body.items) {
+            const original = allItems.find((i: any) => i.id === ri.id)
+            if (!original) continue
+            const qty = Math.max(0, Math.min(Number(ri.qty), original.qty))
+            refundQtyMap[ri.id] = qty
+          }
+        }
+
+        for (const item of allItems) {
+          const refundQty = refundQtyMap[item.id] ?? item.qty
+          if (refundQty <= 0) continue
+          if (item.productId) {
+            stmts.push({
+              sql: `UPDATE Product SET stock = stock + ? WHERE id = ? AND storeId = ?`,
+              params: [refundQty, item.productId, storeId],
+            })
+            stmts.push({
+              sql: `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
+              params: [
+                newId(),
+                item.productId,
+                'REFUND',
+                refundQty,
+                `Refund ${order.number}`,
+                t,
+              ],
+            })
+          }
+        }
+
+        await batchExec(stmts)
+
+        logAudit({
+          storeId,
+          userId: user.id,
+          action: 'ORDER_REFUND',
+          resourceType: 'Order',
+          resourceId: oid,
+          meta: { number: order.number, partial: !!body.items?.length },
+        }).catch(() => {})
+
+        // Return updated order with items + payments
+        const [updatedOrder, items, payments] = await Promise.all([
+          queryOne(
+            `SELECT o.*, u.name as userName, c.name as customerName
+             FROM "Order" o
+             LEFT JOIN User u ON o.userId = u.id
+             LEFT JOIN Customer c ON o.customerId = c.id
+             WHERE o.id = ? AND o.storeId = ?`,
+            [oid, storeId],
+          ),
+          query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid]),
+          query(`SELECT * FROM Payment WHERE orderId = ?`, [oid]),
+        ])
+        return ok({ ...updatedOrder, items, payments })
+      }
+
+      // ── PATCH /api/orders/:id/void — PATCH alias for void ────────────────────
+      if (segs.length === 3 && segs[2] === 'void' && method === 'PATCH') {
+        const oid = segs[1]
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+        if (order.status !== 'PENDING') return err('Only PENDING orders can be voided via PATCH', 400)
+        const t = nowISO()
+        await batchExec([
+          {
+            sql: `UPDATE "Order" SET status = 'VOIDED', updatedAt = ? WHERE id = ?`,
+            params: [t, oid],
+          },
+        ])
+        return ok({ success: true, status: 'VOIDED' })
+      }
+
       // ── GET /api/orders/:id — fetch single order with items and payments ──────
       if (segs.length === 2 && method === 'GET') {
         const oid = segs[1]
@@ -5212,6 +5327,112 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           [sessionId],
         )
         return ok({ ...updated, items })
+      }
+    }
+
+    // ── accounting/reconciliation ─────────────────────────────────────────────
+    // GET  /api/accounting/reconciliation?storeId=&from=&to=
+    //      → returns unmatched system transactions for the date range
+    // POST /api/accounting/reconciliation?storeId=
+    //      body: { bankId, systemId }  → creates a reconciliation match record
+    if (segs[0] === 'accounting' && segs[1] === 'reconciliation') {
+      // Lazy-create BankStatement table if it doesn't exist yet
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BankStatement (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          date TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount REAL NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('CREDIT','DEBIT')),
+          matchedId TEXT,
+          status TEXT NOT NULL DEFAULT 'UNMATCHED' CHECK(status IN ('UNMATCHED','MATCHED','IGNORED')),
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      `, [])
+
+      // Lazy-create ReconciliationMatch table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ReconciliationMatch (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          bankStatementId TEXT NOT NULL,
+          systemTransactionId TEXT NOT NULL,
+          systemTransactionType TEXT NOT NULL,
+          matchedAt TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      `, [])
+
+      if (method === 'GET') {
+        const from = sp.get('from') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+        const to = sp.get('to') ?? new Date().toISOString().slice(0, 10)
+
+        // Collect unmatched system transactions from Orders (PAID) and JournalEntries
+        const orders = await query<any>(
+          `SELECT id, createdAt as date, 'Order #' || id as description, total as amount, 'CREDIT' as type,
+                  NULL as matchedId, 'UNMATCHED' as status, 'order' as sourceType
+           FROM "Order"
+           WHERE storeId = ? AND status = 'PAID'
+             AND date(createdAt) BETWEEN ? AND ?
+           ORDER BY createdAt DESC
+           LIMIT 200`,
+          [storeId, from, to],
+        )
+
+        const expenses = await query<any>(
+          `SELECT id, date, COALESCE(description, category) as description, amount,
+                  'DEBIT' as type, NULL as matchedId, 'UNMATCHED' as status, 'expense' as sourceType
+           FROM Expense
+           WHERE storeId = ? AND date BETWEEN ? AND ?
+           ORDER BY date DESC
+           LIMIT 200`,
+          [storeId, from, to],
+        )
+
+        // Mark any already-matched ones
+        const matchedOrders = await query<any>(
+          `SELECT systemTransactionId FROM ReconciliationMatch WHERE storeId = ? AND systemTransactionType = 'order'`,
+          [storeId],
+        )
+        const matchedExpenses = await query<any>(
+          `SELECT systemTransactionId FROM ReconciliationMatch WHERE storeId = ? AND systemTransactionType = 'expense'`,
+          [storeId],
+        )
+        const matchedOrderIds = new Set(matchedOrders.map((r: any) => r.systemTransactionId))
+        const matchedExpenseIds = new Set(matchedExpenses.map((r: any) => r.systemTransactionId))
+
+        const result = [
+          ...orders.map((r: any) => ({
+            ...r,
+            status: matchedOrderIds.has(r.id) ? 'MATCHED' : 'UNMATCHED',
+          })),
+          ...expenses.map((r: any) => ({
+            ...r,
+            status: matchedExpenseIds.has(r.id) ? 'MATCHED' : 'UNMATCHED',
+          })),
+        ]
+
+        return ok(result)
+      }
+
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['bankId', 'systemId'])
+        const t = nowISO()
+        const matchId = newId()
+
+        // Determine source type from systemId prefix heuristic or just store both
+        const systemType = String(b.systemId).startsWith('exp') ? 'expense' : 'order'
+
+        await exec(
+          `INSERT OR IGNORE INTO ReconciliationMatch (id, storeId, bankStatementId, systemTransactionId, systemTransactionType, matchedAt, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [matchId, storeId, b.bankId, b.systemId, systemType, t, t],
+        )
+
+        return ok({ id: matchId, bankId: b.bankId, systemId: b.systemId, matchedAt: t }, 201)
       }
     }
 

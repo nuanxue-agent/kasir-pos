@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
 import { BottomNav } from '@/components/dashboard/BottomNav'
@@ -33,6 +33,11 @@ interface DashboardShellProps {
   initialStoreId?: string
 }
 
+// Swipe threshold in pixels — must drag at least this far to trigger
+const SWIPE_THRESHOLD = 60
+// Only respond to touch that starts within this px from the left edge (open gesture)
+const EDGE_ZONE = 40
+
 export function DashboardShell({
   children,
   userName,
@@ -52,6 +57,70 @@ export function DashboardShell({
   const activeModules = modules ??
     currentStore?.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
 
+  // ── Swipe gesture to open/close sidebar on mobile ─────────────────────────
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+
+  useEffect(() => {
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      touchStartX.current = t.clientX
+      touchStartY.current = t.clientY
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (touchStartX.current === null || touchStartY.current === null) return
+      const t = e.changedTouches[0]
+      const deltaX = t.clientX - touchStartX.current
+      const deltaY = t.clientY - (touchStartY.current ?? 0)
+
+      // Only handle mostly-horizontal swipes (avoid conflicting with scroll)
+      if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        touchStartX.current = null
+        touchStartY.current = null
+        return
+      }
+
+      // Swipe RIGHT from left edge → open sidebar
+      if (deltaX > SWIPE_THRESHOLD && touchStartX.current <= EDGE_ZONE && !sidebarOpen) {
+        setSidebarOpen(true)
+      }
+      // Swipe LEFT anywhere → close sidebar
+      else if (deltaX < -SWIPE_THRESHOLD && sidebarOpen) {
+        setSidebarOpen(false)
+      }
+
+      touchStartX.current = null
+      touchStartY.current = null
+    }
+
+    // Only register on non-desktop viewports
+    const mq = window.matchMedia('(max-width: 1023px)')
+    if (mq.matches) {
+      document.addEventListener('touchstart', onTouchStart, { passive: true })
+      document.addEventListener('touchend', onTouchEnd, { passive: true })
+    }
+
+    const handleResize = () => {
+      if (mq.matches) {
+        document.addEventListener('touchstart', onTouchStart, { passive: true })
+        document.addEventListener('touchend', onTouchEnd, { passive: true })
+      } else {
+        document.removeEventListener('touchstart', onTouchStart)
+        document.removeEventListener('touchend', onTouchEnd)
+        // Auto-close mobile sidebar when resizing to desktop
+        setSidebarOpen(false)
+      }
+    }
+
+    mq.addEventListener('change', handleResize)
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchend', onTouchEnd)
+      mq.removeEventListener('change', handleResize)
+    }
+  }, [sidebarOpen])
+
   return (
     <StoreProvider stores={stores} initialStoreId={currentStoreId}>
       {/* Skip to main content — accessibility */}
@@ -63,6 +132,7 @@ export function DashboardShell({
       </a>
 
       <div className="flex h-screen overflow-hidden bg-[var(--bg-base)]">
+        {/* Sidebar — hidden on mobile (< md), slides in via overlay when sidebarOpen */}
         <Sidebar
           userRole={userRole}
           isSuperAdmin={isSuperAdmin}
@@ -98,6 +168,7 @@ export function DashboardShell({
           </main>
         </div>
 
+        {/* Bottom nav — mobile only, safe-area aware */}
         <BottomNav modules={activeModules} />
         <QuickActions />
       </div>
