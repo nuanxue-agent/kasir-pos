@@ -1,31 +1,30 @@
-import { auth } from '@/lib/auth'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromRequest } from '@/lib/auth'
 
-export async function middleware(request: NextRequest) {
-  const session = await auth()
-  const pathname = request.nextUrl.pathname
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
 
-  // Protect dashboard routes
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin')) {
-    if (!session) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-    // Protect admin routes to super admin only
-    if (pathname.startsWith('/admin') && !session.user.isSuperAdmin) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+  // Public routes
+  if (pathname.startsWith('/login') || pathname.startsWith('/signup') || 
+      pathname.startsWith('/api/auth') || pathname.startsWith('/_next') ||
+      pathname === '/') {
+    return NextResponse.next()
   }
 
-  // Redirect logged-in users away from auth pages
-  if ((pathname === '/login' || pathname === '/signup') && session) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Protected routes
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/api/')) {
+    const session = await getSessionFromRequest(req)
+    if (!session) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/login', '/signup'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

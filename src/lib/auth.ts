@@ -1,78 +1,98 @@
-import NextAuth from 'next-auth'
-import Credentials from 'next-auth/providers/credentials'
+// Tiny edge-compatible JWT auth — replaces next-auth
+// Uses Web Crypto API (available in all edge runtimes)
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [
-    Credentials({
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+const SESSION_COOKIE = 'kasir_session'
+const ALG = { name: 'HMAC', hash: 'SHA-256' }
 
-        try {
-          // Get D1 binding via getRequestContext in edge runtime
-          const { getRequestContext } = await import('@cloudflare/next-on-pages')
-          const { env } = getRequestContext()
-          const db = (env as any).DB as D1Database
+async function getKey() {
+  const secret = process.env.NEXTAUTH_SECRET ?? 'kasir-default-secret'
+  const enc = new TextEncoder().encode(secret)
+  return crypto.subtle.importKey('raw', enc, ALG, false, ['sign', 'verify'])
+}
 
-          const { queryOne, query } = await import('@/lib/db')
+async function sign(payload: object): Promise<string> {
+  const key = await getKey()
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const body = btoa(JSON.stringify({ ...payload, iat: Date.now(), exp: Date.now() + 86400000 * 7 }))
+  const data = `${header}.${body}`
+  const sig = await crypto.subtle.sign(ALG, key, new TextEncoder().encode(data))
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+  return `${data}.${sigB64}`
+}
 
-          const user = await queryOne<any>(db,
-            `SELECT * FROM User WHERE email = ? AND active = 1 LIMIT 1`,
-            [credentials.email]
-          )
+async function verify(token: string): Promise<any | null> {
+  try {
+    const [header, body, sig] = token.split('.')
+    if (!header || !body || !sig) return null
+    const key = await getKey()
+    const data = `${header}.${body}`
+    const sigBytes = Uint8Array.from(atob(sig), c => c.charCodeAt(0))
+    const valid = await crypto.subtle.verify(ALG, key, sigBytes, new TextEncoder().encode(data))
+    if (!valid) return null
+    const payload = JSON.parse(atob(body))
+    if (payload.exp < Date.now()) return null
+    return payload
+  } catch {
+    return null
+  }
+}
 
-          if (!user) return null
+export interface SessionUser {
+  id: string
+  name: string
+  email: string
+  role: string
+  tenantId?: string
+  stores: Array<{ id: string; name: string; role: string; currency: string; taxRate: number }>
+}
 
-          const bcrypt = await import('bcryptjs')
-          const valid = await bcrypt.compare(credentials.password as string, user.password ?? '')
-          if (!valid) return null
+export interface Session {
+  user: SessionUser
+}
 
-          // Get all store access
-          const stores = await query<any>(db,
-            `SELECT su.storeId as id, s.name, su.role, s.currency, s.taxRate
-             FROM StoreUser su JOIN Store s ON su.storeId = s.id
-             WHERE su.userId = ?`,
-            [user.id]
-          )
+export async function createSession(user: SessionUser): Promise<string> {
+  return sign(user)
+}
 
-          return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            stores,
-          }
-        } catch (e) {
-          console.error('Auth error:', e)
-          return null
-        }
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = (user as any).id
-        token.role = (user as any).role
-        token.stores = (user as any).stores ?? []
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string
-        ;(session.user as any).role = token.role as string
-        ;(session.user as any).stores = (token.stores as any[]) ?? []
-      }
-      return session
-    },
-  },
-  pages: {
-    signIn: '/login',
-  },
-  session: { strategy: 'jwt' },
-  secret: process.env.NEXTAUTH_SECRET,
-})
+export async function getSession(): Promise<Session | null> {
+  try {
+    const store = await cookies()
+    const token = store.get(SESSION_COOKIE)?.value
+    if (!token) return null
+    const payload = await verify(token)
+    if (!payload) return null
+    return { user: payload as SessionUser }
+  } catch {
+    return null
+  }
+}
+
+// For use in API routes / middleware via request
+export async function getSessionFromRequest(req: NextRequest): Promise<Session | null> {
+  const token = req.cookies.get(SESSION_COOKIE)?.value
+  if (!token) return null
+  const payload = await verify(token)
+  if (!payload) return null
+  return { user: payload as SessionUser }
+}
+
+export function setSessionCookie(res: NextResponse, token: string) {
+  res.cookies.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 86400 * 7,
+    path: '/',
+  })
+}
+
+export function clearSessionCookie(res: NextResponse) {
+  res.cookies.delete(SESSION_COOKIE)
+}
+
+// Drop-in replacement for auth() from next-auth
+export async function auth(): Promise<Session | null> {
+  return getSession()
+}
