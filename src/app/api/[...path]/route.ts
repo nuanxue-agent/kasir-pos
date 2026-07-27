@@ -696,6 +696,178 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── Chart of Accounts ────────────────────────────────────────────────────
+    if (segs[0] === 'accounts') {
+      if (!segs[1] && method === 'GET') {
+        const type = url.searchParams.get('type') ?? ''
+        const rows = type
+          ? await query(`SELECT * FROM Account WHERE storeId=? AND active=1 AND type=? ORDER BY code`, [storeId, type])
+          : await query(`SELECT * FROM Account WHERE storeId=? AND active=1 ORDER BY code`, [storeId])
+        // Also include system accounts from demo store for new tenants without seeded accounts
+        if ((rows as any[]).length === 0) {
+          const demo = await query(`SELECT * FROM Account WHERE storeId='store_demo' AND active=1 ORDER BY code`, [])
+          return ok(demo)
+        }
+        return ok(rows)
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.code || !/^\d{3,6}$/.test(b.code)) return err('Kode akun harus 3-6 digit angka')
+        if (!b.name || b.name.trim().length < 2) return err('Nama akun minimal 2 karakter')
+        if (!b.type) return err('Tipe akun harus diisi')
+        const normalBalance = ['ASSET','EXPENSE'].includes(b.type) ? 'DEBIT' : 'CREDIT'
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO Account (id,storeId,code,name,type,normalBalance,parentId,balance,active,isSystem,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,0,1,0,?,?)`,
+          [id, storeId, b.code, b.name.trim(), b.type, normalBalance, b.parentId ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const allowed = new Set(['name','type','parentId','active'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Account SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ── Journal Entries ───────────────────────────────────────────────────────
+    if (segs[0] === 'journal') {
+      if (!segs[1] && method === 'GET') {
+        const from = url.searchParams.get('from') ?? ''
+        const to = url.searchParams.get('to') ?? ''
+        const status = url.searchParams.get('status') ?? ''
+        const limit = parseInt(url.searchParams.get('limit') ?? '50')
+        const offset = parseInt(url.searchParams.get('offset') ?? '0')
+        let q = `SELECT * FROM JournalEntry WHERE storeId=?`
+        const params: any[] = [storeId]
+        if (from) { q += ' AND date >= ?'; params.push(from) }
+        if (to) { q += ' AND date <= ?'; params.push(to) }
+        if (status) { q += ' AND status=?'; params.push(status) }
+        q += ' ORDER BY date DESC, createdAt DESC LIMIT ? OFFSET ?'
+        params.push(limit, offset)
+        const entries = await query(q, params)
+        return ok(entries)
+      }
+      if (segs[1] === 'lines' && method === 'GET') {
+        const entryId = url.searchParams.get('entryId')
+        if (!entryId) return err('entryId required')
+        const lines = await query(
+          `SELECT jl.*, a.code, a.name as accountName FROM JournalLine jl JOIN Account a ON jl.accountId=a.id WHERE jl.entryId=? ORDER BY jl.debit DESC`,
+          [entryId]
+        )
+        return ok(lines)
+      }
+      if (!segs[1] && method === 'POST') {
+        const b = await req.json() as any
+        if (!b.date) return err('Tanggal harus diisi')
+        if (!b.description || b.description.trim().length < 2) return err('Deskripsi minimal 2 karakter')
+        if (!b.lines || b.lines.length < 2) return err('Minimal 2 baris jurnal')
+        const totalDebit = b.lines.reduce((s: number, l: any) => s + Number(l.debit ?? 0), 0)
+        const totalCredit = b.lines.reduce((s: number, l: any) => s + Number(l.credit ?? 0), 0)
+        if (Math.abs(totalDebit - totalCredit) > 0.01) return err('Jurnal tidak balance (debit ≠ kredit)')
+        for (const line of b.lines) {
+          if (Number(line.debit ?? 0) < 0 || Number(line.credit ?? 0) < 0) return err('Nilai tidak boleh negatif')
+          if (Number(line.debit ?? 0) === 0 && Number(line.credit ?? 0) === 0) return err('Baris tidak boleh nol semua')
+        }
+        const count = await queryOne<any>(`SELECT COUNT(*) as c FROM JournalEntry WHERE storeId=?`, [storeId])
+        const num = `JE-${String((count?.c ?? 0) + 1).padStart(5, '0')}`
+        const t = nowISO(); const id = newId()
+        await exec(
+          `INSERT INTO JournalEntry (id,storeId,userId,number,date,description,reference,status,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [id, storeId, user.id, num, b.date, b.description.trim(), b.reference ?? null, b.status ?? 'DRAFT', t, t]
+        )
+        for (const line of b.lines) {
+          await exec(
+            `INSERT INTO JournalLine (id,entryId,accountId,debit,credit,description,createdAt) VALUES (?,?,?,?,?,?,?)`,
+            [newId(), id, line.accountId, Number(line.debit ?? 0), Number(line.credit ?? 0), line.description ?? null, t]
+          )
+        }
+        return ok({ id, number: num }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json() as any
+        const entry = await queryOne<any>(`SELECT * FROM JournalEntry WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!entry) return err('Entry not found', 404)
+        if (entry.status === 'POSTED' && b.status !== 'VOIDED') return err('Entry sudah diposting, tidak bisa diedit')
+        await exec(`UPDATE JournalEntry SET status=?, updatedAt=? WHERE id=? AND storeId=?`, [b.status, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ── Financial Reports ─────────────────────────────────────────────────────
+    if (segs[0] === 'financial-reports') {
+      const from = url.searchParams.get('from') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+      const to = url.searchParams.get('to') ?? new Date().toISOString().slice(0,10)
+
+      if (segs[1] === 'pnl') {
+        const accounts = await query<any>(`SELECT * FROM Account WHERE storeId=? OR storeId='store_demo' AND active=1`, [storeId])
+        const entries = await query<any>(
+          `SELECT je.id, je.date FROM JournalEntry je WHERE (je.storeId=? OR je.storeId='store_demo') AND je.status='POSTED' AND je.date BETWEEN ? AND ?`,
+          [storeId, from, to]
+        )
+        const allLines = await Promise.all(entries.map((e: any) =>
+          query<any>(`SELECT * FROM JournalLine WHERE entryId=?`, [e.id])
+        ))
+        const flatLines = allLines.flat()
+
+        let revenue = 0; let expenses = 0
+        for (const acc of accounts) {
+          const lines = flatLines.filter((l: any) => l.accountId === acc.id)
+          if (acc.type === 'REVENUE') {
+            revenue += lines.reduce((s: number, l: any) => s + l.credit - l.debit, 0)
+          }
+          if (acc.type === 'EXPENSE') {
+            expenses += lines.reduce((s: number, l: any) => s + l.debit - l.credit, 0)
+          }
+        }
+
+        // Also factor in Expense records (non-accounting expenses)
+        const expenseRecords = await queryOne<any>(
+          `SELECT COALESCE(SUM(amount),0) as total FROM Expense WHERE storeId=? AND date BETWEEN ? AND ?`,
+          [storeId, from, to]
+        )
+        expenses += expenseRecords?.total ?? 0
+
+        // Factor in POS revenue
+        const posRevenue = await queryOne<any>(
+          `SELECT COALESCE(SUM(total),0) as total FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+          [storeId, `${from}T00:00:00.000Z`, `${to}T23:59:59.999Z`]
+        )
+        revenue += posRevenue?.total ?? 0
+
+        return ok({ from, to, revenue, expenses, netProfit: revenue - expenses })
+      }
+
+      if (segs[1] === 'balance-sheet') {
+        const storeAccs = await query<any>(`SELECT * FROM Account WHERE (storeId=? OR storeId='store_demo') AND active=1`, [storeId])
+        const lines = await query<any>(
+          `SELECT jl.* FROM JournalLine jl
+           JOIN JournalEntry je ON jl.entryId=je.id
+           WHERE (je.storeId=? OR je.storeId='store_demo') AND je.status='POSTED' AND je.date <= ?`,
+          [storeId, to]
+        )
+
+        const result: Record<string, { code: string; name: string; balance: number }[]> = {
+          ASSET: [], LIABILITY: [], EQUITY: []
+        }
+        for (const acc of storeAccs.filter((a: any) => ['ASSET','LIABILITY','EQUITY'].includes(a.type))) {
+          const accLines = lines.filter((l: any) => l.accountId === acc.id)
+          const nb = acc.normalBalance
+          const balance = acc.balance + accLines.reduce((s: number, l: any) =>
+            nb === 'DEBIT' ? s + l.debit - l.credit : s + l.credit - l.debit, 0)
+          if (balance !== 0) result[acc.type].push({ code: acc.code, name: acc.name, balance })
+        }
+        const totalAssets = result.ASSET.reduce((s, a) => s + a.balance, 0)
+        const totalLiabilities = result.LIABILITY.reduce((s, a) => s + a.balance, 0)
+        const totalEquity = result.EQUITY.reduce((s, a) => s + a.balance, 0)
+        return ok({ as_of: to, accounts: result, totalAssets, totalLiabilities, totalEquity })
+      }
+    }
+
     return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)

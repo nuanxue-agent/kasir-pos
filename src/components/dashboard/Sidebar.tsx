@@ -47,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Supplier',    href: '/dashboard/suppliers', icon: Truck },
       { label: 'Shift & Kas', href: '/dashboard/shifts',    icon: Clock },
       { label: 'Pengeluaran', href: '/dashboard/expenses',  icon: TrendingDown },
+      { label: 'Akuntansi',   href: '/dashboard/accounting', icon: BarChart3 },
       { label: 'Laporan',     href: '/dashboard/reports',   icon: BarChart3 },
     ],
   },
