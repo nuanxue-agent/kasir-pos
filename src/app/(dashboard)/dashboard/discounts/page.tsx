@@ -7,16 +7,7 @@ export const runtime = 'edge'
 export default async function DiscountsPage() {
   const session = await auth()
   if (!session) redirect('/login')
-
-  const storeId = session.user.stores?.[0]?.id
-  if (!storeId) redirect('/dashboard')
-
-  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { currency: true } })
-
-  return (
-    <DiscountsPageClient
-      storeId={storeId}
-      currency={store?.currency ?? 'IDR'}
-    />
-  )
+  const storeId = (session.user as any).stores?.[0]?.id ?? ''
+  const currency = (session.user as any).stores?.[0]?.currency ?? 'IDR'
+  return <DiscountsPageClient storeId={storeId} session={session} currency={currency} />
 }

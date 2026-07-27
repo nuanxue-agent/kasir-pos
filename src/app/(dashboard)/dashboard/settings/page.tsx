@@ -7,12 +7,7 @@ export const runtime = 'edge'
 export default async function SettingsPage() {
   const session = await auth()
   if (!session) redirect('/login')
-
-  const storeId = session.user.stores?.[0]?.id
-  if (!storeId) redirect('/dashboard')
-
-  const store = await prisma.store.findUnique({ where: { id: storeId } })
-  if (!store) redirect('/dashboard')
-
-  return <SettingsPageClient storeId={storeId} store={store} />
+  const storeId = (session.user as any).stores?.[0]?.id ?? ''
+  const currency = (session.user as any).stores?.[0]?.currency ?? 'IDR'
+  return <SettingsPageClient storeId={storeId} session={session} currency={currency} />
 }
