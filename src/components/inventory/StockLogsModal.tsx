@@ -29,7 +29,7 @@ const LOG_TYPE_CONFIG = {
   RESTOCK: { label: 'Restock', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
   ADJUSTMENT: { label: 'Adjustment', color: 'bg-violet-500/20 text-violet-500 border-blue-500/30' },
   VOID: { label: 'Void', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-  INITIAL: { label: 'Initial', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  INITIAL: { label: 'Initial', color: 'bg-stone-500/20 text-stone-400 border-gray-500/30' },
 }
 
 const LIMIT = 10
@@ -80,7 +80,7 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-stone-800 transition-colors"
+            className="text-stone-400 hover:text-stone-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -91,12 +91,12 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
           <div className="text-stone-800 font-medium">{product.name}</div>
           <div className="flex items-center gap-4 mt-0.5">
             {product.sku && (
-              <div className="text-gray-400 text-sm">SKU: {product.sku}</div>
+              <div className="text-stone-400 text-sm">SKU: {product.sku}</div>
             )}
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-stone-400">
               Current: <span className="text-stone-800 font-semibold">{product.stock}</span>
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-stone-400">
               {total} log{total !== 1 ? 's' : ''}
             </div>
           </div>
@@ -105,16 +105,16 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
         {/* Logs List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="py-12 text-center text-gray-500">Loading...</div>
+            <div className="py-12 text-center text-stone-500">Loading...</div>
           ) : logs.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">No stock logs found</div>
+            <div className="py-12 text-center text-stone-500">No stock logs found</div>
           ) : (
             <ul className="divide-y divide-gray-700">
               {logs.map((log) => {
                 const config = LOG_TYPE_CONFIG[log.type] || LOG_TYPE_CONFIG.ADJUSTMENT
                 const isPositive = log.qty > 0
                 return (
-                  <li key={log.id} className="px-6 py-4 hover:bg-gray-700/30 transition-colors">
+                  <li key={log.id} className="px-6 py-4 hover:bg-stone-700/30 transition-colors">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3 min-w-0">
                         <span className={cn(
@@ -124,10 +124,10 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
                           {config.label}
                         </span>
                         <div className="min-w-0">
-                          <div className="text-gray-300 text-sm truncate">
+                          <div className="text-stone-300 text-sm truncate">
                             {log.note || '-'}
                           </div>
-                          <div className="text-gray-500 text-xs mt-0.5">
+                          <div className="text-stone-500 text-xs mt-0.5">
                             {formatDate(log.createdAt)}
                           </div>
                         </div>
@@ -149,7 +149,7 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-6 py-3 border-t border-stone-200 flex items-center justify-between">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-stone-400">
               Page {page} of {totalPages}
             </div>
             <div className="flex items-center gap-2">

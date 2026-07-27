@@ -106,7 +106,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
             <Boxes className="w-7 h-7" />
             Inventory Management
           </h1>
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-stone-400 text-sm mt-1">
             Track and manage product stock levels
           </p>
         </div>
@@ -115,7 +115,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
           <input
             type="text"
             placeholder="Search by name or SKU..."
@@ -135,7 +135,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors',
               filter === 'all'
                 ? 'bg-amber-500 text-white'
-                : 'bg-stone-100 text-gray-400 hover:bg-gray-700'
+                : 'bg-stone-100 text-stone-400 hover:bg-stone-700'
             )}
           >
             All
@@ -146,7 +146,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2',
               filter === 'low'
                 ? 'bg-orange-600 text-white'
-                : 'bg-stone-100 text-gray-400 hover:bg-gray-700'
+                : 'bg-stone-100 text-stone-400 hover:bg-stone-700'
             )}
           >
             <AlertTriangle className="w-4 h-4" />
@@ -158,7 +158,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors',
               filter === 'out'
                 ? 'bg-red-600 text-white'
-                : 'bg-stone-100 text-gray-400 hover:bg-gray-700'
+                : 'bg-stone-100 text-stone-400 hover:bg-stone-700'
             )}
           >
             Out of Stock
@@ -172,25 +172,25 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
           <table className="w-full">
             <thead>
               <tr className="bg-stone-50 border-b border-stone-200">
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400">Product</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400">SKU</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400">Category</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-gray-400">Current Stock</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-gray-400">Low Stock Alert</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-gray-400">Status</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-gray-400">Actions</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-stone-400">Product</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-stone-400">SKU</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-stone-400">Category</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-stone-400">Current Stock</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-stone-400">Low Stock Alert</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-stone-400">Status</th>
+                <th className="text-right px-4 py-3 text-sm font-semibold text-stone-400">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
                     Loading...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
                     No products found
                   </td>
                 </tr>
@@ -198,15 +198,15 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                 products.map((product) => {
                   const status = getStockStatus(product)
                   return (
-                    <tr key={product.id} className="border-b border-stone-200 hover:bg-gray-700/50">
+                    <tr key={product.id} className="border-b border-stone-200 hover:bg-stone-700/50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-stone-700">{product.name}</div>
-                        <div className="text-sm text-gray-400">{formatCurrency(product.price)}</div>
+                        <div className="text-sm text-stone-400">{formatCurrency(product.price)}</div>
                       </td>
-                      <td className="px-4 py-3 text-gray-300 text-sm">
+                      <td className="px-4 py-3 text-stone-300 text-sm">
                         {product.sku || '-'}
                       </td>
-                      <td className="px-4 py-3 text-gray-300 text-sm">
+                      <td className="px-4 py-3 text-stone-300 text-sm">
                         {product.category?.name || '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -214,7 +214,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                           {product.stock}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-400">
+                      <td className="px-4 py-3 text-center text-stone-400">
                         {product.lowStock}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -254,7 +254,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
         {/* Pagination */}
         {!loading && products.length > 0 && (
           <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-stone-400">
               Showing {products.length} of {total} products
             </div>
           </div>

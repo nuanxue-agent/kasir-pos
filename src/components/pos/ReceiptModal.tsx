@@ -127,35 +127,35 @@ export default function ReceiptModal({
 
           {/* Receipt body */}
           <div className="p-5 overflow-y-auto max-h-[70vh]">
-            <div className="receipt-content bg-white rounded-xl p-5 text-gray-900 text-xs">
+            <div className="receipt-content bg-white rounded-xl p-5 text-stone-800 text-xs">
               {/* Store name */}
               <div className="text-center mb-3">
                 <p className="font-bold text-sm uppercase tracking-widest">{storeName}</p>
-                <div className="border-t border-dashed border-gray-400 my-2" />
+                <div className="border-t border-dashed border-stone-400 my-2" />
               </div>
 
               {/* Order info */}
               <div className="space-y-0.5 mb-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">No.</span>
+                  <span className="text-stone-500">No.</span>
                   <span className="font-semibold">{receipt.number}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Date</span>
+                  <span className="text-stone-500">Date</span>
                   <span>{dateStr}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Time</span>
+                  <span className="text-stone-500">Time</span>
                   <span>{timeStr}</span>
                 </div>
               </div>
 
-              <div className="border-t border-dashed border-gray-400 my-2" />
+              <div className="border-t border-dashed border-stone-400 my-2" />
 
               {/* Items */}
               <table className="w-full mb-1" aria-label="Order items">
                 <thead>
-                  <tr className="text-gray-500">
+                  <tr className="text-stone-500">
                     <th className="text-left font-normal pb-1">Item</th>
                     <th className="text-center font-normal pb-1 w-8">Qty</th>
                     <th className="text-right font-normal pb-1">Total</th>
@@ -166,7 +166,7 @@ export default function ReceiptModal({
                     <tr key={idx}>
                       <td className="py-0.5 pr-2">
                         <p className="leading-tight">{item.name}</p>
-                        <p className="text-gray-400 text-[10px]">
+                        <p className="text-stone-400 text-[10px]">
                           {fmt(item.price, currency)} × {item.qty}
                         </p>
                       </td>
@@ -179,47 +179,47 @@ export default function ReceiptModal({
                 </tbody>
               </table>
 
-              <div className="border-t border-dashed border-gray-400 my-2" />
+              <div className="border-t border-dashed border-stone-400 my-2" />
 
               {/* Totals */}
               <div className="space-y-0.5">
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-stone-600">
                   <span>Subtotal</span>
                   <span>{fmt(receipt.subtotal, currency)}</span>
                 </div>
                 {(receipt.discountAmt ?? 0) > 0 && (
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-stone-600">
                     <span>Diskon</span>
                     <span>- {fmt(receipt.discountAmt!, currency)}</span>
                   </div>
                 )}
                 {taxRate > 0 && receipt.taxAmt > 0 && (
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-stone-600">
                     <span>Tax ({(taxRate * 100).toFixed(0)}%)</span>
                     <span>{fmt(receipt.taxAmt, currency)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-sm pt-1 border-t border-gray-300">
+                <div className="flex justify-between font-bold text-sm pt-1 border-t border-stone-300">
                   <span>TOTAL</span>
                   <span>{fmt(receipt.total, currency)}</span>
                 </div>
               </div>
 
-              <div className="border-t border-dashed border-gray-400 my-2" />
+              <div className="border-t border-dashed border-stone-400 my-2" />
 
               {/* Payment */}
               {primaryPayment && (
                 <div className="space-y-0.5">
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-stone-600">
                     <span>Payment</span>
                     <span>{METHOD_LABELS[primaryPayment.method] ?? primaryPayment.method}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-stone-600">
                     <span>Paid</span>
                     <span>{fmt(primaryPayment.amount, currency)}</span>
                   </div>
                   {primaryPayment.change > 0 && (
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-stone-600">
                       <span>Kembalian</span>
                       <span>{fmt(primaryPayment.change, currency)}</span>
                     </div>
@@ -230,13 +230,13 @@ export default function ReceiptModal({
               {/* Receipt note */}
               {receiptNote && (
                 <>
-                  <div className="border-t border-dashed border-gray-400 my-2" />
-                  <p className="text-center text-gray-500 text-[10px] leading-snug">{receiptNote}</p>
+                  <div className="border-t border-dashed border-stone-400 my-2" />
+                  <p className="text-center text-stone-500 text-[10px] leading-snug">{receiptNote}</p>
                 </>
               )}
 
               {/* Footer */}
-              <div className="border-t border-dashed border-gray-400 mt-2 pt-2 text-center text-gray-400 text-[10px]">
+              <div className="border-t border-dashed border-stone-400 mt-2 pt-2 text-center text-stone-400 text-[10px]">
                 Thank you for your purchase!
               </div>
             </div>

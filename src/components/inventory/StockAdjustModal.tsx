@@ -83,7 +83,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
           <h2 className="text-lg font-semibold text-stone-800">Adjust Stock</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-stone-800 transition-colors"
+            className="text-stone-400 hover:text-stone-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -93,13 +93,13 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
         <div className="px-6 py-4 bg-stone-50 border-b border-stone-200">
           <div className="text-stone-800 font-medium">{product.name}</div>
           {product.sku && (
-            <div className="text-gray-400 text-sm mt-0.5">SKU: {product.sku}</div>
+            <div className="text-stone-400 text-sm mt-0.5">SKU: {product.sku}</div>
           )}
           <div className="flex items-center gap-4 mt-2">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-stone-400">
               Current stock: <span className="text-stone-800 font-semibold">{product.stock}</span>
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-stone-400">
               Low stock alert: <span className="text-stone-800">{product.lowStock}</span>
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
         <div className="px-6 py-5 space-y-5">
           {/* Type Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
+            <label className="block text-sm font-medium text-stone-400 mb-2">
               Adjustment Type
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -119,7 +119,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                   'flex items-center justify-center gap-2 px-4 py-3 rounded-lg border font-medium transition-colors',
                   type === 'RESTOCK'
                     ? 'bg-green-600 border-green-500 text-white'
-                    : 'bg-gray-700 border-stone-200 text-gray-300 hover:bg-gray-600'
+                    : 'bg-stone-700 border-stone-200 text-stone-300 hover:bg-stone-600'
                 )}
               >
                 <TrendingUp className="w-4 h-4" />
@@ -131,7 +131,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                   'flex items-center justify-center gap-2 px-4 py-3 rounded-lg border font-medium transition-colors',
                   type === 'ADJUSTMENT'
                     ? 'bg-amber-500 border-amber-400 text-white'
-                    : 'bg-gray-700 border-stone-200 text-gray-300 hover:bg-gray-600'
+                    : 'bg-stone-700 border-stone-200 text-stone-300 hover:bg-stone-600'
                 )}
               >
                 <TrendingDown className="w-4 h-4" />
@@ -142,10 +142,10 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
 
           {/* Qty Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
+            <label className="block text-sm font-medium text-stone-400 mb-2">
               Quantity
               {type === 'ADJUSTMENT' && (
-                <span className="text-gray-500 ml-1">(use negative to reduce)</span>
+                <span className="text-stone-500 ml-1">(use negative to reduce)</span>
               )}
             </label>
             <div className="flex items-center gap-2">
@@ -172,8 +172,8 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
 
           {/* Note Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Note <span className="text-gray-600">(optional)</span>
+            <label className="block text-sm font-medium text-stone-400 mb-2">
+              Note <span className="text-stone-600">(optional)</span>
             </label>
             <input
               type="text"
@@ -187,16 +187,16 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
           {/* Stock Preview */}
           {qtyNum !== 0 && (
             <div className="bg-stone-50 rounded-lg p-4 space-y-2">
-              <div className="text-sm font-medium text-gray-400">Preview</div>
+              <div className="text-sm font-medium text-stone-400">Preview</div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-300">Current stock</span>
+                <span className="text-stone-300">Current stock</span>
                 <span className="text-stone-800 font-semibold">{product.stock}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-300">Kembalian</span>
+                <span className="text-stone-300">Kembalian</span>
                 <span className={cn(
                   'font-semibold',
-                  stockDiff > 0 ? 'text-green-400' : stockDiff < 0 ? 'text-red-400' : 'text-gray-400'
+                  stockDiff > 0 ? 'text-green-400' : stockDiff < 0 ? 'text-red-400' : 'text-stone-400'
                 )}>
                   {stockDiffLabel}
                 </span>

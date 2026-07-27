@@ -112,21 +112,21 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
           onClick={(e) => e.stopPropagation()}
         >
           {/* ── Header ── */}
-          <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+          <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-stone-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
                 <Receipt className="h-5 w-5 text-indigo-500" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{order.number}</h2>
-                <p className="text-xs text-gray-400">{formatDate(order.createdAt)}</p>
+                <h2 className="text-lg font-semibold text-stone-800">{order.number}</h2>
+                <p className="text-xs text-stone-400">{formatDate(order.createdAt)}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={order.status} />
               <button
                 onClick={onClose}
-                className="ml-2 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+                className="ml-2 p-1.5 rounded-lg hover:bg-stone-100 text-stone-400"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -136,26 +136,26 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
 
           {/* ── Meta row ── */}
           <div className="px-6 py-4 grid grid-cols-2 gap-4 text-sm border-b border-gray-50">
-            <div className="flex items-center gap-2 text-gray-600">
-              <User className="h-4 w-4 text-gray-400 shrink-0" />
+            <div className="flex items-center gap-2 text-stone-600">
+              <User className="h-4 w-4 text-stone-400 shrink-0" />
               <span className="font-medium">Cashier:</span>
               <span>{order.user?.name ?? '—'}</span>
             </div>
-            <div className="flex items-center gap-2 text-gray-600">
-              <User className="h-4 w-4 text-gray-400 shrink-0" />
+            <div className="flex items-center gap-2 text-stone-600">
+              <User className="h-4 w-4 text-stone-400 shrink-0" />
               <span className="font-medium">Customer:</span>
-              <span>{order.customer?.name ?? <em className="text-gray-400">Walk-in</em>}</span>
+              <span>{order.customer?.name ?? <em className="text-stone-400">Walk-in</em>}</span>
             </div>
           </div>
 
           {/* ── Items table ── */}
           <div className="px-6 py-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">
               Items
             </h3>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                <tr className="text-left text-xs text-stone-400 border-b border-stone-100">
                   <th className="pb-2 font-medium">Product</th>
                   <th className="pb-2 font-medium text-center w-12">Qty</th>
                   <th className="pb-2 font-medium text-right">Price</th>
@@ -166,9 +166,9 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
                 {order.items.map((item) => (
                   <tr key={item.id}>
                     <td className="py-2.5 pr-4">
-                      <p className="font-medium text-gray-800">{item.name}</p>
+                      <p className="font-medium text-stone-700">{item.name}</p>
                       {item.variantName && (
-                        <p className="text-xs text-gray-400">{item.variantName}</p>
+                        <p className="text-xs text-stone-400">{item.variantName}</p>
                       )}
                       {item.discount > 0 && (
                         <p className="text-xs text-red-500">
@@ -176,11 +176,11 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
                         </p>
                       )}
                     </td>
-                    <td className="py-2.5 text-center text-gray-600">{item.qty}</td>
-                    <td className="py-2.5 text-right text-gray-600">
+                    <td className="py-2.5 text-center text-stone-600">{item.qty}</td>
+                    <td className="py-2.5 text-right text-stone-600">
                       {formatCurrency(item.price, currency)}
                     </td>
-                    <td className="py-2.5 text-right font-medium text-gray-800">
+                    <td className="py-2.5 text-right font-medium text-stone-700">
                       {formatCurrency(item.subtotal, currency)}
                     </td>
                   </tr>
@@ -190,8 +190,8 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
           </div>
 
           {/* ── Totals ── */}
-          <div className="px-6 py-4 border-t border-gray-100 space-y-1.5 text-sm">
-            <div className="flex justify-between text-gray-600">
+          <div className="px-6 py-4 border-t border-stone-100 space-y-1.5 text-sm">
+            <div className="flex justify-between text-stone-600">
               <span>Subtotal</span>
               <span>{formatCurrency(order.subtotal, currency)}</span>
             </div>
@@ -202,40 +202,40 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
               </div>
             )}
             {order.taxAmt > 0 && (
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between text-stone-600">
                 <span>Pajak</span>
                 <span>{formatCurrency(order.taxAmt, currency)}</span>
               </div>
             )}
-            <div className="flex justify-between font-semibold text-gray-900 text-base pt-1 border-t border-gray-100">
+            <div className="flex justify-between font-semibold text-stone-800 text-base pt-1 border-t border-stone-100">
               <span>Total</span>
               <span>{formatCurrency(order.total, currency)}</span>
             </div>
           </div>
 
           {/* ── Payments ── */}
-          <div className="px-6 py-4 border-t border-gray-100">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="px-6 py-4 border-t border-stone-100">
+            <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">
               Payment
             </h3>
             <div className="space-y-2">
               {order.payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-stone-700">
                       {PAYMENT_LABELS[p.method] ?? p.method}
                     </span>
                     {p.reference && (
-                      <span className="text-xs text-gray-400">#{p.reference}</span>
+                      <span className="text-xs text-stone-400">#{p.reference}</span>
                     )}
                   </div>
-                  <span className="font-medium text-gray-800">
+                  <span className="font-medium text-stone-700">
                     {formatCurrency(p.amount, currency)}
                   </span>
                 </div>
               ))}
               {totalChange > 0 && (
-                <div className="flex justify-between text-sm text-gray-500 pt-1 border-t border-gray-50">
+                <div className="flex justify-between text-sm text-stone-500 pt-1 border-t border-gray-50">
                   <span>Kembalian</span>
                   <span>{formatCurrency(totalChange, currency)}</span>
                 </div>
@@ -245,11 +245,11 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
 
           {/* ── Note ── */}
           {order.note && (
-            <div className="px-6 py-4 border-t border-gray-100">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            <div className="px-6 py-4 border-t border-stone-100">
+              <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">
                 Note
               </h3>
-              <p className="text-sm text-gray-600">{order.note}</p>
+              <p className="text-sm text-stone-600">{order.note}</p>
             </div>
           )}
 
@@ -273,7 +273,7 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
                 <button
                   onClick={() => { setConfirming(false); setVoidError(null) }}
                   disabled={voiding}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -282,11 +282,11 @@ export function OrderDetailModal({ order: initialOrder, currency, onClose, onVoi
           )}
 
           {/* ── Footer actions ── */}
-          <div className="px-6 pb-6 pt-2 flex justify-between items-center border-t border-gray-100 gap-3 flex-wrap">
+          <div className="px-6 pb-6 pt-2 flex justify-between items-center border-t border-stone-100 gap-3 flex-wrap">
             <div className="flex gap-2">
               <button
                 onClick={() => window.print()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
               >
                 <Printer className="h-4 w-4" />
                 Print Receipt
