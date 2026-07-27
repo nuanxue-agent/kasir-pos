@@ -45,9 +45,10 @@ const COMPANY_NAME = 'Kasir App'
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
 /**
- * Export a table to PDF using jspdf + jspdf-autotable.
- * Adds company name, report title, date, and page numbers.
+ * Data export utilities — CSV and Excel (via exceljs).
+ * Both functions work in browser environments only (they trigger a download).
  */
+
 export async function exportToPDF(
   title: string,
   columns: ExportColumn[],
@@ -77,13 +78,16 @@ export async function exportToPDF(
   doc.text(`Dicetak: ${todayLabel()}`, 14, 29)
 
   // Table
-  const head: string[][] = [columns.map((c) => c.label)]
+  const head: string[][] = [columns.map(c => c.label)]
 
-  const body: RowInput[] = rows.map((row) =>
-    columns.map((col) => {
+  const body: RowInput[] = rows.map(row =>
+    columns.map(col => {
       const val = row[col.key]
       // Auto-format numbers that look like currency amounts
-      if (typeof val === 'number' && col.key.match(/amount|total|price|cost|revenue|profit|salary|wage/i)) {
+      if (
+        typeof val === 'number' &&
+        col.key.match(/amount|total|price|cost|revenue|profit|salary|wage/i)
+      ) {
         return formatCurrencyValue(val, currency)
       }
       return val === null || val === undefined ? '' : String(val)
@@ -107,9 +111,11 @@ export async function exportToPDF(
       fillColor: [250, 245, 235], // stone-50
     },
     margin: { left: 14, right: 14 },
-    didDrawPage: (data) => {
+    didDrawPage: data => {
       // Page number footer
-      const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages()
+      const pageCount = (
+        doc.internal as unknown as { getNumberOfPages: () => number }
+      ).getNumberOfPages()
       const currentPage = data.pageNumber
       doc.setFontSize(8)
       doc.setTextColor(150, 150, 150)
@@ -135,10 +141,7 @@ export async function exportToPDF(
  * Generates a real .xlsx-compatible file without any npm package,
  * eliminating the xlsx/exceljs CVE surface entirely.
  */
-export async function exportToExcel(
-  sheets: ExportSheet[],
-  filename: string,
-): Promise<void> {
+export async function exportToExcel(sheets: ExportSheet[], filename: string): Promise<void> {
   // Each sheet becomes a tab-separated CSV download when only one sheet,
   // or a multi-sheet SpreadsheetML workbook for multiple sheets.
   if (sheets.length === 1) {
@@ -149,9 +152,9 @@ export async function exportToExcel(
   // Multi-sheet: generate SpreadsheetML (XML-based .xlsx subset)
   const xmlSheets = sheets.map((sheet, i) => {
     const rows = [
-      sheet.columns.map((c) => _xmlCell(c.label, 's')),
-      ...sheet.rows.map((row) =>
-        sheet.columns.map((col) => {
+      sheet.columns.map(c => _xmlCell(c.label, 's')),
+      ...sheet.rows.map(row =>
+        sheet.columns.map(col => {
           const val = row[col.key]
           const str = val === null || val === undefined ? '' : String(val)
           const num = Number(val)
@@ -160,10 +163,7 @@ export async function exportToExcel(
       ),
     ]
     const rowXml = rows
-      .map(
-        (cells, ri) =>
-          `<Row ss:Index="${ri + 1}">${cells.join('')}</Row>`,
-      )
+      .map((cells, ri) => `<Row ss:Index="${ri + 1}">${cells.join('')}</Row>`)
       .join('')
     return `<Worksheet ss:Name="${_xmlAttr(sheet.name.slice(0, 31))}"><Table>${rowXml}</Table></Worksheet>`
   })
@@ -183,7 +183,11 @@ export async function exportToExcel(
 }
 
 function _xmlCell(value: string, type: 'n' | 's'): string {
-  const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  const escaped = value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
   return `<Cell><Data ss:Type="${type === 'n' ? 'Number' : 'String'}">${escaped}</Data></Cell>`
 }
 
@@ -193,12 +197,14 @@ function _xmlAttr(value: string): string {
 
 function _downloadCsv(sheet: ExportSheet, filename: string): void {
   const BOM = '\uFEFF' // UTF-8 BOM so Excel opens it correctly
-  const header = sheet.columns.map((c) => _csvCell(c.label)).join(',')
-  const rows = sheet.rows.map((row) =>
-    sheet.columns.map((col) => {
-      const val = row[col.key]
-      return _csvCell(val === null || val === undefined ? '' : String(val))
-    }).join(','),
+  const header = sheet.columns.map(c => _csvCell(c.label)).join(',')
+  const rows = sheet.rows.map(row =>
+    sheet.columns
+      .map(col => {
+        const val = row[col.key]
+        return _csvCell(val === null || val === undefined ? '' : String(val))
+      })
+      .join(','),
   )
   const csv = BOM + [header, ...rows].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
@@ -269,9 +275,13 @@ function buildReportPayload(
         equity?: Array<{ name: string; amount: number }>
       }
       const rows: Record<string, unknown>[] = [
-        ...(d.assets ?? []).map((a) => ({ section: 'Aset', name: a.name, amount: a.amount })),
-        ...(d.liabilities ?? []).map((l) => ({ section: 'Liabilitas', name: l.name, amount: l.amount })),
-        ...(d.equity ?? []).map((e) => ({ section: 'Ekuitas', name: e.name, amount: e.amount })),
+        ...(d.assets ?? []).map(a => ({ section: 'Aset', name: a.name, amount: a.amount })),
+        ...(d.liabilities ?? []).map(l => ({
+          section: 'Liabilitas',
+          name: l.name,
+          amount: l.amount,
+        })),
+        ...(d.equity ?? []).map(e => ({ section: 'Ekuitas', name: e.name, amount: e.amount })),
       ]
       return {
         title: `Neraca Keuangan${d.period ? ` — ${d.period}` : ''}`,
@@ -368,6 +378,58 @@ function buildReportPayload(
     default:
       return { title: 'Laporan', columns: [], rows: [] }
   }
+}
+
+/**
+ * Simple CSV download.
+ * @param rows     Array of row objects
+ * @param filename Filename without extension
+ * @param headers  Optional ordered list of column keys. When omitted, keys
+ *                 are inferred from the first row in insertion order.
+ */
+export function exportToCSV(
+  rows: Record<string, unknown>[],
+  filename: string,
+  headers?: string[],
+): void {
+  const escape = (v: unknown) => {
+    const s = v == null ? '' : String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+
+  if (rows.length === 0) {
+    const cols = headers ?? []
+    const csv = cols.map(escape).join(',') + '\n'
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${filename}.csv`
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    return
+  }
+
+  const cols = headers ?? Object.keys(rows[0])
+  const lines = [
+    cols.map(escape).join(','),
+    ...rows.map(row => cols.map(k => escape(row[k])).join(',')),
+  ]
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}.csv`
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 /**

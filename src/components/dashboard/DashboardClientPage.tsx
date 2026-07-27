@@ -24,6 +24,18 @@ import {
   TrendingDown,
   Minus,
 } from 'lucide-react'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as RechartsTooltip,
+  Legend as RechartsLegend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -73,6 +85,182 @@ const STATUS_STYLES: Record<string, { icon: React.ReactNode; pill: string; label
     pill: 'bg-red-50 text-red-500 border border-red-200',
     label: 'Batal',
   },
+}
+
+// ─── Hourly Heatmap ───────────────────────────────────────────────────────────
+
+interface HourlySlot {
+  hour: number
+  revenue: number
+  count: number
+}
+
+function HourlyHeatmap({ data }: { data: HourlySlot[] }) {
+  if (!data.length) return null
+  const maxRevenue = Math.max(...data.map(d => d.revenue), 1)
+  const hourLabels = [
+    '12a',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+    '11',
+    '12p',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+    '11',
+  ]
+  return (
+    <div>
+      <div className="flex gap-0.5">
+        {data.map(slot => {
+          const intensity = slot.revenue / maxRevenue
+          const opacity = slot.revenue === 0 ? 0.07 : 0.15 + intensity * 0.85
+          return (
+            <div
+              key={slot.hour}
+              className="group relative flex-1"
+              title={`${hourLabels[slot.hour]}:00 — ${slot.count} order(s)`}
+            >
+              <div
+                className="h-8 rounded-sm transition-opacity"
+                style={{ backgroundColor: `rgba(245, 158, 11, ${opacity})` }}
+              />
+              {/* Tooltip on hover */}
+              <div className="pointer-events-none absolute -top-8 left-1/2 z-10 hidden -translate-x-1/2 rounded bg-stone-800 px-1.5 py-0.5 text-[9px] whitespace-nowrap text-white group-hover:block">
+                {hourLabels[slot.hour]}h · {slot.count}x
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-1 flex justify-between text-[9px] text-[var(--text-3)]">
+        <span>12a</span>
+        <span>6a</span>
+        <span>12p</span>
+        <span>6p</span>
+        <span>11p</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Payment Method Donut ─────────────────────────────────────────────────────
+
+const PAYMENT_COLORS: Record<string, string> = {
+  CASH: '#10b981',
+  CARD: '#6366f1',
+  TRANSFER: '#f59e0b',
+  QRIS: '#ec4899',
+  OTHER: '#94a3b8',
+}
+
+interface PaymentSlice {
+  method: string
+  total: number
+  count: number
+}
+
+function PaymentDonut({ data, currency }: { data: PaymentSlice[]; currency: string }) {
+  if (!data.length) return <p className="py-4 text-center text-xs text-[var(--text-3)]">No data</p>
+  const pieData = data.map(d => ({ name: d.method, value: d.total }))
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <PieChart>
+        <Pie
+          data={pieData}
+          cx="50%"
+          cy="50%"
+          innerRadius={42}
+          outerRadius={64}
+          paddingAngle={2}
+          dataKey="value"
+        >
+          {pieData.map((entry, i) => (
+            <Cell key={i} fill={PAYMENT_COLORS[entry.name] ?? '#94a3b8'} />
+          ))}
+        </Pie>
+        <RechartsTooltip
+          formatter={value => formatCurrency(value as number, currency)}
+          contentStyle={{ borderRadius: 8, fontSize: 11, border: '1px solid #e5e7eb' }}
+        />
+        <RechartsLegend
+          iconType="circle"
+          iconSize={8}
+          wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Today vs Yesterday Sparkline ─────────────────────────────────────────────
+
+interface HourlyCompareProps {
+  today: HourlySlot[]
+  yesterday: HourlySlot[]
+  currency: string
+}
+
+function TodayVsYesterdaySparkline({ today, yesterday, currency }: HourlyCompareProps) {
+  if (!today.length && !yesterday.length) return null
+  // Build cumulative hourly data for the current hour range
+  const now = new Date().getHours()
+  const points = Array.from({ length: now + 1 }, (_, h) => ({
+    hour: h,
+    today: today.find(s => s.hour === h)?.revenue ?? 0,
+    yesterday: yesterday.find(s => s.hour === h)?.revenue ?? 0,
+  }))
+  return (
+    <ResponsiveContainer width="100%" height={80}>
+      <LineChart data={points} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+        <XAxis
+          dataKey="hour"
+          tick={{ fontSize: 9, fill: '#9ca3af' }}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={h => (h % 6 === 0 ? `${h}h` : '')}
+        />
+        <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} hide />
+        <RechartsTooltip
+          formatter={value => formatCurrency(value as number, currency)}
+          labelFormatter={h => `${h}:00`}
+          contentStyle={{ borderRadius: 8, fontSize: 11, border: '1px solid #e5e7eb' }}
+        />
+        <Line
+          type="monotone"
+          dataKey="today"
+          stroke="#f59e0b"
+          strokeWidth={2}
+          dot={false}
+          name="Today"
+        />
+        <Line
+          type="monotone"
+          dataKey="yesterday"
+          stroke="#d1d5db"
+          strokeWidth={1.5}
+          strokeDasharray="4 2"
+          dot={false}
+          name="Yesterday"
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  )
 }
 
 // Simple SVG sparkline
@@ -181,10 +369,29 @@ export default function DashboardClientPage({
     queryFn: () => fetch(`/api/inventory?storeId=${storeId}&lowStockOnly=true`).then(r => r.json()),
   })
 
-  // Top products today
-
   // Top products today (from today's summary)
   const topProducts = (data as any)?.topProducts ?? []
+  const paymentBreakdown: PaymentSlice[] = (data as any)?.paymentBreakdown ?? []
+
+  // Hourly data for today
+  const todayDate = new Date().toISOString().slice(0, 10)
+  const { data: hourlyToday = [] } = useQuery<HourlySlot[]>({
+    queryKey: ['hourly-today', storeId, todayDate],
+    queryFn: () =>
+      fetch(`/api/reports/hourly?storeId=${storeId}&date=${todayDate}`).then(r => r.json()),
+  })
+
+  // Hourly data for yesterday (for sparkline comparison)
+  const yesterdayDate = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().slice(0, 10)
+  })()
+  const { data: hourlyYesterday = [] } = useQuery<HourlySlot[]>({
+    queryKey: ['hourly-yesterday', storeId, yesterdayDate],
+    queryFn: () =>
+      fetch(`/api/reports/hourly?storeId=${storeId}&date=${yesterdayDate}`).then(r => r.json()),
+  })
 
   const stats = (data as any) ?? {}
   const yStats = (yesterday as any) ?? {}
@@ -502,6 +709,55 @@ export default function DashboardClientPage({
           </div>
         </div>
       )}
+
+      {/* ── Analytics row: Hourly Heatmap + Payment Donut + Today vs Yesterday ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Hourly heatmap */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+          <p className="mb-3 text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
+            Penjualan per Jam — Hari Ini
+          </p>
+          {(hourlyToday as HourlySlot[]).length > 0 ? (
+            <HourlyHeatmap data={hourlyToday as HourlySlot[]} />
+          ) : (
+            <div className="flex h-10 items-center justify-center text-xs text-[var(--text-3)]">
+              Belum ada data hari ini
+            </div>
+          )}
+        </div>
+
+        {/* Payment method donut */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+          <p className="mb-1 text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
+            Metode Pembayaran
+          </p>
+          <PaymentDonut data={paymentBreakdown} currency={currency} />
+        </div>
+
+        {/* Today vs Yesterday sparkline */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
+              Hari Ini vs Kemarin
+            </p>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-4 rounded-sm bg-amber-400" />
+                Hari Ini
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-px w-4 border border-dashed border-stone-400" />
+                Kemarin
+              </span>
+            </div>
+          </div>
+          <TodayVsYesterdaySparkline
+            today={hourlyToday as HourlySlot[]}
+            yesterday={hourlyYesterday as HourlySlot[]}
+            currency={currency}
+          />
+        </div>
+      </div>
 
       {/* ── Quick actions (mobile-friendly pill row) ── */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
