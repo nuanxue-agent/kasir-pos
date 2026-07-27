@@ -5094,6 +5094,128 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ projections, avgRevenue, avgExpenses })
     }
 
+    // ─── REPORTS / CHURN ─────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'churn') {
+      // POST: log re-engagement outreach in AuditLog
+      if (method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['customerId', 'customerName'])
+        await logAudit({
+          storeId,
+          userId: user.id,
+          action: 'UPDATE',
+          resourceType: 'Customer',
+          resourceId: b.customerId,
+          meta: { action: 'reengagement_sent', customerName: b.customerName },
+        })
+        return ok({ success: true })
+      }
+
+      // GET: return all customers with churn score
+      if (method === 'GET') {
+        // Pull all customers for this store
+        const customers = (await query(
+          `SELECT id, name, phone, email FROM Customer WHERE storeId = ?`,
+          [storeId],
+        )) as any[]
+
+        if (customers.length === 0) return ok([])
+
+        const now = Date.now()
+
+        // Per-customer aggregates: total orders, last order, and orders split by time window
+        const stats = (await query(
+          `SELECT
+             customerId,
+             COUNT(*) AS total_orders,
+             MAX(createdAt) AS last_order_at,
+             SUM(CASE WHEN createdAt >= ? THEN 1 ELSE 0 END) AS recent_orders,
+             SUM(CASE WHEN createdAt < ? AND createdAt >= ? THEN 1 ELSE 0 END) AS older_orders,
+             AVG(CASE WHEN createdAt >= ? THEN total ELSE NULL END) AS recent_avg_value,
+             AVG(CASE WHEN createdAt < ? AND createdAt >= ? THEN total ELSE NULL END) AS older_avg_value
+           FROM "Order"
+           WHERE storeId = ? AND status = 'PAID' AND customerId IS NOT NULL
+           GROUP BY customerId`,
+          [
+            new Date(now - 86400000 * 30).toISOString(), // recent window start
+            new Date(now - 86400000 * 30).toISOString(), // older window boundary
+            new Date(now - 86400000 * 90).toISOString(), // older window start
+            new Date(now - 86400000 * 30).toISOString(), // recent avg start
+            new Date(now - 86400000 * 30).toISOString(), // older avg boundary
+            new Date(now - 86400000 * 90).toISOString(), // older avg start
+            storeId,
+          ],
+        )) as any[]
+
+        const statsMap = new Map<string, any>()
+        for (const r of stats) {
+          statsMap.set(r.customerId, r)
+        }
+
+        const result = customers.map((c: any) => {
+          const s = statsMap.get(c.id)
+
+          const lastOrderAt: string | null = s?.last_order_at ?? null
+          const daysSince = lastOrderAt
+            ? Math.floor((now - new Date(lastOrderAt).getTime()) / 86400000)
+            : 9999
+          const purchaseCount = s ? Number(s.total_orders) : 0
+
+          // Frequency trend: ratio of recent rate to older rate (clamped 0-1)
+          const recentOrders = s ? Number(s.recent_orders) : 0
+          const olderOrders = s ? Number(s.older_orders) : 0
+          const recentRate = recentOrders / 30
+          const olderRate = olderOrders / 60
+          const frequencyTrend = olderRate === 0
+            ? (recentRate > 0 ? 1 : 0.5)
+            : Math.min(1, recentRate / olderRate)
+
+          // Value trend negative: how much avg order value dropped
+          const recentAvg = s ? Number(s.recent_avg_value ?? 0) : 0
+          const olderAvg = s ? Number(s.older_avg_value ?? 0) : 0
+          const valueTrendNeg = olderAvg > 0
+            ? Math.min(1, Math.max(0, (olderAvg - recentAvg) / olderAvg))
+            : 0
+
+          // score = (recency/90 * 40) + ((1 - freq_trend) * 30) + (value_neg * 30), cap 100
+          const recencyComponent = Math.min(1, daysSince / 90) * 40
+          const frequencyComponent = (1 - Math.min(1, Math.max(0, frequencyTrend))) * 30
+          const valueComponent = Math.min(1, Math.max(0, valueTrendNeg)) * 30
+          const churn_score = Math.min(100, Math.round(recencyComponent + frequencyComponent + valueComponent))
+
+          const risk_level: 'LOW' | 'MEDIUM' | 'HIGH' =
+            churn_score >= 70 ? 'HIGH' : churn_score >= 40 ? 'MEDIUM' : 'LOW'
+
+          const recommended_action =
+            risk_level === 'HIGH'
+              ? daysSince > 60
+                ? 'Kirim penawaran eksklusif segera'
+                : 'Hubungi via WhatsApp dengan promo khusus'
+              : risk_level === 'MEDIUM'
+                ? 'Ingatkan dengan diskon atau loyalitas poin'
+                : 'Pertahankan dengan program loyalitas'
+
+          return {
+            id: c.id,
+            name: c.name,
+            phone: c.phone ?? null,
+            email: c.email ?? null,
+            churn_score,
+            risk_level,
+            days_since_purchase: Math.min(daysSince, 9999),
+            purchase_count: purchaseCount,
+            last_purchase_at: lastOrderAt,
+            recommended_action,
+          }
+        })
+
+        // Sort by churn_score descending
+        result.sort((a: any, b: any) => b.churn_score - a.churn_score)
+
+        return okCached(result, 'private, max-age=60')
+      }
+    }
+
     // ─── REPORTS / PRODUCTS ───────────────────────────────────────────────────
     if (segs[0] === 'reports' && segs[1] === 'products' && method === 'GET') {
       const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
@@ -5894,6 +6016,64 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       // DELETE /api/marketing-campaigns/:id
       if (segs[1] && segs[1] !== 'send' && method === 'DELETE') {
         await exec(`DELETE FROM MarketingCampaign WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ─── EXCHANGE RATES ───────────────────────────────────────────────────────
+    if (segs[0] === 'exchange-rates') {
+      // Lazy-create ExchangeRate table if it doesn't exist yet
+      await exec(`CREATE TABLE IF NOT EXISTS ExchangeRate (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        fromCurrency TEXT NOT NULL,
+        toCurrency TEXT NOT NULL,
+        rate REAL NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+
+      // GET /api/exchange-rates?storeId=...
+      if (method === 'GET' && segs.length === 1) {
+        const rows = await query(
+          `SELECT * FROM ExchangeRate WHERE storeId = ? ORDER BY fromCurrency, toCurrency`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/exchange-rates — upsert a rate
+      if (method === 'POST' && segs.length === 1) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['fromCurrency', 'toCurrency', 'rate'])
+        validatePositive(b.rate, 'rate')
+        const from = String(b.fromCurrency).toUpperCase()
+        const to = String(b.toCurrency).toUpperCase()
+        if (from === to) return err('fromCurrency and toCurrency must differ')
+        const t = nowISO()
+        // Upsert: if pair already exists, update; otherwise insert
+        const existing = await queryOne(
+          `SELECT id FROM ExchangeRate WHERE storeId=? AND fromCurrency=? AND toCurrency=?`,
+          [storeId, from, to],
+        )
+        if (existing) {
+          await exec(
+            `UPDATE ExchangeRate SET rate=?, updatedAt=? WHERE storeId=? AND fromCurrency=? AND toCurrency=?`,
+            [Number(b.rate), t, storeId, from, to],
+          )
+          return ok({ success: true, id: (existing as any).id })
+        }
+        const id = newId()
+        await exec(
+          `INSERT INTO ExchangeRate (id, storeId, fromCurrency, toCurrency, rate, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [id, storeId, from, to, Number(b.rate), t],
+        )
+        return ok({ success: true, id }, 201)
+      }
+
+      // DELETE /api/exchange-rates/:id
+      if (method === 'DELETE' && segs.length === 2) {
+        await exec(`DELETE FROM ExchangeRate WHERE id=? AND storeId=?`, [segs[1], storeId])
         return ok({ success: true })
       }
     }
