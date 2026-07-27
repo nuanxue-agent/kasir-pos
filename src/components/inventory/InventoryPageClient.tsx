@@ -200,7 +200,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                   return (
                     <tr key={product.id} className="border-b border-stone-200 hover:bg-gray-700/50">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-white">{product.name}</div>
+                        <div className="font-medium text-stone-700">{product.name}</div>
                         <div className="text-sm text-gray-400">{formatCurrency(product.price)}</div>
                       </td>
                       <td className="px-4 py-3 text-gray-300 text-sm">

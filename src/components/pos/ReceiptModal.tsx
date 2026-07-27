@@ -109,16 +109,16 @@ export default function ReceiptModal({
         className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       >
         {/* Modal shell */}
-        <div className="w-full max-w-sm bg-[#0d0d14] rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-stone-200 shadow-2xl overflow-hidden">
           {/* Header — hidden on print */}
           <div className="no-print flex items-center justify-between px-5 py-4 border-b border-white/5">
             <div className="flex items-center gap-2">
               <Printer className="h-4 w-4 text-indigo-400" />
-              <h2 className="text-sm font-semibold text-white">Receipt</h2>
+              <h2 className="text-sm font-semibold text-stone-800">Receipt</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-white/30 hover:text-white transition-colors"
+              className="text-white/30 hover:text-stone-700 transition-colors"
               aria-label="Close receipt"
             >
               <X className="h-5 w-5" />
@@ -253,7 +253,7 @@ export default function ReceiptModal({
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/70 text-sm font-medium hover:text-white hover:bg-white/10 transition-colors"
+              className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/70 text-sm font-medium hover:text-stone-700 hover:bg-white/10 transition-colors"
             >
               Close
             </button>

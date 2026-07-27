@@ -52,7 +52,7 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Discounts</h1>
+          <h1 className="text-2xl font-bold text-stone-800">Discounts</h1>
           <p className="text-stone-500 mt-1 text-sm">Manage coupon codes and promotions</p>
         </div>
         <button
@@ -91,7 +91,7 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-white">{d.name}</p>
+                  <p className="font-medium text-stone-700">{d.name}</p>
                   {!d.active && <span className="text-xs bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">Inactive</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-stone-500">
@@ -113,7 +113,7 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => { setEditing(d); setShowForm(true) }}
-                  className="p-2 text-stone-500 hover:text-white hover:bg-stone-200 rounded-lg transition-colors"
+                  className="p-2 text-stone-500 hover:text-stone-700 hover:bg-stone-200 rounded-lg transition-colors"
                 >
                   <Pencil size={15} />
                 </button>
@@ -217,7 +217,7 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-white text-sm transition-colors">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors">Cancel</button>
           <button onClick={submit} disabled={loading || !form.name}
             className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-500 disabled:bg-stone-200 text-white text-sm font-medium transition-colors">
             {loading ? 'Saving...' : 'Save'}

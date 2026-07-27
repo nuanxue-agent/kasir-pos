@@ -76,7 +76,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   return (
     <div className="p-6 max-w-2xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Store Settings</h1>
+        <h1 className="text-2xl font-bold text-stone-800">Store Settings</h1>
         <p className="text-stone-500 mt-1 text-sm">Configure your store information and preferences</p>
       </div>
 

@@ -204,10 +204,10 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
             />
           </div>
           <div className="flex rounded-lg border border-stone-200 overflow-hidden">
-            <button onClick={() => setViewMode('grid')} className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-white')}>
+            <button onClick={() => setViewMode('grid')} className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-700')}>
               <Grid3x3 className="h-4 w-4" />
             </button>
-            <button onClick={() => setViewMode('list')} className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-white')}>
+            <button onClick={() => setViewMode('list')} className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-700')}>
               <List className="h-4 w-4" />
             </button>
           </div>
@@ -222,13 +222,13 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
         <div className="flex gap-2 px-4 py-2.5 border-b border-stone-100 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', !selectedCategory ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-white hover:bg-stone-100')}
+            className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', !selectedCategory ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-stone-700 hover:bg-stone-100')}
           >All</button>
           {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
-              className={cn('flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', selectedCategory === cat.id ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-white hover:bg-stone-100')}
+              className={cn('flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', selectedCategory === cat.id ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-stone-700 hover:bg-stone-100')}
             >
               {cat.icon && <span>{cat.icon}</span>}
               {cat.name}
@@ -268,7 +268,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
         {/* Items */}
         <div className="flex-1 overflow-y-auto">
           {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-white/20 py-16">
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-stone-300 py-16">
               <CreditCard className="h-12 w-12" />
               <p className="text-sm">Add items to start an order</p>
             </div>
@@ -281,7 +281,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                       <p className="text-sm font-medium text-stone-700 truncate">{item.name}</p>
                       <p className="text-xs text-stone-400 mt-0.5">{fmt(item.price, currency)} each</p>
                     </div>
-                    <button onClick={() => removeItem(item.id)} className="text-white/20 hover:text-red-400 transition-colors mt-0.5">
+                    <button onClick={() => removeItem(item.id)} className="text-stone-300 hover:text-red-400 transition-colors mt-0.5">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -332,7 +332,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                 <div className="flex items-center gap-2">
                   <User className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                   <div>
-                    <p className="text-xs font-medium text-white">{selectedCustomer.name}</p>
+                    <p className="text-xs font-medium text-stone-700">{selectedCustomer.name}</p>
                     <p className="text-[10px] text-stone-400 flex items-center gap-0.5">
                       <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
                       {selectedCustomer.points} pts
@@ -356,7 +356,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                   'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-colors',
                   redeemPoints
                     ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
-                    : 'border-stone-200 bg-stone-50 text-stone-500 hover:text-white hover:border-stone-300'
+                    : 'border-stone-200 bg-stone-50 text-stone-500 hover:text-stone-700 hover:border-stone-300'
                 )}
               >
                 <span className="flex items-center gap-1.5">
@@ -501,7 +501,7 @@ function CustomerSearch({ storeId, onSelect, onClose }: {
           className="w-full flex items-center justify-between px-3 py-2 hover:bg-stone-100 transition-colors text-left border-t border-stone-100 first:border-t-0"
         >
           <div>
-            <p className="text-xs font-medium text-white">{c.name}</p>
+            <p className="text-xs font-medium text-stone-700">{c.name}</p>
             {c.phone && <p className="text-[10px] text-stone-400">{c.phone}</p>}
           </div>
           <span className="flex items-center gap-1 text-[10px] text-amber-400 shrink-0">
@@ -683,7 +683,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                 key={m.id}
                 onClick={() => setMethod(m.id)}
                 className={cn('flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all',
-                  method === m.id ? 'border-amber-500/60 bg-amber-500/15 text-white' : 'border-stone-200 bg-stone-50 text-stone-400 hover:text-white hover:border-stone-300'
+                  method === m.id ? 'border-amber-500/60 bg-amber-500/15 text-white' : 'border-stone-200 bg-stone-50 text-stone-400 hover:text-stone-700 hover:border-stone-300'
                 )}
               >
                 <m.icon className={cn('h-5 w-5', method === m.id ? m.color : '')} />
@@ -706,7 +706,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
               <div className="flex gap-2">
                 {quickAmounts.map(a => (
                   <button key={a} onClick={() => setCashGiven(String(a))}
-                    className="flex-1 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-xs text-stone-500 hover:text-white hover:bg-stone-100 transition-colors">
+                    className="flex-1 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-xs text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors">
                     {fmt(a, currency)}
                   </button>
                 ))}

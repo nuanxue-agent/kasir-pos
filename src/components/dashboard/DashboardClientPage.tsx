@@ -93,7 +93,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-stone-800">
             {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''} 👋
           </h1>
           <p className="text-stone-400 mt-1 text-sm">Ini ringkasan tokomu hari ini.</p>
@@ -143,14 +143,14 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
         </Link>
         <Link
           href="/dashboard/products"
-          className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
+          className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-stone-700 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
         >
           <Package size={16} />
           Tambah Produk
         </Link>
         <Link
           href="/dashboard/reports"
-          className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
+          className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-stone-700 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
         >
           <BarChart3 size={16} />
           Lihat Laporan
@@ -180,7 +180,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
             </div>
           ) : (recentOrders as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <ShoppingCart className="h-8 w-8 text-white/10" />
+              <ShoppingCart className="h-8 w-8 text-stone-200" />
               <p className="text-sm text-stone-400">Belum ada pesanan hari ini</p>
             </div>
           ) : (
@@ -235,7 +235,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
             </div>
           ) : (lowStock as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <Boxes className="h-8 w-8 text-white/10" />
+              <Boxes className="h-8 w-8 text-stone-200" />
               <p className="text-sm text-stone-400">All products well stocked ✓</p>
             </div>
           ) : (

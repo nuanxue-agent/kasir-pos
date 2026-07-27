@@ -65,7 +65,7 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Staff</h1>
+          <h1 className="text-2xl font-bold text-stone-800">Staff</h1>
           <p className="text-stone-500 mt-1 text-sm">Manage your team members and permissions</p>
         </div>
         <button
@@ -104,7 +104,7 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-white">{member.user.name}</p>
+                  <p className="font-medium text-stone-700">{member.user.name}</p>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', ROLE_COLORS[member.role])}>
                     {member.role}
                   </span>
@@ -126,7 +126,7 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => { setEditing(member); setShowForm(true) }}
-                  className="p-2 text-stone-500 hover:text-white hover:bg-stone-200 rounded-lg transition-colors"
+                  className="p-2 text-stone-500 hover:text-stone-700 hover:bg-stone-200 rounded-lg transition-colors"
                   title="Edit"
                 >
                   <Pencil size={15} />
@@ -274,7 +274,7 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
         {error && <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-white text-sm transition-colors">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors">
             Cancel
           </button>
           <button
