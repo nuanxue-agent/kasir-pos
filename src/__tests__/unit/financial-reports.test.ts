@@ -58,28 +58,39 @@ function calcPctChange(current: number, previous: number): number | null {
   return ((current - previous) / Math.abs(previous)) * 100
 }
 
+/** Format a local date as YYYY-MM-DD without UTC shift */
+function localDateStr(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+/** Last day of a given month (1-indexed) */
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
+}
+
 function getPeriodRange(period: 'month' | 'quarter' | 'year', referenceDate: string): { from: string; to: string } {
-  // Parse date parts directly to avoid UTC-vs-local timezone shift
   const [y, m0] = referenceDate.split('-').map(Number)
-  const m = m0 - 1 // zero-indexed month
+  const m = m0 // 1-indexed month
 
   switch (period) {
     case 'month':
       return {
-        from: new Date(y, m, 1).toISOString().slice(0, 10),
-        to: new Date(y, m + 1, 0).toISOString().slice(0, 10),
+        from: localDateStr(y, m, 1),
+        to: localDateStr(y, m, lastDayOfMonth(y, m)),
       }
     case 'quarter': {
-      const q = Math.floor(m / 3)
+      const q = Math.floor((m - 1) / 3) // 0-indexed quarter
+      const qStartMonth = q * 3 + 1     // 1-indexed
+      const qEndMonth = qStartMonth + 2
       return {
-        from: new Date(y, q * 3, 1).toISOString().slice(0, 10),
-        to: new Date(y, q * 3 + 3, 0).toISOString().slice(0, 10),
+        from: localDateStr(y, qStartMonth, 1),
+        to: localDateStr(y, qEndMonth, lastDayOfMonth(y, qEndMonth)),
       }
     }
     case 'year':
       return {
-        from: new Date(y, 0, 1).toISOString().slice(0, 10),
-        to: new Date(y, 11, 31).toISOString().slice(0, 10),
+        from: localDateStr(y, 1, 1),
+        to: localDateStr(y, 12, 31),
       }
   }
 }

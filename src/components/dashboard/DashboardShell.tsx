@@ -69,7 +69,7 @@ export function DashboardShell({
             userEmail={userEmail}
             userImage={userImage}
             userRole={userRole}
-            stores={stores}
+            stores={stores as any}
             currentStoreId={currentStoreId}
             onStoreChange={setCurrentStoreId}
             onMenuToggle={() => setSidebarOpen((v) => !v)}
