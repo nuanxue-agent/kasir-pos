@@ -4092,6 +4092,406 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       )
     }
 
+    // ─── DELIVERY ORDERS ──────────────────────────────────────────────────────
+    if (segs[0] === 'delivery-orders') {
+      // Lazy-create the DeliveryOrder table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS DeliveryOrder (
+          id               TEXT PRIMARY KEY,
+          storeId          TEXT NOT NULL,
+          orderId          TEXT,
+          customerId       TEXT,
+          customerName     TEXT,
+          address          TEXT NOT NULL,
+          status           TEXT NOT NULL DEFAULT 'PENDING',
+          driverId         TEXT,
+          driverName       TEXT,
+          estimatedMinutes INTEGER,
+          distanceKm       REAL,
+          itemsSummary     TEXT,
+          total            REAL NOT NULL DEFAULT 0,
+          orderNumber      TEXT,
+          createdAt        TEXT NOT NULL
+        )
+      `, [])
+
+      // GET /api/delivery-orders?storeId=&status=
+      if (segs.length === 1 && method === 'GET') {
+        const statusFilter = sp.get('status')
+        let sql = `SELECT * FROM DeliveryOrder WHERE storeId = ?`
+        const p: any[] = [storeId]
+        if (statusFilter) {
+          sql += ` AND status = ?`
+          p.push(statusFilter)
+        }
+        sql += ` ORDER BY createdAt DESC`
+        const rows = await query(sql, p)
+        return ok(rows)
+      }
+
+      // POST /api/delivery-orders
+      if (segs.length === 1 && method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['address'])
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO DeliveryOrder
+            (id, storeId, orderId, customerId, customerName, address, status, driverId, driverName, estimatedMinutes, distanceKm, itemsSummary, total, orderNumber, createdAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            b.orderId ?? null,
+            b.customerId ?? null,
+            b.customerName ?? null,
+            b.address,
+            'PENDING',
+            null,
+            null,
+            b.estimatedMinutes != null ? Number(b.estimatedMinutes) : null,
+            b.distanceKm != null ? Number(b.distanceKm) : null,
+            b.itemsSummary ?? null,
+            Number(b.total) || 0,
+            b.orderNumber ?? null,
+            t,
+          ],
+        )
+        return ok({ id, status: 'PENDING', createdAt: t }, 201)
+      }
+
+      // PATCH /api/delivery-orders/:id
+      if (segs.length === 2 && method === 'PATCH') {
+        const orderId = segs[1]
+        const b: any = await req.json()
+
+        const VALID_DELIVERY_STATUSES = ['PENDING', 'PREPARING', 'ON_DELIVERY', 'DELIVERED', 'CANCELLED']
+        const STATUS_TRANSITIONS_MAP: Record<string, string[]> = {
+          PENDING:     ['PREPARING', 'CANCELLED'],
+          PREPARING:   ['ON_DELIVERY', 'CANCELLED'],
+          ON_DELIVERY: ['DELIVERED', 'CANCELLED'],
+          DELIVERED:   [],
+          CANCELLED:   [],
+        }
+
+        // Fetch existing order
+        const existing = await query<any>(
+          `SELECT * FROM DeliveryOrder WHERE id = ? AND storeId = ?`,
+          [orderId, storeId],
+        )
+        if (!existing || existing.length === 0) {
+          return err('Delivery order not found', 404, 'NOT_FOUND', requestId, startMs)
+        }
+        const current = existing[0]
+
+        const updates: Record<string, any> = {}
+
+        if (b.status !== undefined) {
+          if (!VALID_DELIVERY_STATUSES.includes(b.status)) {
+            return err(`Invalid status: ${b.status}`, 400, 'INVALID_VALUE', requestId, startMs)
+          }
+          const allowed = STATUS_TRANSITIONS_MAP[current.status as string] ?? []
+          if (!allowed.includes(b.status)) {
+            return err(
+              `Tidak bisa mengubah status dari ${current.status} ke ${b.status}`,
+              400,
+              'INVALID_TRANSITION',
+              requestId,
+              startMs,
+            )
+          }
+          updates.status = b.status
+        }
+
+        if (b.driverId !== undefined) {
+          updates.driverId = b.driverId
+          // Resolve driver name
+          if (b.driverId) {
+            const emp = await query<any>(
+              `SELECT name FROM Employee WHERE id = ? AND storeId = ?`,
+              [b.driverId, storeId],
+            )
+            updates.driverName = emp[0]?.name ?? null
+          } else {
+            updates.driverName = null
+          }
+        }
+
+        if (b.estimatedMinutes !== undefined) {
+          updates.estimatedMinutes = b.estimatedMinutes != null ? Number(b.estimatedMinutes) : null
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return err('No valid fields to update', 400, 'MISSING_FIELD', requestId, startMs)
+        }
+
+        const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ')
+        const values = Object.values(updates)
+        await exec(
+          `UPDATE DeliveryOrder SET ${setClauses} WHERE id = ? AND storeId = ?`,
+          [...values, orderId, storeId],
+        )
+        return ok({ success: true, ...updates })
+      }
+    }
+
+    // ─── REPORTS / RFM ───────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'rfm' && method === 'GET') {
+      // Pull all customers for this store
+      const customers = await query(
+        `SELECT id, name, phone, email FROM Customer WHERE storeId = ?`,
+        [storeId],
+      ) as any[]
+
+      if (customers.length === 0) return ok([])
+
+      const now = Date.now()
+
+      // Per-customer order stats in one query
+      const stats = await query(
+        `SELECT customerId,
+                COUNT(*)        AS frequency,
+                SUM(total)      AS monetary,
+                MAX(createdAt)  AS lastOrderAt
+         FROM "Order"
+         WHERE storeId = ? AND status = 'PAID' AND customerId IS NOT NULL
+         GROUP BY customerId`,
+        [storeId],
+      ) as any[]
+
+      // Build stats map
+      const statsMap = new Map<string, { frequency: number; monetary: number; recency: number }>()
+      for (const r of stats) {
+        const lastMs = new Date(r.lastOrderAt).getTime()
+        const recency = Math.floor((now - lastMs) / 86400000)
+        statsMap.set(r.customerId, {
+          frequency: Number(r.frequency),
+          monetary:  Number(r.monetary),
+          recency:   Math.max(0, recency),
+        })
+      }
+
+      // Build raw stats array (customers with no orders get high recency + 0 freq/monetary)
+      const rawStats = customers.map((c: any) => {
+        const s = statsMap.get(c.id)
+        return {
+          id:        c.id,
+          name:      c.name,
+          phone:     c.phone ?? null,
+          email:     c.email ?? null,
+          recency:   s?.recency   ?? 9999,
+          frequency: s?.frequency ?? 0,
+          monetary:  s?.monetary  ?? 0,
+        }
+      })
+
+      // Inline RFM computation (mirrors src/lib/rfm.ts — avoids import in edge route)
+      function scoreMetricLocal(value: number, allValues: number[], invert: boolean): number {
+        if (allValues.length === 0) return 3
+        const sorted = [...allValues].sort((a, b) => a - b)
+        const rank   = sorted.filter((v) => v <= value).length
+        const pct    = rank / sorted.length
+        const score  = Math.max(1, Math.min(5, Math.ceil(pct * 5)))
+        return invert ? 6 - score : score
+      }
+
+      function assignSegmentLocal(r: number, f: number, m: number): string {
+        const avg = (r + f + m) / 3
+        if (r >= 4 && f >= 4 && m >= 4) return 'Champions'
+        if (avg >= 3.5 && f >= 3)        return 'Loyal'
+        if (r >= 4 && f <= 2)            return 'New'
+        if (r <= 2 && f >= 3)            return 'AtRisk'
+        if (r <= 2 && f <= 2)            return 'Lost'
+        return avg >= 2.5 ? 'Loyal' : 'AtRisk'
+      }
+
+      const recencies   = rawStats.map((c) => c.recency)
+      const frequencies = rawStats.map((c) => c.frequency)
+      const monetaries  = rawStats.map((c) => c.monetary)
+
+      const result = rawStats.map((c) => {
+        const rScore = scoreMetricLocal(c.recency,   recencies,   true)
+        const fScore = scoreMetricLocal(c.frequency, frequencies, false)
+        const mScore = scoreMetricLocal(c.monetary,  monetaries,  false)
+        return {
+          ...c,
+          scores:  { recencyScore: rScore, frequencyScore: fScore, monetaryScore: mScore },
+          segment: assignSegmentLocal(rScore, fScore, mScore),
+        }
+      })
+
+      return okCached(result, 'private, max-age=60')
+    }
+
+    // ─── REFERRALS ────────────────────────────────────────────────────────────
+    if (segs[0] === 'referrals' && method === 'GET') {
+      const customerId = sp.get('customerId')
+      if (!customerId) return err('customerId required', 400, 'MISSING_FIELD', requestId, startMs)
+
+      // Verify the customer belongs to this store
+      const customer = await queryOne(
+        `SELECT id FROM Customer WHERE id = ? AND storeId = ?`,
+        [customerId, storeId],
+      )
+      if (!customer) return err('Customer not found', 404, 'NOT_FOUND', requestId, startMs)
+
+      // Fetch referrals where this customer is the referrer
+      const rows = await query(
+        `SELECT r.id,
+                r.referredCustomerId,
+                c.name      AS referredCustomerName,
+                r.rewarded,
+                r.pointsAwarded,
+                r.createdAt
+         FROM Referral r
+         JOIN Customer c ON c.id = r.referredCustomerId
+         WHERE r.referrerId = ? AND r.storeId = ?
+         ORDER BY r.createdAt DESC`,
+        [customerId, storeId],
+      ) as any[]
+
+      const referrals = rows.map((r: any) => ({
+        id:                   r.id,
+        referredCustomerId:   r.referredCustomerId,
+        referredCustomerName: r.referredCustomerName ?? 'Unknown',
+        createdAt:            r.createdAt,
+        rewarded:             Boolean(r.rewarded),
+        pointsAwarded:        Number(r.pointsAwarded ?? 0),
+      }))
+
+      return ok(referrals)
+    }
+
+    // ─── BUDGETS ──────────────────────────────────────────────────────────────
+    if (segs[0] === 'budgets') {
+      // Lazy-create Budget table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS Budget (
+          id        TEXT PRIMARY KEY,
+          storeId   TEXT NOT NULL,
+          month     INTEGER NOT NULL,
+          year      INTEGER NOT NULL,
+          category  TEXT NOT NULL,
+          budgetAmount REAL NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          UNIQUE(storeId, month, year, category)
+        )
+      `)
+
+      if (method === 'GET') {
+        const month = parseInt(sp.get('month') ?? String(new Date().getMonth() + 1))
+        const year  = parseInt(sp.get('year')  ?? String(new Date().getFullYear()))
+        if (isNaN(month) || month < 1 || month > 12) return err('Invalid month', 400)
+        if (isNaN(year)  || year  < 2000 || year > 2100) return err('Invalid year', 400)
+
+        // Fetch budget rows
+        const budgetRows = await query(
+          `SELECT * FROM Budget WHERE storeId=? AND month=? AND year=?`,
+          [storeId, month, year],
+        ) as any[]
+
+        // Compute actual per category for the month
+        const firstDay = `${year}-${String(month).padStart(2, '0')}-01`
+        const lastDay  = new Date(year, month, 0).toISOString().slice(0, 10)
+        const actuals  = await query(
+          `SELECT category, COALESCE(SUM(amount),0) as actual
+             FROM Expense
+            WHERE storeId=? AND date BETWEEN ? AND ?
+            GROUP BY category`,
+          [storeId, firstDay, lastDay],
+        ) as any[]
+
+        const actualMap = new Map<string, number>()
+        for (const a of actuals) actualMap.set(a.category, Number(a.actual))
+
+        const result = budgetRows.map((b: any) => ({
+          ...b,
+          actualAmount: actualMap.get(b.category) ?? 0,
+        }))
+        return ok(result)
+      }
+
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.category || b.budgetAmount === undefined) return err('Missing required fields', 400)
+        const month = parseInt(b.month ?? new Date().getMonth() + 1)
+        const year  = parseInt(b.year  ?? new Date().getFullYear())
+        const id    = newId()
+        const t     = nowISO()
+        // Upsert: replace on conflict
+        await exec(
+          `INSERT INTO Budget (id,storeId,month,year,category,budgetAmount,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?)
+           ON CONFLICT(storeId,month,year,category) DO UPDATE SET budgetAmount=excluded.budgetAmount, updatedAt=excluded.updatedAt`,
+          [id, storeId, month, year, b.category, Number(b.budgetAmount), t, t],
+        )
+        return ok({ id }, 201)
+      }
+
+      if (segs[1] && method === 'PATCH') {
+        const b = (await req.json()) as any
+        if (b.budgetAmount === undefined) return err('budgetAmount is required', 400)
+        await exec(
+          `UPDATE Budget SET budgetAmount=?, updatedAt=? WHERE id=? AND storeId=?`,
+          [Number(b.budgetAmount), nowISO(), segs[1], storeId],
+        )
+        return ok({ success: true })
+      }
+
+      if (segs[1] && method === 'DELETE') {
+        await exec(`DELETE FROM Budget WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ─── REPORTS / CASHFLOW ───────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'cashflow' && method === 'GET') {
+      const months = Math.min(6, Math.max(1, parseInt(sp.get('months') ?? '3')))
+
+      // Revenue: last 3 months grouped by month
+      const revenueRows = await query(
+        `SELECT strftime('%Y-%m', createdAt) as ym, SUM(total) as revenue
+           FROM "Order"
+          WHERE storeId=? AND status='PAID'
+            AND createdAt >= date('now', '-3 months')
+          GROUP BY ym
+          ORDER BY ym`,
+        [storeId],
+      ) as any[]
+
+      // Expenses: last 3 months grouped by month
+      const expenseRows = await query(
+        `SELECT strftime('%Y-%m', date) as ym, SUM(amount) as expenses
+           FROM Expense
+          WHERE storeId=? AND date >= date('now', '-3 months')
+          GROUP BY ym
+          ORDER BY ym`,
+        [storeId],
+      ) as any[]
+
+      const revenueValues  = revenueRows.map((r: any) => Number(r.revenue))
+      const expenseValues  = expenseRows.map((r: any) => Number(r.expenses))
+
+      const avgRevenue  = revenueValues.length  > 0 ? revenueValues.reduce((a, b) => a + b, 0)  / revenueValues.length  : 0
+      const avgExpenses = expenseValues.length  > 0 ? expenseValues.reduce((a, b) => a + b, 0) / expenseValues.length : 0
+
+      // Build projections for next `months` months
+      const now2 = new Date()
+      const projections = Array.from({ length: months }, (_, i) => {
+        const d = new Date(now2.getFullYear(), now2.getMonth() + i + 1, 1)
+        const label = d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })
+        return {
+          month: label,
+          projectedIncome:   Math.max(0, avgRevenue),
+          projectedExpenses: Math.max(0, avgExpenses),
+          projectedNet:      avgRevenue - avgExpenses,
+        }
+      })
+
+      return ok({ projections, avgRevenue, avgExpenses })
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
