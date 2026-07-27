@@ -109,13 +109,13 @@ export function CustomerFormModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
           <div className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-amber-600" />
-            <h2 className="text-lg font-semibold text-slate-100">
+            <h2 className="text-lg font-semibold text-stone-800">
               {isEdit ? 'Edit Customer' : 'Add Customer'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-500 hover:text-slate-100 hover:bg-stone-100 transition-colors"
+            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

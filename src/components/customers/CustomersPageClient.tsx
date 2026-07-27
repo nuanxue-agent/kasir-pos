@@ -89,7 +89,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
             <Users className="h-6 w-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Customers</h1>
+            <h1 className="text-2xl font-bold text-stone-800">Customers</h1>
             <p className="text-sm text-stone-500">
               {total} {total === 1 ? 'customer' : 'customers'}
             </p>
@@ -124,7 +124,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
           </div>
         ) : customers.length === 0 ? (
           <div className="text-center py-12">
-            <Users className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+            <Users className="h-12 w-12 text-stone-300 mx-auto mb-3" />
             <p className="text-stone-500">
               {searchQuery ? 'No customers found' : 'No customers yet'}
             </p>
@@ -208,8 +208,8 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                     className={cn(
                       'px-3 py-1 rounded text-sm font-medium transition-colors',
                       page === 1
-                        ? 'bg-stone-100 text-slate-600 cursor-not-allowed'
-                        : 'bg-stone-200 text-slate-200 hover:bg-stone-300'
+                        ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                        : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
                     )}
                   >
                     Previous
@@ -220,8 +220,8 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                     className={cn(
                       'px-3 py-1 rounded text-sm font-medium transition-colors',
                       page === pages
-                        ? 'bg-stone-100 text-slate-600 cursor-not-allowed'
-                        : 'bg-stone-200 text-slate-200 hover:bg-stone-300'
+                        ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                        : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
                     )}
                   >
                     Next

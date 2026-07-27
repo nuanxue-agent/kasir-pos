@@ -716,7 +716,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                 <span>-{fmt(pointsRedeemed * 100, currency)}</span>
               </div>
             )}
-            <div className="flex justify-between text-base font-bold text-white pt-1.5 border-t border-stone-200"><span>Total</span><span>{fmt(total, currency)}</span></div>
+            <div className="flex justify-between text-base font-bold text-stone-800 pt-1.5 border-t border-stone-200"><span>Total</span><span>{fmt(total, currency)}</span></div>
           </div>
 
           {/* Payment method */}
@@ -744,7 +744,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                 value={cashGiven}
                 onChange={e => setCashGiven(e.target.value)}
                 placeholder={fmt(total, currency)}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-400/60"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800 text-sm focus:outline-none focus:border-amber-400/60"
               />
               <div className="flex gap-2">
                 {quickAmounts.map(a => (

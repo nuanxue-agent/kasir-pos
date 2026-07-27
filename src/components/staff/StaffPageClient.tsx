@@ -214,7 +214,7 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-md border border-stone-200 p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-stone-800 flex items-center gap-2">
           <UserCog size={20} />
           {staff ? 'Edit Staff Member' : 'Add Staff Member'}
         </h2>
@@ -290,4 +290,4 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
   )
 }
 
-const inputCls = 'w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed'
+const inputCls = 'w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-stone-400 disabled:opacity-50 disabled:cursor-not-allowed'

@@ -171,10 +171,10 @@ export function CustomerDetailModal({
       <div className="relative w-full max-w-2xl bg-white border border-stone-200 rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 shrink-0">
-          <h2 className="text-lg font-semibold text-slate-100">Customer Details</h2>
+          <h2 className="text-lg font-semibold text-stone-800">Customer Details</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-500 hover:text-slate-100 hover:bg-stone-100 transition-colors"
+            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

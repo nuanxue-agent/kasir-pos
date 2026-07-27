@@ -91,7 +91,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
 
         {/* Product Info */}
         <div className="px-6 py-4 bg-stone-50 border-b border-stone-200">
-          <div className="text-white font-medium">{product.name}</div>
+          <div className="text-stone-800 font-medium">{product.name}</div>
           {product.sku && (
             <div className="text-gray-400 text-sm mt-0.5">SKU: {product.sku}</div>
           )}
@@ -155,7 +155,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                     const n = parseInt(q) || 0
                     return String(n > 0 ? -n : n)
                   })}
-                  className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
                 >
                   {qtyNum >= 0 ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
                 </button>
@@ -165,7 +165,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
                 placeholder="Enter quantity"
-                className="flex-1 px-4 py-2 bg-gray-700 border border-stone-200 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           </div>
@@ -180,7 +180,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Reason for adjustment..."
-              className="w-full px-4 py-2 bg-gray-700 border border-stone-200 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </div>
 
@@ -202,8 +202,8 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
                 </span>
               </div>
               <div className="flex items-center justify-between border-t border-stone-200 pt-2 mt-1">
-                <span className="text-white font-medium">New stock</span>
-                <span className="text-white font-bold text-lg">{newStock}</span>
+                <span className="text-stone-800 font-medium">New stock</span>
+                <span className="text-stone-800 font-bold text-lg">{newStock}</span>
               </div>
             </div>
           )}
@@ -220,7 +220,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
         <div className="flex gap-3 px-6 py-4 border-t border-stone-200">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+            className="flex-1 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg font-medium transition-colors"
           >
             Cancel
           </button>

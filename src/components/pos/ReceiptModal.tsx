@@ -253,7 +253,7 @@ export default function ReceiptModal({
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/70 text-sm font-medium hover:text-stone-700 hover:bg-white/10 transition-colors"
+              className="flex-1 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-600 text-sm font-medium hover:text-stone-800 hover:bg-stone-100 transition-colors"
             >
               Close
             </button>

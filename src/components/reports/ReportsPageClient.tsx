@@ -141,7 +141,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="bg-stone-200 text-white rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="bg-stone-50 text-stone-800 rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
             <div>
@@ -150,7 +150,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="bg-stone-200 text-white rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="bg-stone-50 text-stone-800 rounded-lg px-3 py-2 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           </div>

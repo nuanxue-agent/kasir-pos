@@ -66,7 +66,7 @@ export default function CartPanel({ storeId, taxRate, currency, onCheckout }: Ca
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="text-slate-600 hover:text-red-400 transition-colors mt-0.5"
+                    className="text-stone-400 hover:text-red-400 transition-colors mt-0.5"
                   >
                     <Trash2 size={14} />
                   </button>

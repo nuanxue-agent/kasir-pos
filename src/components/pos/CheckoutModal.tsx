@@ -168,7 +168,7 @@ export default function PembayaranModal({
                   <button
                     key={amount}
                     onClick={() => setTunaiGiven(String(amount))}
-                    className="flex-1 text-xs py-1.5 rounded bg-stone-100 border border-stone-200 text-stone-600 hover:border-slate-500 transition-colors"
+                    className="flex-1 text-xs py-1.5 rounded bg-stone-100 border border-stone-200 text-stone-600 hover:border-stone-400 transition-colors"
                   >
                     {fmt(amount)}
                   </button>

@@ -74,7 +74,7 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
       <div className="relative bg-stone-100 rounded-xl border border-stone-200 shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-stone-800 flex items-center gap-2">
             <History className="w-5 h-5" />
             Stock History
           </h2>
@@ -88,7 +88,7 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
 
         {/* Product Info */}
         <div className="px-6 py-3 bg-stone-50 border-b border-stone-200">
-          <div className="text-white font-medium">{product.name}</div>
+          <div className="text-stone-800 font-medium">{product.name}</div>
           <div className="flex items-center gap-4 mt-0.5">
             {product.sku && (
               <div className="text-gray-400 text-sm">SKU: {product.sku}</div>
@@ -156,14 +156,14 @@ export default function StockLogsModal({ product, onClose }: StockLogsModalProps
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="p-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                className="p-1.5 bg-stone-100 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed text-stone-700 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="p-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                className="p-1.5 bg-stone-100 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed text-stone-700 rounded-lg transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
