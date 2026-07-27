@@ -52,6 +52,22 @@ interface POSPageClientProps {
 
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS'
 
+// ─── Hold Order ───────────────────────────────────────────────────────────────
+
+const HELD_ORDERS_KEY = 'pos_held_orders'
+const MAX_HELD_ORDERS = 5
+
+interface HeldOrder {
+  id: string
+  timestamp: number
+  items: CartItem[]
+  customerName: string | null
+  customerId: string | null
+  note: string
+  discountType: 'PERCENT' | 'FLAT' | null
+  discountValue: number
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(n: number, currency: string) {
@@ -83,6 +99,24 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
 
   // Camera barcode scanner modal state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+
+  // Hold order state
+  const [heldOrders, setHeldOrders] = useState<HeldOrder[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem(HELD_ORDERS_KEY) ?? '[]') } catch { return [] }
+  })
+  const [showHeldOrders, setShowHeldOrders] = useState(false)
+
+  // Manual discount state
+  const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
+  const [discountValue, setDiscountValue] = useState('')
+
+  // Computed manual discount amount
+  const manualDiscountAmt = (() => {
+    const v = parseFloat(discountValue) || 0
+    if (discountType === 'PERCENT') return Math.round(subtotal * Math.min(v, 100) / 100)
+    return Math.min(v, subtotal)
+  })
 
   // HID barcode scanner state
   const barcodeBuffer = useRef('')
@@ -132,6 +166,80 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
     return () => window.removeEventListener('keydown', onKey)
   }, [products]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onShortcut = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      } else if (e.key === 'F2') {
+        e.preventDefault()
+        if (cart.length > 0) setShowCheckout(true)
+      } else if (e.key === 'Escape') {
+        if (document.activeElement === searchRef.current) {
+          setSearch('')
+          searchRef.current?.blur()
+        }
+      }
+    }
+    window.addEventListener('keydown', onShortcut)
+    return () => window.removeEventListener('keydown', onShortcut)
+  }, [cart.length])
+
+  // ── Hold / Recall helpers ─────────────────────────────────────────────────
+  const saveHeldOrders = (orders: HeldOrder[]) => {
+    setHeldOrders(orders)
+    localStorage.setItem(HELD_ORDERS_KEY, JSON.stringify(orders))
+  }
+
+  const holdOrder = () => {
+    if (cart.length === 0) return
+    const existing = heldOrders
+    if (existing.length >= MAX_HELD_ORDERS) {
+      setSuccessMsg('⚠ Max 5 held orders reached. Recall or delete one first.')
+      setTimeout(() => setSuccessMsg(''), 2500)
+      return
+    }
+    const held: HeldOrder = {
+      id: `held-${Date.now()}`,
+      timestamp: Date.now(),
+      items: cart,
+      customerName: selectedCustomer?.name ?? null,
+      customerId: selectedCustomer?.id ?? null,
+      note: '',
+      discountType: discountValue ? discountType : null,
+      discountValue: parseFloat(discountValue) || 0,
+    }
+    saveHeldOrders([...existing, held])
+    clearCart()
+    setSelectedCustomer(null)
+    setRedeemPoints(false)
+    setDiscountValue('')
+    setSuccessMsg('✓ Order held')
+    setTimeout(() => setSuccessMsg(''), 2000)
+  }
+
+  const recallOrder = (held: HeldOrder) => {
+    // Restore cart, customer, discount
+    setCart(held.items)
+    if (held.customerId) {
+      setSelectedCustomer({ id: held.customerId, name: held.customerName ?? '', phone: null, points: 0 })
+    }
+    if (held.discountType) {
+      setDiscountType(held.discountType)
+      setDiscountValue(String(held.discountValue))
+    }
+    // Remove from held list
+    saveHeldOrders(heldOrders.filter(h => h.id !== held.id))
+    setShowHeldOrders(false)
+    setSuccessMsg('✓ Order recalled')
+    setTimeout(() => setSuccessMsg(''), 2000)
+  }
+
+  const deleteHeldOrder = (id: string) => {
+    saveHeldOrders(heldOrders.filter(h => h.id !== id))
+  }
+
   const filtered = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
     const matchCat = !selectedCategory || p.category?.id === selectedCategory
@@ -145,7 +253,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
   const maxRedeemablePoints = selectedCustomer?.points ?? 0
   const pointsDiscount = redeemPoints ? Math.min(maxRedeemablePoints * 100, baseTotal) : 0
   const pointsRedeemed = redeemPoints ? Math.floor(pointsDiscount / 100) : 0
-  const total = baseTotal - pointsDiscount
+  const total = baseTotal - pointsDiscount - manualDiscountAmt()
   const addToCart = useCallback((product: Product) => {
     if (product.trackStock && product.stock <= 0) return
     setCart(prev => {
@@ -261,8 +369,9 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Cari produk…"
-              className="w-full pl-9 pr-4 py-2 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
+              className="w-full pl-9 pr-12 py-2 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
             />
+            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-stone-100 text-[10px] font-mono text-stone-400 border border-stone-200 pointer-events-none">F1</kbd>
           </div>
           <div className="flex rounded-lg border border-stone-200 overflow-hidden">
             <button onClick={() => setViewMode('grid')} className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-700')}>
@@ -337,10 +446,85 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100">
           <h2 className="text-sm font-semibold text-stone-800">Pesanan</h2>
-          {cart.length > 0 && (
-            <button onClick={clearCart} className="text-xs text-red-400 hover:text-red-300 transition-colors">Hapus semua</button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Recall button */}
+            <button
+              onClick={() => setShowHeldOrders(v => !v)}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors relative',
+                heldOrders.length > 0
+                  ? 'bg-amber-500/15 text-amber-600 hover:bg-amber-500/25'
+                  : 'bg-stone-100 text-stone-400 hover:text-stone-600'
+              )}
+              title="Recall held order"
+            >
+              <PlayCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Recall</span>
+              {heldOrders.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+                  {heldOrders.length}
+                </span>
+              )}
+            </button>
+            {/* Hold button */}
+            {cart.length > 0 && (
+              <button
+                onClick={holdOrder}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700 transition-colors"
+                title="Hold current order"
+              >
+                <PauseCircle className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Hold</span>
+              </button>
+            )}
+            {cart.length > 0 && (
+              <button onClick={clearCart} className="text-xs text-red-400 hover:text-red-300 transition-colors">Hapus semua</button>
+            )}
+          </div>
         </div>
+
+        {/* Held orders panel */}
+        {showHeldOrders && (
+          <div className="border-b border-stone-100 bg-amber-500/5">
+            <div className="px-4 py-2 flex items-center justify-between">
+              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Held Orders ({heldOrders.length}/{MAX_HELD_ORDERS})</p>
+              <button onClick={() => setShowHeldOrders(false)} className="text-stone-400 hover:text-stone-600"><X className="h-3.5 w-3.5" /></button>
+            </div>
+            {heldOrders.length === 0 ? (
+              <p className="text-xs text-stone-400 text-center py-3">No held orders</p>
+            ) : (
+              <div className="divide-y divide-stone-100 max-h-48 overflow-y-auto">
+                {heldOrders.map(h => (
+                  <div key={h.id} className="flex items-center gap-2 px-4 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-stone-700 truncate">
+                        {h.items.length} item{h.items.length !== 1 ? 's' : ''}
+                        {h.customerName ? ` · ${h.customerName}` : ''}
+                      </p>
+                      <p className="text-[10px] text-stone-400">
+                        {new Date(h.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        {' · '}
+                        {fmt(h.items.reduce((s, i) => s + i.subtotal, 0), currency)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => recallOrder(h)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500 text-white text-[10px] font-semibold hover:bg-amber-600 transition-colors shrink-0"
+                    >
+                      <PlayCircle className="h-3 w-3" /> Recall
+                    </button>
+                    <button
+                      onClick={() => deleteHeldOrder(h.id)}
+                      className="text-stone-300 hover:text-red-400 transition-colors shrink-0"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto">
@@ -462,16 +646,59 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                   <span>-{fmt(pointsDiscount, currency)}</span>
                 </div>
               )}
+              {manualDiscountAmt() > 0 && (
+                <div className="flex justify-between text-sm text-emerald-500">
+                  <span>Diskon manual</span>
+                  <span>-{fmt(manualDiscountAmt(), currency)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-bold text-stone-800 pt-1 border-t border-stone-200">
                 <span>Total</span><span>{fmt(total, currency)}</span>
               </div>
             </div>
-            <button
-              onClick={() => setShowCheckout(true)}
-              className="w-full mt-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-amber-500/20"
-            >
-              Bayar — {fmt(total, currency)}
-            </button>
+
+            {/* Manual discount */}
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-lg border border-stone-200 overflow-hidden shrink-0">
+                <button
+                  onClick={() => setDiscountType('PERCENT')}
+                  className={cn('px-2 py-1.5 text-xs font-medium transition-colors', discountType === 'PERCENT' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600')}
+                >
+                  <Percent className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => setDiscountType('FLAT')}
+                  className={cn('px-2 py-1.5 text-xs font-medium transition-colors', discountType === 'FLAT' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600')}
+                >
+                  <Tag className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  min="0"
+                  value={discountValue}
+                  onChange={e => setDiscountValue(e.target.value)}
+                  placeholder={discountType === 'PERCENT' ? 'Diskon %' : 'Diskon flat'}
+                  className="w-full pl-3 pr-3 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
+                />
+              </div>
+              {discountValue && (
+                <button onClick={() => setDiscountValue('')} className="text-stone-300 hover:text-red-400 transition-colors shrink-0">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCheckout(true)}
+                className="flex-1 mt-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+              >
+                <span>Bayar — {fmt(total, currency)}</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono border border-white/30">F2</kbd>
+              </button>
+            </div>
           </div>
         )}
       </div>

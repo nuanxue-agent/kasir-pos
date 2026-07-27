@@ -4,14 +4,51 @@
   "description": "Point of Sale & Business Management for SMEs",
   "start_url": "/dashboard",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#ffffff",
   "theme_color": "#f59e0b",
   "orientation": "any",
   "categories": ["business", "productivity", "finance"],
   "icons": [
     {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
       "type": "image/png",
       "purpose": "any maskable"
     },
@@ -22,23 +59,52 @@
       "purpose": "any maskable"
     }
   ],
-  "shortcuts": [
+  "screenshots": [
     {
-      "name": "POS Cashier",
-      "short_name": "Kasir",
-      "description": "Open POS screen",
-      "url": "/dashboard/pos",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "src": "/screenshots/pos-desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "POS Cashier on Desktop"
     },
     {
-      "name": "New Order",
-      "short_name": "Order",
-      "description": "Quick new order",
-      "url": "/dashboard/orders",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "src": "/screenshots/pos-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "POS Cashier on Mobile"
+    },
+    {
+      "src": "/screenshots/dashboard-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard Overview"
     }
   ],
-  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "New Sale",
+      "short_name": "New Sale",
+      "description": "Start a new sale transaction",
+      "url": "/dashboard/pos",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "View Orders",
+      "short_name": "Orders",
+      "description": "View all orders",
+      "url": "/dashboard/orders",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Check Inventory",
+      "short_name": "Inventory",
+      "description": "Check and manage inventory",
+      "url": "/dashboard/products",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
   "lang": "en",
   "dir": "ltr"
 }
