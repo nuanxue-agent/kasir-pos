@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
+import { calcCLV } from '@/components/reports/SalesForecastClient'
 
 // Dynamic imports for recharts — keeps these heavy chart components out of the initial bundle
 const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false })
@@ -52,6 +53,23 @@ interface SummaryData {
   totalOrders: number
   avgOrderValue: number
   newCustomers: number
+}
+
+interface CohortRow {
+  cohort: string // e.g. "2024-01"
+  customers: number
+  retention: number[] // index 0 = month 0, 1 = month 1, …, 6 = month 6
+}
+
+interface CohortData {
+  rows: CohortRow[]
+}
+
+interface CLVData {
+  avgOrderValue: number
+  avgOrdersPerMonth: number
+  avgMonthsActive: number
+  clv: number
 }
 
 function getDateRange(range: DateRange): { from: string; to: string } {
@@ -165,6 +183,26 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
       if (!res.ok) throw new Error('Failed to fetch analytics')
       return res.json()
     },
+  })
+
+  const { data: cohortData, isLoading: cohortLoading } = useQuery<CohortData>({
+    queryKey: ['reports-cohort', storeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/cohort?${new URLSearchParams({ storeId })}`)
+      if (!res.ok) throw new Error('Failed to fetch cohort data')
+      return res.json()
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+
+  const { data: clvData, isLoading: clvLoading } = useQuery<CLVData>({
+    queryKey: ['reports-clv', storeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/clv?${new URLSearchParams({ storeId })}`)
+      if (!res.ok) throw new Error('Failed to fetch CLV data')
+      return res.json()
+    },
+    staleTime: 10 * 60 * 1000,
   })
 
   const isLoading = summaryLoading || analyticsLoading
@@ -562,6 +600,112 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── CLV Card ─────────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-amber-500" />
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">Customer Lifetime Value</h3>
+        </div>
+        {clvLoading ? (
+          <Skeleton className="h-24" />
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-xl bg-[var(--bg-subtle)] p-3">
+              <p className="mb-1 text-xs text-[var(--text-3)]">Avg Order Value</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">
+                {formatCurrency(clvData?.avgOrderValue ?? 0, currency)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[var(--bg-subtle)] p-3">
+              <p className="mb-1 text-xs text-[var(--text-3)]">Orders / Month</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">
+                {(clvData?.avgOrdersPerMonth ?? 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[var(--bg-subtle)] p-3">
+              <p className="mb-1 text-xs text-[var(--text-3)]">Avg Months Active</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">
+                {(clvData?.avgMonthsActive ?? 0).toFixed(1)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-3">
+              <p className="mb-1 text-xs font-semibold text-amber-700">Est. CLV</p>
+              <p className="text-lg font-bold text-amber-600">
+                {formatCurrency(
+                  calcCLV(
+                    clvData?.avgOrderValue ?? 0,
+                    clvData?.avgOrdersPerMonth ?? 0,
+                    clvData?.avgMonthsActive ?? 0,
+                  ),
+                  currency,
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Cohort Analysis ──────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <Users className="h-4 w-4 text-amber-500" />
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">Cohort Retention Analysis</h3>
+          <span className="ml-auto text-xs text-[var(--text-3)]">
+            % of cohort still buying in month N
+          </span>
+        </div>
+        {cohortLoading ? (
+          <Skeleton className="h-48" />
+        ) : (cohortData?.rows ?? []).length === 0 ? (
+          <div className="flex h-32 items-center justify-center text-sm text-[var(--text-3)]">
+            Not enough data for cohort analysis
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className="pb-2 text-left font-semibold text-[var(--text-3)]">Cohort</th>
+                  <th className="pb-2 text-right font-semibold text-[var(--text-3)]">Customers</th>
+                  {[0, 1, 2, 3, 4, 5, 6].map(m => (
+                    <th key={m} className="pb-2 text-right font-semibold text-[var(--text-3)]">
+                      M+{m}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(cohortData?.rows ?? []).map(row => (
+                  <tr
+                    key={row.cohort}
+                    className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-subtle)]"
+                  >
+                    <td className="py-1.5 font-medium text-[var(--text-2)]">{row.cohort}</td>
+                    <td className="py-1.5 text-right text-[var(--text-2)]">{row.customers}</td>
+                    {(row.retention ?? []).slice(0, 7).map((pct, i) => {
+                      const opacity = Math.round((pct / 100) * 9) / 10
+                      return (
+                        <td key={i} className="py-1.5 text-right">
+                          <span
+                            className="inline-block min-w-[3rem] rounded px-1 py-0.5 text-center font-medium"
+                            style={{
+                              backgroundColor: `rgba(245,158,11,${opacity})`,
+                              color: opacity > 0.5 ? '#fff' : 'var(--text-2)',
+                            }}
+                          >
+                            {pct.toFixed(0)}%
+                          </span>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

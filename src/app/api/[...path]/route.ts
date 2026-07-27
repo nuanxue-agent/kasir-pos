@@ -939,6 +939,134 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     }
 
     // ─── REPORTS ──────────────────────────────────────────────────────────────
+    // ─── REPORTS / FORECAST ──────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'forecast' && method === 'GET') {
+      const days = Math.min(90, Math.max(7, parseInt(sp.get('days') ?? '30')))
+      const since = new Date(Date.now() - 86400000 * days).toISOString()
+      const rows = await query(
+        `SELECT DATE(createdAt) as date, SUM(total) as revenue
+         FROM "Order"
+         WHERE storeId=? AND status='PAID' AND createdAt >= ?
+         GROUP BY DATE(createdAt)
+         ORDER BY date`,
+        [storeId, since],
+      )
+      return ok(
+        (rows as any[]).map((r: any) => ({
+          date: r.date,
+          revenue: Number(r.revenue),
+        })),
+      )
+    }
+
+    // ─── REPORTS / COHORT ────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'cohort' && method === 'GET') {
+      // First purchase month per customer
+      const firstPurchaseRaw = await query(
+        `SELECT customerId,
+                strftime('%Y-%m', MIN(createdAt)) as cohort,
+                MIN(createdAt) as firstAt
+         FROM "Order"
+         WHERE storeId=? AND status='PAID' AND customerId IS NOT NULL
+         GROUP BY customerId`,
+        [storeId],
+      )
+
+      // All purchases per customer
+      const allPurchasesRaw = await query(
+        `SELECT customerId, strftime('%Y-%m', createdAt) as month
+         FROM "Order"
+         WHERE storeId=? AND status='PAID' AND customerId IS NOT NULL`,
+        [storeId],
+      )
+
+      // Build cohort map: cohort -> Set<customerId>
+      const cohortMap = new Map<string, Set<string>>()
+      for (const r of firstPurchaseRaw as any[]) {
+        if (!cohortMap.has(r.cohort)) cohortMap.set(r.cohort, new Set())
+        cohortMap.get(r.cohort)!.add(r.customerId)
+      }
+
+      // Build customer -> first cohort month map
+      const customerCohort = new Map<string, string>()
+      for (const r of firstPurchaseRaw as any[]) {
+        customerCohort.set(r.customerId, r.cohort)
+      }
+
+      // Build purchase set: customerId+month -> true
+      const purchaseSet = new Set<string>()
+      for (const r of allPurchasesRaw as any[]) {
+        purchaseSet.add(`${r.customerId}|${r.month}`)
+      }
+
+      // For each cohort, compute retention for months 0-6
+      const cohortRows = Array.from(cohortMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([cohort, customers]) => {
+          const [cy, cm] = cohort.split('-').map(Number)
+          const retention: number[] = []
+          for (let offset = 0; offset <= 6; offset++) {
+            const targetDate = new Date(cy, cm - 1 + offset, 1)
+            const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`
+            let active = 0
+            for (const cid of customers) {
+              if (purchaseSet.has(`${cid}|${targetMonth}`)) active++
+            }
+            retention.push(customers.size > 0 ? (active / customers.size) * 100 : 0)
+          }
+          return { cohort, customers: customers.size, retention }
+        })
+
+      return ok({ rows: cohortRows })
+    }
+
+    // ─── REPORTS / CLV ───────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'clv' && method === 'GET') {
+      // Per-customer order stats
+      const custStats = await query(
+        `SELECT customerId,
+                COUNT(*) as orderCount,
+                AVG(total) as avgOrder,
+                MIN(createdAt) as firstAt,
+                MAX(createdAt) as lastAt
+         FROM "Order"
+         WHERE storeId=? AND status='PAID' AND customerId IS NOT NULL
+         GROUP BY customerId
+         HAVING orderCount >= 1`,
+        [storeId],
+      )
+
+      if ((custStats as any[]).length === 0) {
+        return ok({ avgOrderValue: 0, avgOrdersPerMonth: 0, avgMonthsActive: 0, clv: 0 })
+      }
+
+      let totalAvgOrder = 0
+      let totalOrdersPerMonth = 0
+      let totalMonthsActive = 0
+      const n = (custStats as any[]).length
+
+      for (const r of custStats as any[]) {
+        totalAvgOrder += Number(r.avgOrder)
+        const first = new Date(r.firstAt)
+        const last = new Date(r.lastAt)
+        const monthsActive = Math.max(
+          1,
+          (last.getFullYear() - first.getFullYear()) * 12 +
+            (last.getMonth() - first.getMonth()) +
+            1,
+        )
+        totalMonthsActive += monthsActive
+        totalOrdersPerMonth += Number(r.orderCount) / monthsActive
+      }
+
+      const avgOrderValue = totalAvgOrder / n
+      const avgOrdersPerMonth = totalOrdersPerMonth / n
+      const avgMonthsActive = totalMonthsActive / n
+      const clv = avgOrderValue * avgOrdersPerMonth * avgMonthsActive
+
+      return ok({ avgOrderValue, avgOrdersPerMonth, avgMonthsActive, clv })
+    }
+
     if (segs[0] === 'reports' && segs[1] === 'summary' && method === 'GET') {
       const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
       const to = sp.get('to') ?? new Date().toISOString()
@@ -1215,6 +1343,59 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         )
         return ok({ id }, 201)
       }
+      if (segs[1] && segs[2] === 'summary' && method === 'GET') {
+        // GET /api/shifts/:id/summary — end-of-day report
+        const shift = await queryOne<any>(
+          `SELECT s.*, u.name as userName FROM Shift s JOIN User u ON s.userId=u.id WHERE s.id=? AND s.storeId=?`,
+          [segs[1], storeId],
+        )
+        if (!shift) return err('Shift not found', 404)
+
+        const closedAt = shift.closedAt ?? nowISO()
+
+        // Total sales (all methods) during shift
+        const salesRows = await query<any>(
+          `SELECT p.method, COALESCE(SUM(p.amount),0) as total FROM Payment p JOIN "Order" o ON p.orderId=o.id WHERE o.storeId=? AND o.status='PAID' AND o.createdAt >= ? AND o.createdAt <= ? GROUP BY p.method`,
+          [storeId, shift.openedAt, closedAt],
+        )
+        const totalSales = salesRows.reduce((s: number, r: any) => s + Number(r.total), 0)
+        const paymentBreakdown = Object.fromEntries(
+          salesRows.map((r: any) => [r.method, Number(r.total)]),
+        )
+
+        // Total expenses during shift
+        const expRow = await queryOne<any>(
+          `SELECT COALESCE(SUM(amount),0) as total FROM Expense WHERE storeId=? AND date >= ? AND date <= ?`,
+          [storeId, shift.openedAt.slice(0, 10), closedAt.slice(0, 10)],
+        )
+        const totalExpenses = Number(expRow?.total ?? 0)
+
+        const openingCash = shift.openingCash ?? 0
+        const closingCash = shift.closingCash ?? 0
+        const cashSales = Number(paymentBreakdown['CASH'] ?? 0)
+        const netCashFlow = cashSales - totalExpenses
+        const expectedCash = openingCash + netCashFlow
+        const cashVariance = closingCash - expectedCash
+
+        // Duration in minutes
+        const openedMs = new Date(shift.openedAt).getTime()
+        const closedMs = new Date(closedAt).getTime()
+        const durationMinutes = Math.round((closedMs - openedMs) / 60_000)
+
+        return ok({
+          shift,
+          openingCash,
+          closingCash,
+          totalSales,
+          totalExpenses,
+          netCashFlow,
+          expectedCash,
+          cashVariance,
+          paymentBreakdown,
+          durationMinutes,
+        })
+      }
+
       if (segs[1] && method === 'PATCH') {
         // Close shift
         const b = (await req.json()) as any

@@ -106,36 +106,41 @@ export default function ReceiptModal({
       {/* ── Screen overlay ── */}
       <div
         id="receipt-print-root"
-        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receipt-modal-title"
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       >
         {/* Modal shell */}
-        <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-2xl overflow-hidden">
+        <div className="w-full max-w-sm overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl">
           {/* Header — hidden on print */}
-          <div className="no-print flex items-center justify-between px-5 py-4 border-b border-white/5">
+          <div className="no-print flex items-center justify-between border-b border-white/5 px-5 py-4">
             <div className="flex items-center gap-2">
-              <Printer className="h-4 w-4 text-indigo-400" />
-              <h2 className="text-sm font-semibold text-[var(--text-1)]">Receipt</h2>
+              <Printer className="h-4 w-4 text-indigo-400" aria-hidden="true" />
+              <h2 id="receipt-modal-title" className="text-sm font-semibold text-[var(--text-1)]">
+                Receipt
+              </h2>
             </div>
             <button
               onClick={onClose}
-              className="text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors"
               aria-label="Close receipt"
+              className="text-[var(--text-3)] transition-colors hover:text-[var(--text-1)]"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Receipt body */}
-          <div className="p-5 overflow-y-auto max-h-[70vh]">
-            <div className="receipt-content bg-[var(--bg-card)] rounded-xl p-5 text-[var(--text-1)] text-xs">
+          <div className="max-h-[70vh] overflow-y-auto p-5">
+            <div className="receipt-content rounded-xl bg-[var(--bg-card)] p-5 text-xs text-[var(--text-1)]">
               {/* Store name */}
-              <div className="text-center mb-3">
-                <p className="font-bold text-sm uppercase tracking-widest">{storeName}</p>
-                <div className="border-t border-dashed border-stone-400 my-2" />
+              <div className="mb-3 text-center">
+                <p className="text-sm font-bold tracking-widest uppercase">{storeName}</p>
+                <div className="my-2 border-t border-dashed border-stone-400" />
               </div>
 
               {/* Order info */}
-              <div className="space-y-0.5 mb-3">
+              <div className="mb-3 space-y-0.5">
                 <div className="flex justify-between">
                   <span className="text-[var(--text-2)]">No.</span>
                   <span className="font-semibold">{receipt.number}</span>
@@ -150,15 +155,15 @@ export default function ReceiptModal({
                 </div>
               </div>
 
-              <div className="border-t border-dashed border-stone-400 my-2" />
+              <div className="my-2 border-t border-dashed border-stone-400" />
 
               {/* Items */}
-              <table className="w-full mb-1" aria-label="Order items">
+              <table className="mb-1 w-full" aria-label="Order items">
                 <thead>
                   <tr className="text-[var(--text-2)]">
-                    <th className="text-left font-normal pb-1">Item</th>
-                    <th className="text-center font-normal pb-1 w-8">Qty</th>
-                    <th className="text-right font-normal pb-1">Total</th>
+                    <th className="pb-1 text-left font-normal">Item</th>
+                    <th className="w-8 pb-1 text-center font-normal">Qty</th>
+                    <th className="pb-1 text-right font-normal">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,12 +171,12 @@ export default function ReceiptModal({
                     <tr key={idx}>
                       <td className="py-0.5 pr-2">
                         <p className="leading-tight">{item.name}</p>
-                        <p className="text-[var(--text-3)] text-[10px]">
+                        <p className="text-[10px] text-[var(--text-3)]">
                           {fmt(item.price, currency)} × {item.qty}
                         </p>
                       </td>
-                      <td className="text-center py-0.5">{item.qty}</td>
-                      <td className="text-right py-0.5 font-medium">
+                      <td className="py-0.5 text-center">{item.qty}</td>
+                      <td className="py-0.5 text-right font-medium">
                         {fmt(item.subtotal, currency)}
                       </td>
                     </tr>
@@ -179,7 +184,7 @@ export default function ReceiptModal({
                 </tbody>
               </table>
 
-              <div className="border-t border-dashed border-stone-400 my-2" />
+              <div className="my-2 border-t border-dashed border-stone-400" />
 
               {/* Totals */}
               <div className="space-y-0.5">
@@ -199,13 +204,13 @@ export default function ReceiptModal({
                     <span>{fmt(receipt.taxAmt, currency)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-sm pt-1 border-t border-stone-300">
+                <div className="flex justify-between border-t border-stone-300 pt-1 text-sm font-bold">
                   <span>TOTAL</span>
                   <span>{fmt(receipt.total, currency)}</span>
                 </div>
               </div>
 
-              <div className="border-t border-dashed border-stone-400 my-2" />
+              <div className="my-2 border-t border-dashed border-stone-400" />
 
               {/* Payment */}
               {primaryPayment && (
@@ -230,30 +235,32 @@ export default function ReceiptModal({
               {/* Receipt note */}
               {receiptNote && (
                 <>
-                  <div className="border-t border-dashed border-stone-400 my-2" />
-                  <p className="text-center text-[var(--text-2)] text-[10px] leading-snug">{receiptNote}</p>
+                  <div className="my-2 border-t border-dashed border-stone-400" />
+                  <p className="text-center text-[10px] leading-snug text-[var(--text-2)]">
+                    {receiptNote}
+                  </p>
                 </>
               )}
 
               {/* Footer */}
-              <div className="border-t border-dashed border-stone-400 mt-2 pt-2 text-center text-[var(--text-3)] text-[10px]">
+              <div className="mt-2 border-t border-dashed border-stone-400 pt-2 text-center text-[10px] text-[var(--text-3)]">
                 Thank you for your purchase!
               </div>
             </div>
           </div>
 
           {/* Action buttons — hidden on print */}
-          <div className="no-print flex gap-3 px-5 py-4 border-t border-white/5">
+          <div className="no-print flex gap-3 border-t border-white/5 px-5 py-4">
             <button
               onClick={() => window.print()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/20"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-opacity hover:opacity-90"
             >
               <Printer className="h-4 w-4" />
               Print Receipt
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-2)] text-sm font-medium hover:text-[var(--text-1)] hover:bg-[var(--bg-muted)] transition-colors"
+              className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] py-2.5 text-sm font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-1)]"
             >
               Close
             </button>

@@ -1,265 +1,138 @@
 import { describe, it, expect } from 'vitest'
 
-// ── Shift business logic ───────────────────────────────────────────────────────
+// ── Pure business-logic helpers (no I/O) ─────────────────────────────────────
 
-type ShiftStatus = 'OPEN' | 'CLOSED'
-
-interface CashierSummary {
-  cashierId: string
-  cashierName: string
-  salesCount: number
-  salesTotal: number
-  cashIn: number   // additional cash added during shift
-  cashOut: number  // cash removed during shift
+/** Returns shift duration in minutes */
+function calcShiftDuration(openedAt: string, closedAt: string): number {
+  const ms = new Date(closedAt).getTime() - new Date(openedAt).getTime()
+  return Math.round(ms / 60_000)
 }
 
-interface Shift {
-  id: string
-  storeId: string
-  status: ShiftStatus
-  openedBy: string
-  openedAt: string
-  closedAt?: string
-  openingCash: number
-  closingCash?: number
-  expectedCash?: number
-  cashiers: CashierSummary[]
+/** Cash variance = actual closing cash − expected closing cash */
+function calcCashVariance(actual: number, expected: number): number {
+  return actual - expected
 }
 
-// ── Pure functions ──────────────────────────────────────────────────────────────
-
-function canOpenShift(existingShifts: Shift[]): { canOpen: boolean; reason?: string } {
-  const openShift = existingShifts.find(s => s.status === 'OPEN')
-  if (openShift) {
-    return { canOpen: false, reason: `Shift sudah dibuka oleh ${openShift.openedBy}` }
-  }
-  return { canOpen: true }
+/** Expected closing cash = opening + cash sales − expenses */
+function calcExpectedCash(opening: number, cashSales: number, expenses: number): number {
+  return opening + cashSales - expenses
 }
 
-function calcExpectedCash(shift: Shift, totalSales: number): number {
-  const cashIn = shift.cashiers.reduce((sum, c) => sum + c.cashIn, 0)
-  const cashOut = shift.cashiers.reduce((sum, c) => sum + c.cashOut, 0)
-  return shift.openingCash + totalSales + cashIn - cashOut
+/** Net cash flow = cash sales − expenses */
+function calcNetCashFlow(cashSales: number, expenses: number): number {
+  return cashSales - expenses
 }
 
-function calcCashDifference(expectedCash: number, actualCash: number): number {
-  return actualCash - expectedCash
+/** Total sales = sum of all payment amounts */
+function calcTotalSales(payments: { amount: number }[]): number {
+  return payments.reduce((s, p) => s + p.amount, 0)
 }
 
-function validateCashCount(amount: number): { valid: boolean; error?: string } {
-  if (amount < 0) return { valid: false, error: 'Jumlah kas tidak boleh negatif' }
-  if (!Number.isFinite(amount)) return { valid: false, error: 'Jumlah kas tidak valid' }
-  return { valid: true }
-}
-
-function calcShiftDurationMinutes(shift: Shift): number | null {
-  if (!shift.closedAt) return null
-  const opened = new Date(shift.openedAt).getTime()
-  const closed = new Date(shift.closedAt).getTime()
-  return Math.round((closed - opened) / (1000 * 60))
-}
-
-function calcShiftSummary(shift: Shift): {
-  totalSalesCount: number
-  totalSalesAmount: number
-  totalCashIn: number
-  totalCashOut: number
-} {
-  return shift.cashiers.reduce(
-    (acc, c) => ({
-      totalSalesCount:  acc.totalSalesCount  + c.salesCount,
-      totalSalesAmount: acc.totalSalesAmount + c.salesTotal,
-      totalCashIn:      acc.totalCashIn      + c.cashIn,
-      totalCashOut:     acc.totalCashOut     + c.cashOut,
-    }),
-    { totalSalesCount: 0, totalSalesAmount: 0, totalCashIn: 0, totalCashOut: 0 }
+/** Payment breakdown by method */
+function calcPaymentBreakdown(
+  payments: { method: string; amount: number }[],
+): Record<string, number> {
+  return payments.reduce(
+    (acc, p) => {
+      acc[p.method] = (acc[p.method] ?? 0) + p.amount
+      return acc
+    },
+    {} as Record<string, number>,
   )
 }
 
-function closeShift(shift: Shift, closingCash: number, closedAt: string): { ok: boolean; shift?: Shift; error?: string } {
-  if (shift.status !== 'OPEN') {
-    return { ok: false, error: 'Shift sudah ditutup' }
-  }
-  const validation = validateCashCount(closingCash)
-  if (!validation.valid) {
-    return { ok: false, error: validation.error }
-  }
-  const summary = calcShiftSummary(shift)
-  const expected = calcExpectedCash(shift, summary.totalSalesAmount)
-  return {
-    ok: true,
-    shift: {
-      ...shift,
-      status: 'CLOSED',
-      closedAt,
-      closingCash,
-      expectedCash: expected,
-    },
-  }
+/** Determine if variance is acceptable (within tolerance) */
+function isVarianceAcceptable(variance: number, tolerance = 1000): boolean {
+  return Math.abs(variance) < tolerance
 }
 
-// ── Tests ───────────────────────────────────────────────────────────────────────
-
-const cashier1: CashierSummary = {
-  cashierId: 'c1',
-  cashierName: 'Andi',
-  salesCount: 10,
-  salesTotal: 500_000,
-  cashIn: 0,
-  cashOut: 0,
-}
-
-const cashier2: CashierSummary = {
-  cashierId: 'c2',
-  cashierName: 'Budi',
-  salesCount: 8,
-  salesTotal: 320_000,
-  cashIn: 100_000,
-  cashOut: 50_000,
-}
-
-const openShift: Shift = {
-  id: 'shift-1',
-  storeId: 'store-1',
-  status: 'OPEN',
-  openedBy: 'Andi',
-  openedAt: '2025-06-01T08:00:00Z',
-  openingCash: 200_000,
-  cashiers: [cashier1],
-}
-
-describe('Shift open guard', () => {
-  it('allows opening when no shift is currently open', () => {
-    const result = canOpenShift([])
-    expect(result.canOpen).toBe(true)
-  })
-
-  it('blocks opening when a shift is already open', () => {
-    const result = canOpenShift([openShift])
-    expect(result.canOpen).toBe(false)
-    expect(result.reason).toContain('Andi')
-  })
-
-  it('allows opening when previous shift is closed', () => {
-    const closedShift: Shift = { ...openShift, status: 'CLOSED' }
-    const result = canOpenShift([closedShift])
-    expect(result.canOpen).toBe(true)
-  })
-
-  it('blocks even when one of multiple shifts is open', () => {
-    const closedShift: Shift = { ...openShift, id: 'shift-0', status: 'CLOSED' }
-    const result = canOpenShift([closedShift, openShift])
-    expect(result.canOpen).toBe(false)
-  })
-})
-
-describe('Cash count validation at close', () => {
-  it('accepts valid positive cash amount', () => {
-    expect(validateCashCount(500_000).valid).toBe(true)
-  })
-
-  it('accepts zero cash amount', () => {
-    expect(validateCashCount(0).valid).toBe(true)
-  })
-
-  it('rejects negative cash amount', () => {
-    const result = validateCashCount(-1000)
-    expect(result.valid).toBe(false)
-    expect(result.error).toContain('negatif')
-  })
-
-  it('rejects non-finite cash amount', () => {
-    const result = validateCashCount(Infinity)
-    expect(result.valid).toBe(false)
-  })
-
-  it('closeShift fails if shift is already closed', () => {
-    const closed: Shift = { ...openShift, status: 'CLOSED' }
-    const result = closeShift(closed, 700_000, '2025-06-01T16:00:00Z')
-    expect(result.ok).toBe(false)
-    expect(result.error).toContain('ditutup')
-  })
-})
-
-describe('Expected vs actual cash reconciliation', () => {
-  it('calculates expected cash correctly', () => {
-    // openingCash=200000 + salesTotal=500000 + cashIn=0 - cashOut=0
-    const expected = calcExpectedCash(openShift, 500_000)
-    expect(expected).toBe(700_000)
-  })
-
-  it('includes cashIn and cashOut from cashiers in expected cash', () => {
-    const shift = { ...openShift, cashiers: [cashier2] }
-    // openingCash=200000 + sales=320000 + cashIn=100000 - cashOut=50000 = 570000
-    const expected = calcExpectedCash(shift, 320_000)
-    expect(expected).toBe(570_000)
-  })
-
-  it('calculates cash difference — surplus', () => {
-    expect(calcCashDifference(700_000, 750_000)).toBe(50_000)
-  })
-
-  it('calculates cash difference — shortage', () => {
-    expect(calcCashDifference(700_000, 680_000)).toBe(-20_000)
-  })
-
-  it('closeShift records expectedCash on the closed shift', () => {
-    const result = closeShift(openShift, 700_000, '2025-06-01T16:00:00Z')
-    expect(result.ok).toBe(true)
-    expect(result.shift?.expectedCash).toBe(700_000)
-    expect(result.shift?.closingCash).toBe(700_000)
-  })
-})
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('Shift duration calculation', () => {
-  it('calculates shift duration in minutes', () => {
-    const shift: Shift = {
-      ...openShift,
-      status: 'CLOSED',
-      closedAt: '2025-06-01T16:00:00Z', // 8 hours = 480 minutes
-    }
-    expect(calcShiftDurationMinutes(shift)).toBe(480)
+  it('calculates duration for a 4-hour shift', () => {
+    const opened = '2024-01-15T08:00:00.000Z'
+    const closed = '2024-01-15T12:00:00.000Z'
+    expect(calcShiftDuration(opened, closed)).toBe(240)
   })
 
-  it('returns null for an open shift with no closedAt', () => {
-    expect(calcShiftDurationMinutes(openShift)).toBeNull()
+  it('calculates duration for a 30-minute shift', () => {
+    const opened = '2024-01-15T09:00:00.000Z'
+    const closed = '2024-01-15T09:30:00.000Z'
+    expect(calcShiftDuration(opened, closed)).toBe(30)
   })
 
-  it('handles short shift duration correctly', () => {
-    const shift: Shift = {
-      ...openShift,
-      status: 'CLOSED',
-      openedAt: '2025-06-01T08:00:00Z',
-      closedAt: '2025-06-01T08:30:00Z',
-    }
-    expect(calcShiftDurationMinutes(shift)).toBe(30)
+  it('returns 0 for same open and close time', () => {
+    const t = '2024-01-15T10:00:00.000Z'
+    expect(calcShiftDuration(t, t)).toBe(0)
   })
 })
 
-describe('Multi-cashier shift summary', () => {
-  it('aggregates sales count from multiple cashiers', () => {
-    const shift: Shift = { ...openShift, cashiers: [cashier1, cashier2] }
-    const summary = calcShiftSummary(shift)
-    expect(summary.totalSalesCount).toBe(18) // 10 + 8
+describe('Cash variance calculation', () => {
+  it('returns positive variance when actual exceeds expected (overage)', () => {
+    expect(calcCashVariance(500_000, 480_000)).toBe(20_000)
   })
 
-  it('aggregates sales total from multiple cashiers', () => {
-    const shift: Shift = { ...openShift, cashiers: [cashier1, cashier2] }
-    const summary = calcShiftSummary(shift)
-    expect(summary.totalSalesAmount).toBe(820_000) // 500000 + 320000
+  it('returns negative variance when actual is less than expected (shortage)', () => {
+    expect(calcCashVariance(470_000, 500_000)).toBe(-30_000)
   })
 
-  it('aggregates cashIn and cashOut across cashiers', () => {
-    const shift: Shift = { ...openShift, cashiers: [cashier1, cashier2] }
-    const summary = calcShiftSummary(shift)
-    expect(summary.totalCashIn).toBe(100_000)
-    expect(summary.totalCashOut).toBe(50_000)
+  it('returns zero when actual equals expected', () => {
+    expect(calcCashVariance(300_000, 300_000)).toBe(0)
   })
 
-  it('returns zeros for shift with no cashiers', () => {
-    const shift: Shift = { ...openShift, cashiers: [] }
-    const summary = calcShiftSummary(shift)
-    expect(summary.totalSalesCount).toBe(0)
-    expect(summary.totalSalesAmount).toBe(0)
+  it('flags large variance as unacceptable', () => {
+    const variance = calcCashVariance(450_000, 500_000) // -50_000
+    expect(isVarianceAcceptable(variance)).toBe(false)
+  })
+
+  it('accepts small variance within tolerance', () => {
+    const variance = calcCashVariance(300_500, 300_000) // +500
+    expect(isVarianceAcceptable(variance)).toBe(true)
+  })
+})
+
+describe('Sales total during shift', () => {
+  it('sums all payment amounts', () => {
+    const payments = [
+      { method: 'CASH', amount: 100_000 },
+      { method: 'QRIS', amount: 50_000 },
+      { method: 'CARD', amount: 75_000 },
+    ]
+    expect(calcTotalSales(payments)).toBe(225_000)
+  })
+
+  it('returns 0 for empty payments', () => {
+    expect(calcTotalSales([])).toBe(0)
+  })
+
+  it('groups payment breakdown by method', () => {
+    const payments = [
+      { method: 'CASH', amount: 100_000 },
+      { method: 'CASH', amount: 50_000 },
+      { method: 'QRIS', amount: 75_000 },
+    ]
+    const breakdown = calcPaymentBreakdown(payments)
+    expect(breakdown['CASH']).toBe(150_000)
+    expect(breakdown['QRIS']).toBe(75_000)
+    expect(breakdown['CARD']).toBeUndefined()
+  })
+})
+
+describe('Net cash flow calculation', () => {
+  it('calculates net cash flow correctly', () => {
+    expect(calcNetCashFlow(500_000, 80_000)).toBe(420_000)
+  })
+
+  it('calculates expected closing cash', () => {
+    // opening 200k + sales 500k − expenses 80k = 620k
+    expect(calcExpectedCash(200_000, 500_000, 80_000)).toBe(620_000)
+  })
+
+  it('handles negative net flow when expenses exceed cash sales', () => {
+    expect(calcNetCashFlow(50_000, 200_000)).toBe(-150_000)
+  })
+
+  it('calculates expected cash with zero expenses', () => {
+    expect(calcExpectedCash(100_000, 300_000, 0)).toBe(400_000)
   })
 })
