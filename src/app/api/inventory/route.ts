@@ -16,25 +16,21 @@ export async function GET(req: NextRequest) {
 
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
-  const where = {
+  let where: any = {
     storeId,
     active: true,
     trackStock: true,
-    ...(lowStockOnly ? {
-      OR: [
-        { stock: { lte: prisma.product.fields.lowStock } },
-        { stock: 0 },
-      ],
-    } : {}),
-    ...(q ? {
-      OR: [
-        { name: { contains: q, mode: 'insensitive' as const } },
-        { sku: { contains: q, mode: 'insensitive' as const } },
-      ],
-    } : {}),
   }
 
-  const [products, total] = await Promise.all([
+  // Add search filter
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: 'insensitive' as const } },
+      { sku: { contains: q, mode: 'insensitive' as const } },
+    ]
+  }
+
+  let [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { category: true },
@@ -44,6 +40,11 @@ export async function GET(req: NextRequest) {
     }),
     prisma.product.count({ where }),
   ])
+
+  // Apply low stock filter client-side
+  if (lowStockOnly) {
+    products = products.filter(p => p.stock <= p.lowStock || p.stock === 0)
+  }
 
   return NextResponse.json({ products, total, page, pages: Math.ceil(total / limit) })
 }

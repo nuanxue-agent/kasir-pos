@@ -23,24 +23,7 @@ interface TopProductsChartProps {
   currency: string
 }
 
-interface CustomTooltipProps {
-  active?: boolean
-  payload?: Array<{ value: number; payload: { name: string; qty: number } }>
-  currency: string
-}
-
 const BAR_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
-
-function CustomTooltip({ active, payload, currency }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="bg-slate-900 border border-slate-600 rounded-lg p-3 shadow-xl">
-      <p className="text-white font-semibold">{formatCurrency(item.value ?? 0, currency)}</p>
-      <p className="text-slate-400 text-xs mt-0.5">{item.payload.qty} units sold</p>
-    </div>
-  )
-}
 
 function truncate(name: string, maxLen = 20) {
   return name.length > maxLen ? name.slice(0, maxLen) + '…' : name
@@ -57,7 +40,6 @@ export function TopProductsChart({ data, currency }: TopProductsChartProps) {
 
   const formatted = data.map((d) => ({
     name: truncate(d.name),
-    fullName: d.name,
     revenue: Number(d._sum.subtotal),
     qty: Number(d._sum.qty),
   }))
@@ -90,7 +72,17 @@ export function TopProductsChart({ data, currency }: TopProductsChartProps) {
           width={90}
         />
         <Tooltip
-          content={(props) => <CustomTooltip {...props} currency={currency} />}
+          contentStyle={{
+            backgroundColor: '#0f172a',
+            border: '1px solid #475569',
+            borderRadius: '8px',
+            color: '#fff',
+          }}
+          labelStyle={{ color: '#94a3b8', fontSize: 12, marginBottom: 4 }}
+          formatter={(value: number, _name: string, entry: { payload?: { qty?: number } }) => [
+            formatCurrency(value, currency),
+            `Revenue (${entry.payload?.qty ?? 0} units)`,
+          ]}
           cursor={{ fill: '#1e293b' }}
         />
         <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>

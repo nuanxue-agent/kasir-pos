@@ -22,29 +22,6 @@ interface SalesChartProps {
   currency: string
 }
 
-interface CustomTooltipProps {
-  active?: boolean
-  payload?: Array<{ value: number; payload: DataPoint }>
-  label?: string
-  currency: string
-}
-
-function CustomTooltip({ active, payload, label, currency }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null
-
-  return (
-    <div className="bg-slate-900 border border-slate-600 rounded-lg p-3 shadow-xl">
-      <p className="text-slate-400 text-xs mb-1.5">{label}</p>
-      <p className="text-white font-semibold">
-        {formatCurrency(payload[0]?.value ?? 0, currency)}
-      </p>
-      <p className="text-slate-400 text-xs mt-0.5">
-        {payload[0]?.payload?.orders ?? 0} orders
-      </p>
-    </div>
-  )
-}
-
 export function SalesChart({ data, currency }: SalesChartProps) {
   if (!data.length) {
     return (
@@ -82,7 +59,16 @@ export function SalesChart({ data, currency }: SalesChartProps) {
           }}
           width={60}
         />
-        <Tooltip content={(props) => <CustomTooltip {...props} currency={currency} />} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: '#0f172a',
+            border: '1px solid #475569',
+            borderRadius: '8px',
+            color: '#fff',
+          }}
+          labelStyle={{ color: '#94a3b8', fontSize: 12, marginBottom: 4 }}
+          formatter={(value: number) => [formatCurrency(value, currency), 'Revenue']}
+        />
         <Line
           type="monotone"
           dataKey="total"
