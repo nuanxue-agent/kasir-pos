@@ -10,7 +10,7 @@ interface SuppliersPageClientProps {
   currency?: string
 }
 
-const inputCls = 'w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition-all'
+const inputCls = 'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition-all'
 
 // ── Rating helpers ────────────────────────────────────────────────────────────
 
@@ -93,11 +93,11 @@ function SupplierForm({ storeId, supplier, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-          <h2 className="text-base font-bold text-stone-800">{supplier ? 'Edit Supplier' : 'Tambah Supplier'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-            <X className="h-4 w-4 text-stone-500" />
+      <div className="bg-[var(--bg-card)] w-full sm:max-w-lg sm:rounded-xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2 className="text-base font-bold text-[var(--text-1)]">{supplier ? 'Edit Supplier' : 'Tambah Supplier'}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-muted)] transition-colors">
+            <X className="h-4 w-4 text-[var(--text-2)]" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -105,43 +105,43 @@ function SupplierForm({ storeId, supplier, onClose, onSaved }: {
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>
           )}
           <div>
-            <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Nama Supplier *</label>
+            <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">Nama Supplier *</label>
             <input value={form.name} onChange={set('name')} className={inputCls} placeholder="PT Sumber Makmur" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Telepon</label>
+              <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">Telepon</label>
               <input value={form.phone} onChange={set('phone')} className={inputCls} placeholder="021-12345678" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Email</label>
+              <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">Email</label>
               <input value={form.email} onChange={set('email')} type="email" className={inputCls} placeholder="info@supplier.com" />
             </div>
           </div>
           <div>
-            <label className="text-xs font-semibold text-stone-500 mb-1.5 block">NPWP / Tax ID</label>
+            <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">NPWP / Tax ID</label>
             <input value={form.taxId} onChange={set('taxId')} className={inputCls} placeholder="01.234.567.8-901.000" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Alamat</label>
+            <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">Alamat</label>
             <textarea value={form.address} onChange={set('address')} rows={2} className={inputCls} placeholder="Jl. Industri No. 1, Jakarta" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Rating Supplier</label>
+            <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">Rating Supplier</label>
             <div className="flex items-center gap-3">
               <StarRating value={rating} onChange={setRating} />
               {rating > 0 && (
-                <span className="text-xs text-stone-400">{rating} bintang</span>
+                <span className="text-xs text-[var(--text-3)]">{rating} bintang</span>
               )}
             </div>
           </div>
           <div>
-            <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Catatan</label>
+            <label className="text-xs font-semibold text-[var(--text-2)] mb-1.5 block">Catatan</label>
             <textarea value={form.notes} onChange={set('notes')} rows={2} className={inputCls} placeholder="Catatan internal…" />
           </div>
         </div>
-        <div className="border-t border-stone-100 p-4 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-600 text-sm font-semibold hover:bg-stone-200 transition-colors">Batal</button>
+        <div className="border-t border-[var(--border)] p-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-[var(--bg-muted)] text-[var(--text-2)] text-sm font-semibold hover:bg-stone-200 transition-colors">Batal</button>
           <button onClick={handleSubmit} disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold shadow-md shadow-amber-200 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? 'Menyimpan…' : 'Simpan'}
@@ -194,34 +194,34 @@ function SupplierDetailModal({ supplier, storeId, currency, onClose, onEdit }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-xl sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col">
+      <div className="bg-[var(--bg-card)] w-full sm:max-w-xl sm:rounded-xl rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
               <Truck className="h-5 w-5 text-amber-500" />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-stone-800 truncate">{supplier.name}</p>
+              <p className="font-bold text-[var(--text-1)] truncate">{supplier.name}</p>
               {rating > 0 && <StarRating value={rating} readonly />}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-              <Edit2 className="h-4 w-4 text-stone-400" />
+            <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-[var(--bg-muted)] transition-colors">
+              <Edit2 className="h-4 w-4 text-[var(--text-3)]" />
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-              <X className="h-4 w-4 text-stone-500" />
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-muted)] transition-colors">
+              <X className="h-4 w-4 text-[var(--text-2)]" />
             </button>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-stone-100 px-5">
+        <div className="flex border-b border-[var(--border)] px-5">
           {([['info', 'Info'], ['history', 'Riwayat PO'], ['metrics', 'Performa']] as const).map(([val, label]) => (
             <button key={val} onClick={() => setActiveTab(val)}
               className={cn('px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-                activeTab === val ? 'border-amber-500 text-amber-600' : 'border-transparent text-stone-400 hover:text-stone-600'
+                activeTab === val ? 'border-amber-500 text-amber-600' : 'border-transparent text-[var(--text-3)] hover:text-[var(--text-2)]'
               )}>
               {label}
             </button>
@@ -244,7 +244,7 @@ function SupplierDetailModal({ supplier, storeId, currency, onClose, onEdit }: {
                   )}
                   {supplier.phone && (
                     <a href={`tel:${supplier.phone}`}
-                      className="flex items-center gap-2 px-3 py-2 bg-stone-50 text-stone-600 text-xs font-semibold rounded-xl hover:bg-stone-100 transition-colors border border-stone-200">
+                      className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-subtle)] text-[var(--text-2)] text-xs font-semibold rounded-xl hover:bg-[var(--bg-muted)] transition-colors border border-[var(--border)]">
                       <Phone className="h-3.5 w-3.5" />
                       Telepon
                     </a>
@@ -262,30 +262,30 @@ function SupplierDetailModal({ supplier, storeId, currency, onClose, onEdit }: {
               {/* Contact details */}
               <div className="space-y-2">
                 {supplier.phone && (
-                  <div className="flex items-center gap-2 text-sm text-stone-600">
+                  <div className="flex items-center gap-2 text-sm text-[var(--text-2)]">
                     <Phone className="h-4 w-4 text-stone-300 shrink-0" /> {supplier.phone}
                   </div>
                 )}
                 {supplier.email && (
-                  <div className="flex items-center gap-2 text-sm text-stone-600">
+                  <div className="flex items-center gap-2 text-sm text-[var(--text-2)]">
                     <Mail className="h-4 w-4 text-stone-300 shrink-0" /> {supplier.email}
                   </div>
                 )}
                 {supplier.address && (
-                  <div className="flex items-start gap-2 text-sm text-stone-600">
+                  <div className="flex items-start gap-2 text-sm text-[var(--text-2)]">
                     <MapPin className="h-4 w-4 text-stone-300 shrink-0 mt-0.5" />
                     <span>{supplier.address}</span>
                   </div>
                 )}
                 {supplier.taxId && (
-                  <p className="text-xs text-stone-400">NPWP: {supplier.taxId}</p>
+                  <p className="text-xs text-[var(--text-3)]">NPWP: {supplier.taxId}</p>
                 )}
               </div>
 
               {cleanNotes && (
-                <div className="bg-stone-50 rounded-xl px-4 py-3">
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Catatan</p>
-                  <p className="text-sm text-stone-600">{cleanNotes}</p>
+                <div className="bg-[var(--bg-subtle)] rounded-xl px-4 py-3">
+                  <p className="text-xs font-semibold text-[var(--text-2)] mb-1">Catatan</p>
+                  <p className="text-sm text-[var(--text-2)]">{cleanNotes}</p>
                 </div>
               )}
             </div>
@@ -295,18 +295,18 @@ function SupplierDetailModal({ supplier, storeId, currency, onClose, onEdit }: {
           {activeTab === 'history' && (
             <div className="space-y-2">
               {orders.length === 0 ? (
-                <div className="flex flex-col items-center py-10 text-stone-400">
+                <div className="flex flex-col items-center py-10 text-[var(--text-3)]">
                   <Package className="h-10 w-10 text-stone-200 mb-2" />
                   <p className="text-sm">Belum ada purchase order</p>
                 </div>
               ) : orders.map((o: any) => (
-                <div key={o.id} className="flex items-center justify-between bg-stone-50 rounded-xl px-4 py-3">
+                <div key={o.id} className="flex items-center justify-between bg-[var(--bg-subtle)] rounded-xl px-4 py-3">
                   <div>
-                    <p className="font-mono text-xs font-semibold text-stone-700">{o.number}</p>
-                    <p className="text-xs text-stone-400">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('id-ID') : '—'}</p>
+                    <p className="font-mono text-xs font-semibold text-[var(--text-1)]">{o.number}</p>
+                    <p className="text-xs text-[var(--text-3)]">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('id-ID') : '—'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-stone-800">{formatCurrency(o.total, currency)}</p>
+                    <p className="text-sm font-semibold text-[var(--text-1)]">{formatCurrency(o.total, currency)}</p>
                     <span className={cn('text-xs font-medium px-2 py-0.5 rounded-lg',
                       o.status === 'RECEIVED' ? 'bg-emerald-50 text-emerald-600' :
                       o.status === 'CANCELLED' ? 'bg-red-50 text-red-500' :
@@ -322,38 +322,38 @@ function SupplierDetailModal({ supplier, storeId, currency, onClose, onEdit }: {
           {activeTab === 'metrics' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-stone-50 rounded-xl p-4">
+                <div className="bg-[var(--bg-subtle)] rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <ShoppingCart className="h-4 w-4 text-amber-500" />
-                    <p className="text-xs font-semibold text-stone-500">Total PO</p>
+                    <p className="text-xs font-semibold text-[var(--text-2)]">Total PO</p>
                   </div>
-                  <p className="text-2xl font-bold text-stone-800">{totalOrders}</p>
-                  <p className="text-xs text-stone-400 mt-0.5">{receivedOrders.length} diterima</p>
+                  <p className="text-2xl font-bold text-[var(--text-1)]">{totalOrders}</p>
+                  <p className="text-xs text-[var(--text-3)] mt-0.5">{receivedOrders.length} diterima</p>
                 </div>
-                <div className="bg-stone-50 rounded-xl p-4">
+                <div className="bg-[var(--bg-subtle)] rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <TrendingUp className="h-4 w-4 text-emerald-500" />
-                    <p className="text-xs font-semibold text-stone-500">Total Nilai</p>
+                    <p className="text-xs font-semibold text-[var(--text-2)]">Total Nilai</p>
                   </div>
-                  <p className="text-lg font-bold text-stone-800 leading-tight">{formatCurrency(totalValue, currency)}</p>
+                  <p className="text-lg font-bold text-[var(--text-1)] leading-tight">{formatCurrency(totalValue, currency)}</p>
                 </div>
               </div>
-              <div className="bg-stone-50 rounded-xl p-4">
+              <div className="bg-[var(--bg-subtle)] rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Truck className="h-4 w-4 text-blue-500" />
-                  <p className="text-xs font-semibold text-stone-500">Rata-rata Hari Pengiriman</p>
+                  <p className="text-xs font-semibold text-[var(--text-2)]">Rata-rata Hari Pengiriman</p>
                 </div>
-                <p className="text-2xl font-bold text-stone-800">
+                <p className="text-2xl font-bold text-[var(--text-1)]">
                   {avgDeliveryDays !== null ? `${avgDeliveryDays} hari` : '—'}
                 </p>
-                <p className="text-xs text-stone-400 mt-0.5">Berdasarkan {receivedOrders.length} PO yang sudah diterima</p>
+                <p className="text-xs text-[var(--text-3)] mt-0.5">Berdasarkan {receivedOrders.length} PO yang sudah diterima</p>
               </div>
               {rating > 0 && (
-                <div className="bg-stone-50 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-stone-500 mb-2">Rating Supplier</p>
+                <div className="bg-[var(--bg-subtle)] rounded-xl p-4">
+                  <p className="text-xs font-semibold text-[var(--text-2)] mb-2">Rating Supplier</p>
                   <div className="flex items-center gap-3">
                     <StarRating value={rating} readonly />
-                    <span className="text-sm font-semibold text-stone-700">{rating}/5</span>
+                    <span className="text-sm font-semibold text-[var(--text-1)]">{rating}/5</span>
                   </div>
                 </div>
               )}
@@ -402,8 +402,8 @@ export default function SuppliersPageClient({ storeId, currency = 'IDR' }: Suppl
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Supplier</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Kelola daftar pemasok</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Supplier</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Kelola daftar pemasok</p>
         </div>
         <button onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all">
@@ -414,21 +414,21 @@ export default function SuppliersPageClient({ storeId, currency = 'IDR' }: Suppl
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
         <input value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 bg-white border border-stone-100 rounded-2xl text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 shadow-sm"
+          className="w-full pl-9 pr-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 shadow-sm"
           placeholder="Cari nama, email, atau telepon…" />
       </div>
 
       {/* List */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-stone-50 animate-pulse rounded-2xl" />)}
+          {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-stone-100 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-16 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm">
           <Truck className="h-12 w-12 text-stone-200 mb-3" />
-          <p className="text-stone-400 text-sm">{search ? 'Tidak ada supplier yang cocok' : 'Belum ada supplier'}</p>
+          <p className="text-[var(--text-3)] text-sm">{search ? 'Tidak ada supplier yang cocok' : 'Belum ada supplier'}</p>
           {!search && (
             <button onClick={() => setShowForm(true)} className="mt-3 text-amber-500 text-sm font-medium hover:text-amber-600">
               + Tambah supplier pertama
@@ -441,30 +441,30 @@ export default function SuppliersPageClient({ storeId, currency = 'IDR' }: Suppl
             const rating = extractRating(s.notes)
             const phoneForWA = s.phone?.replace(/\D/g, '').replace(/^0/, '62')
             return (
-              <div key={s.id} className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm hover:border-stone-200 transition-colors">
+              <div key={s.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm hover:border-[var(--border)] transition-colors">
                 <div className="flex items-start justify-between gap-2">
                   <button className="flex items-center gap-3 min-w-0 text-left flex-1" onClick={() => setViewing(s)}>
                     <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                       <Truck className="h-5 w-5 text-amber-500" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-stone-800 truncate">{s.name}</p>
-                      {s.taxId && <p className="text-xs text-stone-400 truncate">NPWP: {s.taxId}</p>}
+                      <p className="font-semibold text-[var(--text-1)] truncate">{s.name}</p>
+                      {s.taxId && <p className="text-xs text-[var(--text-3)] truncate">NPWP: {s.taxId}</p>}
                       {rating > 0 && <StarRating value={rating} readonly />}
                     </div>
                   </button>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => { setEditing(s); setViewing(null) }} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-                      <Edit2 className="h-3.5 w-3.5 text-stone-400" />
+                    <button onClick={() => { setEditing(s); setViewing(null) }} className="p-1.5 rounded-lg hover:bg-[var(--bg-muted)] transition-colors">
+                      <Edit2 className="h-3.5 w-3.5 text-[var(--text-3)]" />
                     </button>
                     <button onClick={() => deleteSupplier(s.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                      <Trash2 className="h-3.5 w-3.5 text-stone-400 hover:text-red-500" />
+                      <Trash2 className="h-3.5 w-3.5 text-[var(--text-3)] hover:text-red-500" />
                     </button>
                   </div>
                 </div>
                 <div className="mt-3 space-y-1">
                   {s.phone && (
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
+                    <div className="flex items-center gap-2 text-xs text-[var(--text-2)]">
                       <Phone className="h-3 w-3 text-stone-300" />
                       <span>{s.phone}</span>
                       {phoneForWA && (
@@ -477,7 +477,7 @@ export default function SuppliersPageClient({ storeId, currency = 'IDR' }: Suppl
                     </div>
                   )}
                   {s.email && (
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
+                    <div className="flex items-center gap-2 text-xs text-[var(--text-2)]">
                       <Mail className="h-3 w-3 text-stone-300" />
                       <a href={`mailto:${s.email}`} className="hover:text-blue-500 transition-colors truncate"
                         onClick={e => e.stopPropagation()}>
@@ -486,7 +486,7 @@ export default function SuppliersPageClient({ storeId, currency = 'IDR' }: Suppl
                     </div>
                   )}
                   {s.address && (
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
+                    <div className="flex items-center gap-2 text-xs text-[var(--text-2)]">
                       <MapPin className="h-3 w-3 text-stone-300" /> <span className="truncate">{s.address}</span>
                     </div>
                   )}

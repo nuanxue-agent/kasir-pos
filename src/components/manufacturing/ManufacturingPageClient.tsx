@@ -10,12 +10,12 @@ interface ManufacturingPageClientProps {
   currency: string
 }
 
-const ic = 'w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition-all'
-const labelCls = 'text-xs font-semibold text-stone-500 mb-1.5 block'
+const ic = 'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition-all'
+const labelCls = 'text-xs font-semibold text-[var(--text-2)] mb-1.5 block'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
-  DRAFT:       { label: 'Draft',       cls: 'bg-stone-100 text-stone-600' },
+  DRAFT:       { label: 'Draft',       cls: 'bg-[var(--bg-muted)] text-[var(--text-2)]' },
   IN_PROGRESS: { label: 'In Progress', cls: 'bg-amber-100 text-amber-700' },
   COMPLETED:   { label: 'Completed',   cls: 'bg-emerald-100 text-emerald-700' },
   CANCELLED:   { label: 'Cancelled',   cls: 'bg-red-100 text-red-600' },
@@ -72,11 +72,11 @@ function BOMFormModal({ storeId, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-          <h2 className="text-base font-bold text-stone-800">New Bill of Materials</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-            <X className="h-4 w-4 text-stone-500" />
+      <div className="bg-[var(--bg-card)] w-full sm:max-w-lg sm:rounded-xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2 className="text-base font-bold text-[var(--text-1)]">New Bill of Materials</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-muted)] transition-colors">
+            <X className="h-4 w-4 text-[var(--text-2)]" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -112,8 +112,8 @@ function BOMFormModal({ storeId, onClose, onSaved }: {
             </div>
           </div>
         </div>
-        <div className="border-t border-stone-100 p-4 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-600 text-sm font-semibold hover:bg-stone-200 transition-colors">Cancel</button>
+        <div className="border-t border-[var(--border)] p-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-[var(--bg-muted)] text-[var(--text-2)] text-sm font-semibold hover:bg-stone-200 transition-colors">Cancel</button>
           <button onClick={handleSubmit} disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold shadow-md shadow-amber-200 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? 'Saving…' : 'Create BOM'}
@@ -173,11 +173,11 @@ function WorkOrderFormModal({ storeId, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-          <h2 className="text-base font-bold text-stone-800">New Work Order</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-            <X className="h-4 w-4 text-stone-500" />
+      <div className="bg-[var(--bg-card)] w-full sm:max-w-lg sm:rounded-xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2 className="text-base font-bold text-[var(--text-1)]">New Work Order</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-muted)] transition-colors">
+            <X className="h-4 w-4 text-[var(--text-2)]" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -207,8 +207,8 @@ function WorkOrderFormModal({ storeId, onClose, onSaved }: {
             <textarea value={form.notes} onChange={set('notes')} rows={2} className={ic} placeholder="Optional notes…" />
           </div>
         </div>
-        <div className="border-t border-stone-100 p-4 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-600 text-sm font-semibold hover:bg-stone-200 transition-colors">Cancel</button>
+        <div className="border-t border-[var(--border)] p-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-[var(--bg-muted)] text-[var(--text-2)] text-sm font-semibold hover:bg-stone-200 transition-colors">Cancel</button>
           <button onClick={handleSubmit} disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold shadow-md shadow-amber-200 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? 'Saving…' : 'Create Work Order'}
@@ -238,7 +238,7 @@ function BOMTab({ storeId }: { storeId: string }) {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-stone-500 text-sm">{boms.length} BOM{boms.length !== 1 ? 's' : ''}</p>
+        <p className="text-[var(--text-2)] text-sm">{boms.length} BOM{boms.length !== 1 ? 's' : ''}</p>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all"
@@ -251,13 +251,13 @@ function BOMTab({ storeId }: { storeId: string }) {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-stone-50 animate-pulse rounded-2xl" />
+            <div key={i} className="h-24 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />
           ))}
         </div>
       ) : boms.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-stone-100 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-16 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm">
           <Settings className="h-12 w-12 text-stone-200 mb-3" />
-          <p className="text-stone-400 text-sm font-medium">No Bills of Materials yet</p>
+          <p className="text-[var(--text-3)] text-sm font-medium">No Bills of Materials yet</p>
           <button
             onClick={() => setShowForm(true)}
             className="mt-3 text-amber-500 text-sm font-medium hover:text-amber-600 transition-colors"
@@ -268,16 +268,16 @@ function BOMTab({ storeId }: { storeId: string }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {boms.map((bom: any) => (
-            <div key={bom.id} className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+            <div key={bom.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                     <Settings className="h-5 w-5 text-amber-500" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-stone-800 truncate">{bom.name}</p>
-                    <p className="text-xs text-stone-400 mt-0.5">
-                      Output: <span className="text-stone-600">{bom.outputQty} {bom.unit}</span>
+                    <p className="font-semibold text-[var(--text-1)] truncate">{bom.name}</p>
+                    <p className="text-xs text-[var(--text-3)] mt-0.5">
+                      Output: <span className="text-[var(--text-2)]">{bom.outputQty} {bom.unit}</span>
                     </p>
                   </div>
                 </div>
@@ -285,13 +285,13 @@ function BOMTab({ storeId }: { storeId: string }) {
                   'shrink-0 text-xs font-medium px-2 py-0.5 rounded-full',
                   bom.active !== false
                     ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-stone-100 text-stone-500'
+                    : 'bg-[var(--bg-muted)] text-[var(--text-2)]'
                 )}>
                   {bom.active !== false ? 'Active' : 'Inactive'}
                 </span>
               </div>
               {bom.description && (
-                <p className="text-xs text-stone-400 mt-2 line-clamp-2">{bom.description}</p>
+                <p className="text-xs text-[var(--text-3)] mt-2 line-clamp-2">{bom.description}</p>
               )}
             </div>
           ))}
@@ -336,7 +336,7 @@ function WorkOrdersTab({ storeId }: { storeId: string }) {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-stone-500 text-sm">{orders.length} work order{orders.length !== 1 ? 's' : ''}</p>
+        <p className="text-[var(--text-2)] text-sm">{orders.length} work order{orders.length !== 1 ? 's' : ''}</p>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all"
@@ -349,13 +349,13 @@ function WorkOrdersTab({ storeId }: { storeId: string }) {
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-20 bg-stone-50 animate-pulse rounded-2xl" />
+            <div key={i} className="h-20 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />
           ))}
         </div>
       ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-stone-100 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-16 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm">
           <Cog className="h-12 w-12 text-stone-200 mb-3" />
-          <p className="text-stone-400 text-sm font-medium">No work orders yet</p>
+          <p className="text-[var(--text-3)] text-sm font-medium">No work orders yet</p>
           <button
             onClick={() => setShowForm(true)}
             className="mt-3 text-amber-500 text-sm font-medium hover:text-amber-600 transition-colors"
@@ -370,20 +370,20 @@ function WorkOrdersTab({ storeId }: { storeId: string }) {
             const next = nextStatus(order.status)
             const isUpdating = updatingId === order.id
             return (
-              <div key={order.id} className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+              <div key={order.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                       <Cog className="h-5 w-5 text-amber-500" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-stone-800 truncate">
+                      <p className="font-semibold text-[var(--text-1)] truncate">
                         {order.bom?.name ?? 'Work Order'}
                       </p>
-                      <p className="text-xs text-stone-400 mt-0.5">
-                        Qty: <span className="text-stone-600">{order.plannedQty}</span>
+                      <p className="text-xs text-[var(--text-3)] mt-0.5">
+                        Qty: <span className="text-[var(--text-2)]">{order.plannedQty}</span>
                         {order.plannedStart && (
-                          <> · Start: <span className="text-stone-600">{new Date(order.plannedStart).toLocaleDateString()}</span></>
+                          <> · Start: <span className="text-[var(--text-2)]">{new Date(order.plannedStart).toLocaleDateString()}</span></>
                         )}
                       </p>
                     </div>
@@ -394,7 +394,7 @@ function WorkOrdersTab({ storeId }: { storeId: string }) {
                 </div>
 
                 {order.notes && (
-                  <p className="text-xs text-stone-400 mt-2 ml-13 line-clamp-2">{order.notes}</p>
+                  <p className="text-xs text-[var(--text-3)] mt-2 ml-13 line-clamp-2">{order.notes}</p>
                 )}
 
                 {/* Action buttons */}
@@ -449,13 +449,13 @@ export function ManufacturingPageClient({ storeId, currency }: ManufacturingPage
           <Factory className="h-5 w-5 text-amber-500" />
         </div>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Manufacturing</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Manage production and bills of materials</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Manufacturing</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Manage production and bills of materials</p>
         </div>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 bg-stone-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-[var(--bg-muted)] p-1 rounded-xl w-fit">
         {tabs.map(t => {
           const Icon = t.icon
           return (
@@ -465,8 +465,8 @@ export function ManufacturingPageClient({ storeId, currency }: ManufacturingPage
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all',
                 tab === t.id
-                  ? 'bg-white text-stone-800 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-700'
+                  ? 'bg-[var(--bg-card)] text-[var(--text-1)] shadow-sm'
+                  : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
               )}
             >
               <Icon className="h-4 w-4" />

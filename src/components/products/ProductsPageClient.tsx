@@ -103,8 +103,8 @@ export default function ProductsPageClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">Produk</h1>
-          <p className="text-sm text-stone-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">Produk</h1>
+          <p className="text-sm text-[var(--text-2)] mt-0.5">
             Manage your product catalog
           </p>
         </div>
@@ -121,27 +121,27 @@ export default function ProductsPageClient({
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
             <input
               type="text"
               placeholder="Search by name or SKU..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+              className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
             />
           </div>
 
           {/* Category filter */}
           <div className="relative sm:w-64">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
             <select
               value={selectedCategory ?? ''}
               onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 appearance-none bg-white"
+              className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 appearance-none bg-[var(--bg-card)]"
             >
               <option value="">Semua Kategori</option>
               {categories.map((cat) => (
@@ -155,11 +155,11 @@ export default function ProductsPageClient({
       </div>
 
       {/* Products table */}
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden">
         {filteredProducts.length === 0 ? (
           <div className="py-12 text-center">
             <Package className="h-12 w-12 text-stone-300 mx-auto mb-3" />
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-[var(--text-2)]">
               {search || selectedCategory ? 'No products match your filters' : 'No products yet'}
             </p>
           </div>
@@ -167,45 +167,45 @@ export default function ProductsPageClient({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left">
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                <tr className="bg-[var(--bg-subtle)] text-left">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">
                     Product
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">
                     SKU
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">
                     Category
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide text-right">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-right">
                     Price
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide text-center">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-center">
                     Stock
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide text-center">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-center">
                     Status
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide text-right">
+                  <th className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide text-right">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-stone-50/50 transition-colors">
+                  <tr key={product.id} className="hover:bg-[var(--bg-subtle)]/50 transition-colors">
                     <td className="px-5 py-3">
                       <div>
-                        <p className="font-medium text-stone-700">{product.name}</p>
+                        <p className="font-medium text-[var(--text-1)]">{product.name}</p>
                         {product.description && (
-                          <p className="text-xs text-stone-400 mt-0.5 truncate max-w-xs">
+                          <p className="text-xs text-[var(--text-3)] mt-0.5 truncate max-w-xs">
                             {product.description}
                           </p>
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-stone-600">
-                      {product.sku || <span className="text-stone-400 italic">—</span>}
+                    <td className="px-5 py-3 text-[var(--text-2)]">
+                      {product.sku || <span className="text-[var(--text-3)] italic">—</span>}
                     </td>
                     <td className="px-5 py-3">
                       {product.category ? (
@@ -221,10 +221,10 @@ export default function ProductsPageClient({
                           {product.category.name}
                         </span>
                       ) : (
-                        <span className="text-stone-400 italic text-xs">Uncategorized</span>
+                        <span className="text-[var(--text-3)] italic text-xs">Uncategorized</span>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-right font-medium text-stone-700">
+                    <td className="px-5 py-3 text-right font-medium text-[var(--text-1)]">
                       {formatCurrency(product.price, currency)}
                     </td>
                     <td className="px-5 py-3 text-center">
@@ -237,7 +237,7 @@ export default function ProductsPageClient({
                                 ? product.stock === 0
                                   ? 'text-red-600'
                                   : 'text-orange-600'
-                                : 'text-stone-700'
+                                : 'text-[var(--text-1)]'
                             )}
                           >
                             {product.stock}
@@ -247,7 +247,7 @@ export default function ProductsPageClient({
                           )}
                         </div>
                       ) : (
-                        <span className="text-stone-400 text-xs italic">N/A</span>
+                        <span className="text-[var(--text-3)] text-xs italic">N/A</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-center">
@@ -257,7 +257,7 @@ export default function ProductsPageClient({
                           'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium transition-colors',
                           product.active
                             ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            : 'bg-[var(--bg-muted)] text-[var(--text-2)] hover:bg-stone-200'
                         )}
                       >
                         {product.active ? 'Active' : 'Inactive'}
@@ -270,14 +270,14 @@ export default function ProductsPageClient({
                             setEditingProduct(product)
                             setShowModal(true)
                           }}
-                          className="p-1.5 text-stone-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          className="p-1.5 text-[var(--text-3)] hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(product.id)}
-                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="p-1.5 text-[var(--text-3)] hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />

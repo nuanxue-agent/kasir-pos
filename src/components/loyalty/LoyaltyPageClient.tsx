@@ -46,7 +46,7 @@ const PRESET_COLORS = [
 ]
 
 const inputCls =
-  'w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
+  'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
 
 type Tab = 'Tiers' | 'Members' | 'Redemptions'
 
@@ -101,8 +101,8 @@ export function LoyaltyPageClient({ storeId, currency }: { storeId: string; curr
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Loyalty Program</h1>
-          <p className="text-stone-500 mt-1 text-sm">Manage tiers, members, and redemptions</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Loyalty Program</h1>
+          <p className="text-[var(--text-2)] mt-1 text-sm">Manage tiers, members, and redemptions</p>
         </div>
         {tab === 'Tiers' && (
           <button
@@ -115,15 +115,15 @@ export function LoyaltyPageClient({ storeId, currency }: { storeId: string; curr
       </div>
 
       {/* Tab nav */}
-      <div className="flex gap-1 bg-stone-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-[var(--bg-muted)] p-1 rounded-xl w-fit">
         {tabs.map(({ key, icon, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               tab === key
-                ? 'bg-white text-stone-800 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700'
+                ? 'bg-[var(--bg-card)] text-[var(--text-1)] shadow-sm'
+                : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
             }`}
           >
             {icon}
@@ -168,7 +168,7 @@ function TiersTab({ storeId, onRefresh }: { storeId: string; onRefresh: () => vo
     return (
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-36 bg-stone-100 rounded-2xl animate-pulse" />
+          <div key={i} className="h-36 bg-[var(--bg-muted)] rounded-xl animate-pulse" />
         ))}
       </div>
     )
@@ -176,9 +176,9 @@ function TiersTab({ storeId, onRefresh }: { storeId: string; onRefresh: () => vo
 
   if (tiers.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+      <div className="flex flex-col items-center justify-center py-20 text-[var(--text-3)]">
         <Crown size={48} strokeWidth={1} className="mb-4" />
-        <p className="text-base font-medium text-stone-500">No tiers yet</p>
+        <p className="text-base font-medium text-[var(--text-2)]">No tiers yet</p>
         <p className="text-sm mt-1">Create your first loyalty tier to get started.</p>
       </div>
     )
@@ -195,13 +195,13 @@ function TiersTab({ storeId, onRefresh }: { storeId: string; onRefresh: () => vo
 
 function TierCard({ tier }: { tier: LoyaltyTier }) {
   return (
-    <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-2xl">{tier.icon}</span>
           <div>
-            <p className="font-semibold text-stone-800">{tier.name}</p>
-            <p className="text-xs text-stone-400">from {tier.minPoints.toLocaleString()} pts</p>
+            <p className="font-semibold text-[var(--text-1)]">{tier.name}</p>
+            <p className="text-xs text-[var(--text-3)]">from {tier.minPoints.toLocaleString()} pts</p>
           </div>
         </div>
         {/* Color swatch */}
@@ -243,7 +243,7 @@ function MembersTab({ storeId }: { storeId: string }) {
     return (
       <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-20 bg-stone-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-20 bg-[var(--bg-muted)] rounded-xl animate-pulse" />
         ))}
       </div>
     )
@@ -251,9 +251,9 @@ function MembersTab({ storeId }: { storeId: string }) {
 
   if (members.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+      <div className="flex flex-col items-center justify-center py-20 text-[var(--text-3)]">
         <Users size={48} strokeWidth={1} className="mb-4" />
-        <p className="text-base font-medium text-stone-500">No members yet</p>
+        <p className="text-base font-medium text-[var(--text-2)]">No members yet</p>
         <p className="text-sm mt-1">Customers who earn points will appear here.</p>
       </div>
     )
@@ -285,7 +285,7 @@ function MemberRow({ member, tiers }: { member: LoyaltyMember; tiers: LoyaltyTie
     : 100
 
   return (
-    <div className="bg-white border border-stone-100 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex items-center gap-4 shadow-sm">
       {/* Avatar */}
       <div className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold text-sm">
         {member.name[0]?.toUpperCase() ?? '?'}
@@ -293,7 +293,7 @@ function MemberRow({ member, tiers }: { member: LoyaltyMember; tiers: LoyaltyTie
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-medium text-stone-800 text-sm">{member.name}</p>
+          <p className="font-medium text-[var(--text-1)] text-sm">{member.name}</p>
           {currentTier && (
             <span
               className="text-xs px-2 py-0.5 rounded-full font-semibold"
@@ -303,16 +303,16 @@ function MemberRow({ member, tiers }: { member: LoyaltyMember; tiers: LoyaltyTie
             </span>
           )}
         </div>
-        <p className="text-xs text-stone-400 mt-0.5">{member.phone ?? member.email ?? '—'}</p>
+        <p className="text-xs text-[var(--text-3)] mt-0.5">{member.phone ?? member.email ?? '—'}</p>
 
         {/* Tier progress bar */}
         {nextTier && (
           <div className="mt-2">
-            <div className="flex items-center justify-between text-xs text-stone-400 mb-1">
+            <div className="flex items-center justify-between text-xs text-[var(--text-3)] mb-1">
               <span>{member.points.toLocaleString()} pts</span>
               <span>{nextTier.minPoints.toLocaleString()} pts for {nextTier.icon} {nextTier.name}</span>
             </div>
-            <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
                 style={{
@@ -330,8 +330,8 @@ function MemberRow({ member, tiers }: { member: LoyaltyMember; tiers: LoyaltyTie
 
       {/* Points badge */}
       <div className="shrink-0 text-right">
-        <p className="text-lg font-bold text-stone-800">{member.points.toLocaleString()}</p>
-        <p className="text-xs text-stone-400">points</p>
+        <p className="text-lg font-bold text-[var(--text-1)]">{member.points.toLocaleString()}</p>
+        <p className="text-xs text-[var(--text-3)]">points</p>
       </div>
     </div>
   )
@@ -351,7 +351,7 @@ function RedemptionsTab({ storeId, currency }: { storeId: string; currency: stri
     return (
       <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-16 bg-stone-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-16 bg-[var(--bg-muted)] rounded-xl animate-pulse" />
         ))}
       </div>
     )
@@ -359,9 +359,9 @@ function RedemptionsTab({ storeId, currency }: { storeId: string; currency: stri
 
   if (redemptions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+      <div className="flex flex-col items-center justify-center py-20 text-[var(--text-3)]">
         <Gift size={48} strokeWidth={1} className="mb-4" />
-        <p className="text-base font-medium text-stone-500">No redemptions yet</p>
+        <p className="text-base font-medium text-[var(--text-2)]">No redemptions yet</p>
         <p className="text-sm mt-1">Points redemptions will appear here.</p>
       </div>
     )
@@ -370,7 +370,7 @@ function RedemptionsTab({ storeId, currency }: { storeId: string; currency: stri
   return (
     <div className="space-y-2">
       {/* Header row */}
-      <div className="grid grid-cols-4 gap-2 px-4 text-xs font-medium text-stone-400 uppercase tracking-wide">
+      <div className="grid grid-cols-4 gap-2 px-4 text-xs font-medium text-[var(--text-3)] uppercase tracking-wide">
         <span>Customer</span>
         <span className="text-right">Points</span>
         <span className="text-right">Discount</span>
@@ -380,22 +380,22 @@ function RedemptionsTab({ storeId, currency }: { storeId: string; currency: stri
       {redemptions.map((r) => (
         <div
           key={r.id}
-          className="bg-white border border-stone-100 rounded-xl px-4 py-3 grid grid-cols-4 gap-2 items-center shadow-sm"
+          className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-3 grid grid-cols-4 gap-2 items-center shadow-sm"
         >
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-xs font-bold shrink-0">
               {r.customerName?.[0]?.toUpperCase() ?? '?'}
             </div>
-            <p className="text-sm font-medium text-stone-700 truncate">{r.customerName ?? '—'}</p>
+            <p className="text-sm font-medium text-[var(--text-1)] truncate">{r.customerName ?? '—'}</p>
           </div>
           <div className="text-right">
             <span className="text-sm font-semibold text-rose-500">−{r.pointsRedeemed.toLocaleString()}</span>
-            <span className="text-xs text-stone-400 ml-1">pts</span>
+            <span className="text-xs text-[var(--text-3)] ml-1">pts</span>
           </div>
           <div className="text-right text-sm font-medium text-emerald-600">
             {formatCurrency(r.discountGiven, currency)}
           </div>
-          <div className="text-right text-xs text-stone-400">{formatDate(r.createdAt)}</div>
+          <div className="text-right text-xs text-[var(--text-3)]">{formatDate(r.createdAt)}</div>
         </div>
       ))}
     </div>
@@ -454,16 +454,16 @@ function NewTierModal({
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md border border-stone-100 shadow-xl p-6 space-y-5">
+      <div className="bg-[var(--bg-card)] rounded-xl w-full max-w-md border border-[var(--border)] shadow-xl p-6 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-stone-800 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-[var(--text-1)] flex items-center gap-2">
             <Star size={18} className="text-amber-500" />
             New Loyalty Tier
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+            className="p-1.5 rounded-lg text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg-muted)] transition-colors"
           >
             <X size={18} />
           </button>
@@ -472,7 +472,7 @@ function NewTierModal({
         <div className="space-y-4">
           {/* Tier name */}
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Tier Name *</label>
+            <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">Tier Name *</label>
             <input
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
@@ -483,7 +483,7 @@ function NewTierModal({
 
           {/* Icon */}
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Icon (emoji)</label>
+            <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">Icon (emoji)</label>
             <input
               value={form.icon}
               onChange={(e) => set('icon', e.target.value)}
@@ -495,7 +495,7 @@ function NewTierModal({
 
           {/* Min points */}
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Minimum Points</label>
+            <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">Minimum Points</label>
             <input
               type="number"
               min={0}
@@ -507,7 +507,7 @@ function NewTierModal({
 
           {/* Discount */}
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Discount (%)</label>
+            <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">Discount (%)</label>
             <input
               type="number"
               min={0}
@@ -521,7 +521,7 @@ function NewTierModal({
 
           {/* Color picker */}
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-2">Color</label>
+            <label className="block text-xs font-medium text-[var(--text-2)] mb-2">Color</label>
             <div className="flex gap-2.5">
               {PRESET_COLORS.map((c) => (
                 <button
@@ -541,11 +541,11 @@ function NewTierModal({
           </div>
 
           {/* Preview */}
-          <div className="bg-stone-50 rounded-xl p-3 flex items-center gap-3 border border-stone-100">
+          <div className="bg-[var(--bg-subtle)] rounded-xl p-3 flex items-center gap-3 border border-[var(--border)]">
             <span className="text-xl">{form.icon || '⭐'}</span>
             <div>
-              <p className="text-sm font-semibold text-stone-800">{form.name || 'Tier Name'}</p>
-              <p className="text-xs text-stone-400">
+              <p className="text-sm font-semibold text-[var(--text-1)]">{form.name || 'Tier Name'}</p>
+              <p className="text-xs text-[var(--text-3)]">
                 {form.minPoints.toLocaleString()} pts · {form.discount}% off
               </p>
             </div>
@@ -565,14 +565,14 @@ function NewTierModal({
         <div className="flex gap-3 pt-1">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text-1)] text-sm transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-stone-200 disabled:text-stone-400 text-white text-sm font-medium transition-colors"
+            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-stone-200 disabled:text-[var(--text-3)] text-white text-sm font-medium transition-colors"
           >
             {loading ? 'Creating…' : 'Create Tier'}
           </button>

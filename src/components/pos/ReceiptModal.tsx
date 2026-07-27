@@ -109,16 +109,16 @@ export default function ReceiptModal({
         className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       >
         {/* Modal shell */}
-        <div className="w-full max-w-sm bg-white rounded-2xl border border-stone-200 shadow-2xl overflow-hidden">
+        <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-2xl overflow-hidden">
           {/* Header — hidden on print */}
           <div className="no-print flex items-center justify-between px-5 py-4 border-b border-white/5">
             <div className="flex items-center gap-2">
               <Printer className="h-4 w-4 text-indigo-400" />
-              <h2 className="text-sm font-semibold text-stone-800">Receipt</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-1)]">Receipt</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-stone-400 hover:text-stone-700 transition-colors"
+              className="text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors"
               aria-label="Close receipt"
             >
               <X className="h-5 w-5" />
@@ -127,7 +127,7 @@ export default function ReceiptModal({
 
           {/* Receipt body */}
           <div className="p-5 overflow-y-auto max-h-[70vh]">
-            <div className="receipt-content bg-white rounded-xl p-5 text-stone-800 text-xs">
+            <div className="receipt-content bg-[var(--bg-card)] rounded-xl p-5 text-[var(--text-1)] text-xs">
               {/* Store name */}
               <div className="text-center mb-3">
                 <p className="font-bold text-sm uppercase tracking-widest">{storeName}</p>
@@ -137,15 +137,15 @@ export default function ReceiptModal({
               {/* Order info */}
               <div className="space-y-0.5 mb-3">
                 <div className="flex justify-between">
-                  <span className="text-stone-500">No.</span>
+                  <span className="text-[var(--text-2)]">No.</span>
                   <span className="font-semibold">{receipt.number}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-stone-500">Date</span>
+                  <span className="text-[var(--text-2)]">Date</span>
                   <span>{dateStr}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-stone-500">Time</span>
+                  <span className="text-[var(--text-2)]">Time</span>
                   <span>{timeStr}</span>
                 </div>
               </div>
@@ -155,7 +155,7 @@ export default function ReceiptModal({
               {/* Items */}
               <table className="w-full mb-1" aria-label="Order items">
                 <thead>
-                  <tr className="text-stone-500">
+                  <tr className="text-[var(--text-2)]">
                     <th className="text-left font-normal pb-1">Item</th>
                     <th className="text-center font-normal pb-1 w-8">Qty</th>
                     <th className="text-right font-normal pb-1">Total</th>
@@ -166,7 +166,7 @@ export default function ReceiptModal({
                     <tr key={idx}>
                       <td className="py-0.5 pr-2">
                         <p className="leading-tight">{item.name}</p>
-                        <p className="text-stone-400 text-[10px]">
+                        <p className="text-[var(--text-3)] text-[10px]">
                           {fmt(item.price, currency)} × {item.qty}
                         </p>
                       </td>
@@ -183,18 +183,18 @@ export default function ReceiptModal({
 
               {/* Totals */}
               <div className="space-y-0.5">
-                <div className="flex justify-between text-stone-600">
+                <div className="flex justify-between text-[var(--text-2)]">
                   <span>Subtotal</span>
                   <span>{fmt(receipt.subtotal, currency)}</span>
                 </div>
                 {(receipt.discountAmt ?? 0) > 0 && (
-                  <div className="flex justify-between text-stone-600">
+                  <div className="flex justify-between text-[var(--text-2)]">
                     <span>Diskon</span>
                     <span>- {fmt(receipt.discountAmt!, currency)}</span>
                   </div>
                 )}
                 {taxRate > 0 && receipt.taxAmt > 0 && (
-                  <div className="flex justify-between text-stone-600">
+                  <div className="flex justify-between text-[var(--text-2)]">
                     <span>Tax ({(taxRate * 100).toFixed(0)}%)</span>
                     <span>{fmt(receipt.taxAmt, currency)}</span>
                   </div>
@@ -210,16 +210,16 @@ export default function ReceiptModal({
               {/* Payment */}
               {primaryPayment && (
                 <div className="space-y-0.5">
-                  <div className="flex justify-between text-stone-600">
+                  <div className="flex justify-between text-[var(--text-2)]">
                     <span>Payment</span>
                     <span>{METHOD_LABELS[primaryPayment.method] ?? primaryPayment.method}</span>
                   </div>
-                  <div className="flex justify-between text-stone-600">
+                  <div className="flex justify-between text-[var(--text-2)]">
                     <span>Paid</span>
                     <span>{fmt(primaryPayment.amount, currency)}</span>
                   </div>
                   {primaryPayment.change > 0 && (
-                    <div className="flex justify-between text-stone-600">
+                    <div className="flex justify-between text-[var(--text-2)]">
                       <span>Kembalian</span>
                       <span>{fmt(primaryPayment.change, currency)}</span>
                     </div>
@@ -231,12 +231,12 @@ export default function ReceiptModal({
               {receiptNote && (
                 <>
                   <div className="border-t border-dashed border-stone-400 my-2" />
-                  <p className="text-center text-stone-500 text-[10px] leading-snug">{receiptNote}</p>
+                  <p className="text-center text-[var(--text-2)] text-[10px] leading-snug">{receiptNote}</p>
                 </>
               )}
 
               {/* Footer */}
-              <div className="border-t border-dashed border-stone-400 mt-2 pt-2 text-center text-stone-400 text-[10px]">
+              <div className="border-t border-dashed border-stone-400 mt-2 pt-2 text-center text-[var(--text-3)] text-[10px]">
                 Thank you for your purchase!
               </div>
             </div>
@@ -253,7 +253,7 @@ export default function ReceiptModal({
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-600 text-sm font-medium hover:text-stone-800 hover:bg-stone-100 transition-colors"
+              className="flex-1 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-2)] text-sm font-medium hover:text-[var(--text-1)] hover:bg-[var(--bg-muted)] transition-colors"
             >
               Close
             </button>

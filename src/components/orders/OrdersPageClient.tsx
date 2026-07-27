@@ -63,14 +63,14 @@ const STATUS_STYLES: Record<string, string> = {
   PAID:     'bg-emerald-100 text-emerald-700',
   PENDING:  'bg-yellow-100 text-yellow-700',
   VOIDED:   'bg-red-100 text-red-600',
-  REFUNDED: 'bg-slate-100 text-stone-500',
+  REFUNDED: 'bg-slate-100 text-[var(--text-2)]',
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-        STATUS_STYLES[status] ?? 'bg-slate-100 text-stone-500'
+        STATUS_STYLES[status] ?? 'bg-slate-100 text-[var(--text-2)]'
       }`}
     >
       {status.charAt(0) + status.slice(1).toLowerCase()}
@@ -153,13 +153,13 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
       <div className="flex items-center gap-3">
         <Receipt className="h-6 w-6 text-indigo-500" />
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">Pesanan</h1>
-          <p className="text-sm text-stone-500">Browse and manage all transactions</p>
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">Pesanan</h1>
+          <p className="text-sm text-[var(--text-2)]">Browse and manage all transactions</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 space-y-4">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-4 space-y-4">
         {/* Status tabs */}
         <div className="flex flex-wrap gap-2">
           {STATUS_TABS.map((tab) => (
@@ -169,7 +169,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 statusFilter === tab.value
                   ? 'bg-amber-500 text-white'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  : 'bg-[var(--bg-muted)] text-[var(--text-2)] hover:bg-stone-200'
               }`}
             >
               {tab.label}
@@ -181,35 +181,35 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
         <div className="flex flex-wrap gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
             <input
               type="text"
               placeholder="Search order number…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
             />
           </div>
 
           {/* Date from */}
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 pointer-events-none" />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)] pointer-events-none" />
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
-              className="pl-9 pr-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              className="pl-9 pr-3 py-2 rounded-xl border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
             />
           </div>
 
           {/* Date to */}
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 pointer-events-none" />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)] pointer-events-none" />
             <input
               type="date"
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
-              className="pl-9 pr-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              className="pl-9 pr-3 py-2 rounded-xl border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
             />
           </div>
 
@@ -223,7 +223,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
                 setStatusFilter('ALL')
                 setPage(1)
               }}
-              className="px-3 py-2 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50"
+              className="px-3 py-2 rounded-xl border border-[var(--border)] text-sm text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
             >
               Clear
             </button>
@@ -232,7 +232,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden">
         {isLoading ? (
           <TableSkeleton />
         ) : isError ? (
@@ -241,18 +241,18 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
             <button onClick={() => refetch()} className="underline">Retry</button>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="py-16 text-center text-sm text-stone-400">
+          <div className="py-16 text-center text-sm text-[var(--text-3)]">
             No orders found.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left">
+                <tr className="bg-[var(--bg-subtle)] text-left">
                   {['Order #', 'Date', 'Customer', 'Items', 'Total', 'Status', ''].map((h) => (
                     <th
                       key={h}
-                      className="px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide whitespace-nowrap"
+                      className="px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -263,25 +263,25 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
                 {filteredOrders.map((order) => (
                   <tr
                     key={order.id}
-                    className="hover:bg-stone-50/60 transition-colors cursor-pointer"
+                    className="hover:bg-[var(--bg-subtle)]/60 transition-colors cursor-pointer"
                     onClick={() => setSelectedOrder(order)}
                   >
                     <td className="px-5 py-3 font-medium text-indigo-600">
                       {order.number}
                     </td>
-                    <td className="px-5 py-3 text-stone-500 text-xs whitespace-nowrap">
+                    <td className="px-5 py-3 text-[var(--text-2)] text-xs whitespace-nowrap">
                       {formatDate(order.createdAt)}
                     </td>
-                    <td className="px-5 py-3 text-stone-700">
+                    <td className="px-5 py-3 text-[var(--text-1)]">
                       {order.customer?.name ?? (
-                        <span className="italic text-stone-400">Walk-in</span>
+                        <span className="italic text-[var(--text-3)]">Walk-in</span>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-stone-600">
+                    <td className="px-5 py-3 text-[var(--text-2)]">
                       {order.items.reduce((s, i) => s + i.qty, 0)} item
                       {order.items.reduce((s, i) => s + i.qty, 0) !== 1 ? 's' : ''}
                     </td>
-                    <td className="px-5 py-3 font-medium text-stone-700 whitespace-nowrap">
+                    <td className="px-5 py-3 font-medium text-[var(--text-1)] whitespace-nowrap">
                       {formatCurrency(order.total, currency)}
                     </td>
                     <td className="px-5 py-3">
@@ -307,7 +307,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-stone-500">
+        <div className="flex items-center justify-between text-sm text-[var(--text-2)]">
           <span>
             Page {page} of {totalPages} &middot; {data?.total ?? 0} orders
           </span>
@@ -315,14 +315,14 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-200 disabled:opacity-40 hover:bg-stone-50"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[var(--border)] disabled:opacity-40 hover:bg-[var(--bg-subtle)]"
             >
               <ChevronLeft className="h-4 w-4" /> Prev
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-200 disabled:opacity-40 hover:bg-stone-50"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[var(--border)] disabled:opacity-40 hover:bg-[var(--bg-subtle)]"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>
@@ -349,7 +349,7 @@ function TableSkeleton() {
   return (
     <div className="p-5 space-y-3 animate-pulse">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-10 bg-stone-100 rounded-lg" />
+        <div key={i} className="h-10 bg-[var(--bg-muted)] rounded-lg" />
       ))}
     </div>
   )
