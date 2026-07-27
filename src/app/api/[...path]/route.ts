@@ -668,6 +668,60 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           ),
         )
       }
+
+      // GET /api/inventory/:id/history?days=30
+      if (segs.length === 3 && segs[2] === 'history' && method === 'GET') {
+        const pid = segs[1]
+        const days = Math.min(Math.max(parseInt(sp.get('days') ?? '30', 10) || 30, 1), 90)
+        // Verify product belongs to store
+        const product = await queryOne(`SELECT id FROM Product WHERE id = ? AND storeId = ?`, [
+          pid,
+          storeId,
+        ])
+        if (!product) return err('Product not found', 404)
+        // Build date range: last `days` days inclusive of today
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - (days - 1))
+        cutoff.setHours(0, 0, 0, 0)
+        const cutoffISO = cutoff.toISOString()
+        const logs = await query<{ type: string; qty: number; createdAt: string }>(
+          `SELECT type, qty, createdAt FROM StockLog WHERE productId = ? AND createdAt >= ? ORDER BY createdAt ASC`,
+          [pid, cutoffISO],
+        )
+        // Aggregate by date string (YYYY-MM-DD)
+        const map = new Map<string, { date: string; in: number; out: number }>()
+        // Pre-fill all days so chart has continuous axis
+        for (let i = 0; i < days; i++) {
+          const d = new Date(cutoff)
+          d.setDate(d.getDate() + i)
+          const key = d.toISOString().slice(0, 10)
+          map.set(key, { date: key, in: 0, out: 0 })
+        }
+        for (const log of logs) {
+          const key = log.createdAt.slice(0, 10)
+          const entry = map.get(key)
+          if (!entry) continue
+          const absQty = Math.abs(Number(log.qty))
+          // SALE, OUT, VOID have negative qty or OUT type; everything else is in
+          const isOut =
+            log.type === 'SALE' ||
+            log.type === 'OUT' ||
+            log.type === 'VOID' ||
+            log.type === 'REFUND'
+              ? false // REFUND adds back stock = in
+              : Number(log.qty) < 0
+          if (
+            log.type === 'SALE' ||
+            log.type === 'OUT' ||
+            (Number(log.qty) < 0 && log.type === 'ADJUSTMENT')
+          ) {
+            entry.out += absQty
+          } else {
+            entry.in += absQty
+          }
+        }
+        return ok(Array.from(map.values()))
+      }
     }
 
     // ─── DISCOUNTS ────────────────────────────────────────────────────────────
@@ -2713,6 +2767,98 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         [storeId, like, like, like],
       )
       return ok(rows)
+    }
+
+    // ─── HR ATTENDANCE (calendar view) ───────────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'attendance' && method === 'GET') {
+      const employeeId = sp.get('employeeId') ?? ''
+      const month = parseInt(sp.get('month') ?? '0')
+      const year = parseInt(sp.get('year') ?? '0')
+      if (!employeeId) return err('employeeId required')
+      if (!month || !year) return err('month and year required')
+      const from = `${year}-${String(month).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month, 0).getDate()
+      const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+      const rows = await query(
+        `SELECT a.*, e.name as employeeName FROM Attendance a
+         JOIN Employee e ON a.employeeId = e.id
+         WHERE a.storeId=? AND a.employeeId=? AND a.date >= ? AND a.date <= ?
+         ORDER BY a.date`,
+        [storeId, employeeId, from, to],
+      )
+      return ok(rows)
+    }
+
+    // ─── HR LEAVE ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'leave') {
+      // GET /api/hr/leave — list leave requests
+      if (!segs[2] && method === 'GET') {
+        const employeeId = sp.get('employeeId') ?? ''
+        let q = `SELECT l.*, e.name as employeeName FROM LeaveRequest l
+                 JOIN Employee e ON l.employeeId = e.id
+                 WHERE l.storeId=?`
+        const params: any[] = [storeId]
+        if (employeeId) {
+          q += ` AND l.employeeId=?`
+          params.push(employeeId)
+        }
+        q += ` ORDER BY l.createdAt DESC`
+        return ok(await query(q, params))
+      }
+
+      // POST /api/hr/leave — submit new leave request
+      if (!segs[2] && method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.employeeId) return err('employeeId wajib diisi')
+        if (!b.startDate) return err('Tanggal mulai wajib diisi')
+        if (!b.endDate) return err('Tanggal selesai wajib diisi')
+        if (new Date(b.endDate) < new Date(b.startDate))
+          return err('Tanggal selesai tidak boleh sebelum tanggal mulai')
+        const validTypes = new Set(['ANNUAL', 'SICK', 'PERSONAL'])
+        if (!validTypes.has(b.type)) return err('Tipe cuti tidak valid')
+        if (!b.reason || b.reason.trim().length < 3) return err('Alasan minimal 3 karakter')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO LeaveRequest (id,storeId,employeeId,startDate,endDate,type,status,reason,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            b.employeeId,
+            b.startDate,
+            b.endDate,
+            b.type,
+            'PENDING',
+            b.reason.trim(),
+            t,
+            t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+
+      // PATCH /api/hr/leave/:id — approve or reject
+      if (segs[2] && method === 'PATCH') {
+        const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
+        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+        const b = (await req.json()) as any
+        const validStatuses = new Set(['APPROVED', 'REJECTED'])
+        if (!b.status || !validStatuses.has(b.status))
+          return err('Status harus APPROVED atau REJECTED')
+        const leave = await queryOne<any>(`SELECT * FROM LeaveRequest WHERE id=? AND storeId=?`, [
+          segs[2],
+          storeId,
+        ])
+        if (!leave) return err('Leave request not found', 404)
+        if (leave.status !== 'PENDING') return err('Hanya status PENDING yang bisa diubah')
+        await exec(`UPDATE LeaveRequest SET status=?, updatedAt=? WHERE id=? AND storeId=?`, [
+          b.status,
+          nowISO(),
+          segs[2],
+          storeId,
+        ])
+        return ok({ success: true, status: b.status })
+      }
     }
 
     // ─── AUDIT LOG ────────────────────────────────────────────────────────────

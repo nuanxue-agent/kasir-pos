@@ -77,7 +77,7 @@ function addBundleToCart(cart: CartItem[], bundle: Bundle): CartItem[] {
       updated = updated.map(i =>
         i.productId === newItem.productId
           ? { ...i, qty: i.qty + newItem.qty, subtotal: (i.qty + newItem.qty) * i.price }
-          : i
+          : i,
       )
     } else {
       updated.push(newItem)
@@ -96,10 +96,38 @@ function isBundleAvailable(bundle: Bundle): boolean {
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const coffee: Product = { id: 'p1', name: 'Kopi Hitam', price: 15000, cost: 5000, stock: 20, trackStock: true }
-const cake: Product   = { id: 'p2', name: 'Kue Coklat', price: 25000, cost: 8000, stock: 10, trackStock: true }
-const water: Product  = { id: 'p3', name: 'Air Mineral', price: 5000,  cost: 1000, stock: 0,  trackStock: true }
-const service: Product = { id: 'p4', name: 'Gift Wrap',  price: 2000,  cost: 500,  stock: 0,  trackStock: false }
+const coffee: Product = {
+  id: 'p1',
+  name: 'Kopi Hitam',
+  price: 15000,
+  cost: 5000,
+  stock: 20,
+  trackStock: true,
+}
+const cake: Product = {
+  id: 'p2',
+  name: 'Kue Coklat',
+  price: 25000,
+  cost: 8000,
+  stock: 10,
+  trackStock: true,
+}
+const water: Product = {
+  id: 'p3',
+  name: 'Air Mineral',
+  price: 5000,
+  cost: 1000,
+  stock: 0,
+  trackStock: true,
+}
+const service: Product = {
+  id: 'p4',
+  name: 'Gift Wrap',
+  price: 2000,
+  cost: 500,
+  stock: 0,
+  trackStock: false,
+}
 
 const cafeBundle: Bundle = {
   id: 'b1',
@@ -222,14 +250,16 @@ describe('Bundle discount calculation', () => {
   })
 
   it('addBundleToCart merges with existing cart item for same product', () => {
-    const existing: CartItem[] = [{
-      id: 'existing-p1',
-      productId: 'p1',
-      name: 'Kopi Hitam',
-      price: 15000,
-      qty: 1,
-      subtotal: 15000,
-    }]
+    const existing: CartItem[] = [
+      {
+        id: 'existing-p1',
+        productId: 'p1',
+        name: 'Kopi Hitam',
+        price: 15000,
+        qty: 1,
+        subtotal: 15000,
+      },
+    ]
     const cart = addBundleToCart(existing, cafeBundle)
     const coffeeInCart = cart.find(i => i.productId === 'p1')!
     // original 1 + bundle 1 = 2
@@ -240,10 +270,93 @@ describe('Bundle discount calculation', () => {
   })
 
   it('adding two different bundles accumulates all components', () => {
-    const cart1 = addBundleToCart([], cafeBundle)    // coffee×1, cake×1
+    const cart1 = addBundleToCart([], cafeBundle) // coffee×1, cake×1
     const cart2 = addBundleToCart(cart1, premiumBundle) // coffee×2, cake×1
     const coffeeInCart = cart2.find(i => i.productId === 'p1')!
     expect(coffeeInCart.qty).toBe(3) // 1 + 2
-    expect(cart2).toHaveLength(2)    // coffee + cake only
+    expect(cart2).toHaveLength(2) // coffee + cake only
+  })
+})
+
+// ── Edge cases ────────────────────────────────────────────────────────────────
+
+describe('Bundle edge cases', () => {
+  it('bundle with zero price has max discount', () => {
+    const freeBundle: Bundle = { ...cafeBundle, price: 0 }
+    expect(bundleDiscount(freeBundle)).toBe(bundleComponentTotal(cafeBundle))
+  })
+
+  it('bundle with one item expands to one CartItem', () => {
+    const singleItemBundle: Bundle = {
+      id: 'b5',
+      name: 'Solo',
+      price: 10000,
+      active: true,
+      items: [{ productId: 'p1', qty: 1, product: coffee }],
+    }
+    expect(expandBundleToCartItems(singleItemBundle)).toHaveLength(1)
+  })
+
+  it('bundle with qty > 1 for a single component has correct subtotal', () => {
+    const multiQtyBundle: Bundle = {
+      id: 'b6',
+      name: 'Triple Coffee',
+      price: 40000,
+      active: true,
+      items: [{ productId: 'p1', qty: 3, product: coffee }],
+    }
+    const items = expandBundleToCartItems(multiQtyBundle)
+    expect(items[0].qty).toBe(3)
+    expect(items[0].subtotal).toBe(45000) // 3 × 15000
+  })
+
+  it('bundleDiscountPercent is 0 when bundle price equals component total', () => {
+    const noDiscountBundle: Bundle = { ...cafeBundle, price: 40000 }
+    expect(bundleDiscountPercent(noDiscountBundle)).toBe(0)
+  })
+
+  it('bundleDiscountPercent is 0 for zero-component-total bundle', () => {
+    const zeroCostBundle: Bundle = {
+      id: 'bz',
+      name: 'Zero',
+      price: 0,
+      active: true,
+      items: [{ productId: 'p1', qty: 1, product: { ...coffee, price: 0 } }],
+    }
+    expect(bundleDiscountPercent(zeroCostBundle)).toBe(0)
+  })
+
+  it('addBundleToCart to empty cart returns exactly bundle item count', () => {
+    const cart = addBundleToCart([], premiumBundle)
+    expect(cart).toHaveLength(2) // coffee + cake
+  })
+
+  it('bundle availability: partial stock shortage makes bundle unavailable', () => {
+    const lowStockCoffee: Product = { ...coffee, stock: 0 }
+    const lowBundle: Bundle = {
+      id: 'blow',
+      name: 'Low',
+      price: 30000,
+      active: true,
+      items: [{ productId: 'p1', qty: 1, product: lowStockCoffee }],
+    }
+    expect(isBundleAvailable(lowBundle)).toBe(false)
+  })
+
+  it('bundle with mixed tracked/untracked is available if tracked items have stock', () => {
+    // coffee has stock=20 (tracked), service has stock=0 (untracked) — should be available
+    expect(isBundleAvailable(serviceBundle)).toBe(true)
+  })
+
+  it('expandBundleToCartItems ids are unique (different timestamps are fine)', () => {
+    const items = expandBundleToCartItems(cafeBundle)
+    const ids = items.map(i => i.id)
+    // Each id includes productId so they are distinct
+    expect(ids[0]).not.toBe(ids[1])
+  })
+
+  it('bundleComponentTotal for empty items list is 0', () => {
+    const emptyBundle: Bundle = { id: 'be', name: 'Empty', price: 0, active: true, items: [] }
+    expect(bundleComponentTotal(emptyBundle)).toBe(0)
   })
 })
