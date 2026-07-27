@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS ProductBundle (
+  id TEXT PRIMARY KEY,
+  storeId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  price REAL NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS BundleItem (
+  id TEXT PRIMARY KEY,
+  bundleId TEXT NOT NULL,
+  productId TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 1
+);

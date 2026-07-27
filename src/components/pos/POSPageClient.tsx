@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode, Scan, ShoppingCart, PauseCircle, PlayCircle, Percent, Tag } from 'lucide-react'
+import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode, Scan, ShoppingCart, PauseCircle, PlayCircle, Percent, Tag, Package } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 import BarcodeScanner from './BarcodeScanner'
@@ -21,6 +21,19 @@ interface Product {
   variants: Array<{ id: string; name: string; price?: number | null; stock: number }>
 }
 
+interface BundleItem {
+  productId: string
+  qty: number
+  product: Product | null
+}
+
+interface Bundle {
+  id: string
+  name: string
+  price: number
+  items: BundleItem[]
+}
+
 interface Category { id: string; name: string; color?: string | null; icon?: string | null }
 
 interface CartItem {
@@ -30,6 +43,7 @@ interface CartItem {
   price: number
   qty: number
   subtotal: number
+  bundleId?: string
 }
 
 interface Customer {
@@ -48,6 +62,7 @@ interface POSPageClientProps {
   initialProducts: Product[]
   categories: Category[]
   receiptNote?: string | null
+  initialBundles?: Bundle[]
 }
 
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS'
@@ -76,13 +91,14 @@ function fmt(n: number, currency: string) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp, currency: currencyProp, staffId, initialProducts, categories, receiptNote: receiptNoteProp }: POSPageClientProps) {
+export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp, currency: currencyProp, staffId, initialProducts, categories, receiptNote: receiptNoteProp, initialBundles = [] }: POSPageClientProps) {
   // Read live store settings from context (updated when user switches store)
   const currentStore = useCurrentStore()
   const currency = currentStore?.currency ?? currencyProp
   const taxRate = currentStore?.taxRate ?? taxRateProp
   const receiptNote = currentStore?.receiptNote ?? receiptNoteProp
   const [products] = useState<Product[]>(initialProducts)
+  const [bundles] = useState<Bundle[]>(initialBundles)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -249,6 +265,10 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
     return matchSearch && matchCat
   })
 
+  const filteredBundles = bundles.filter(b =>
+    b.name.toLowerCase().includes(search.toLowerCase()) && !selectedCategory
+  )
+
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0)
   const taxAmt = Math.round(subtotal * taxRate)
   const baseTotal = subtotal + taxAmt
@@ -277,6 +297,35 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
       }]
     })
     // On mobile, briefly flash cart count — don't auto-switch tab so user can keep adding
+  }, [])
+
+  const addBundleToCart = useCallback((bundle: Bundle) => {
+    setCart(prev => {
+      let updated = [...prev]
+      for (const item of bundle.items) {
+        if (!item.product) continue
+        if (item.product.trackStock && item.product.stock <= 0) continue
+        const existing = updated.find(i => i.productId === item.productId)
+        if (existing) {
+          updated = updated.map(i =>
+            i.productId === item.productId
+              ? { ...i, qty: i.qty + item.qty, subtotal: (i.qty + item.qty) * i.price }
+              : i
+          )
+        } else {
+          updated.push({
+            id: `${bundle.id}-${item.productId}-${Date.now()}`,
+            productId: item.productId,
+            name: item.product.name,
+            price: item.product.price,
+            qty: item.qty,
+            subtotal: item.product.price * item.qty,
+            bundleId: bundle.id,
+          })
+        }
+      }
+      return updated
+    })
   }, [])
 
   const handleBarcodeScan = useCallback((barcode: string) => {
@@ -422,17 +471,19 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
 
         {/* Products */}
         <div className="flex-1 overflow-y-auto p-4">
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && filteredBundles.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-stone-400">
               <Search className="h-10 w-10 mb-3" />
               <p className="text-sm">Produk tidak ditemukan</p>
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {filteredBundles.map(b => <BundleCard key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />)}
               {filtered.map(p => <ProductCard key={p.id} product={p} currency={currency} onAdd={addToCart} />)}
             </div>
           ) : (
             <div className="rounded-xl border border-stone-200 overflow-hidden divide-y divide-white/5">
+              {filteredBundles.map(b => <BundleRow key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />)}
               {filtered.map(p => <ProductRow key={p.id} product={p} currency={currency} onAdd={addToCart} />)}
             </div>
           )}
@@ -845,6 +896,72 @@ function CustomerSearch({ storeId, onSelect, onClose }: {
         </button>
       ))}
     </div>
+  )
+}
+
+// ─── Bundle Card ─────────────────────────────────────────────────────────────
+
+function BundleCard({ bundle, currency, onAdd }: { bundle: Bundle; currency: string; onAdd: (b: Bundle) => void }) {
+  const available = bundle.items.some(i => i.product && (!i.product.trackStock || i.product.stock >= i.qty))
+  return (
+    <button
+      onClick={() => available && onAdd(bundle)}
+      disabled={!available}
+      className={cn(
+        'flex flex-col p-3.5 rounded-xl border text-left transition-all duration-150 active:scale-[0.97]',
+        !available
+          ? 'border-stone-100 bg-white/[0.02] opacity-40 cursor-not-allowed'
+          : 'border-amber-200 bg-amber-50/60 hover:border-amber-400 hover:bg-amber-500/10 cursor-pointer'
+      )}
+    >
+      <div className="w-full aspect-square rounded-lg bg-amber-100/60 flex items-center justify-center mb-3 text-2xl">
+        <Package className="h-7 w-7 text-amber-500" />
+      </div>
+      <div className="flex items-start gap-1 mb-1">
+        <span className="shrink-0 text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500 text-white uppercase tracking-wide leading-none mt-0.5">
+          Bundle
+        </span>
+        <p className="text-sm font-medium text-stone-800 leading-tight line-clamp-2">{bundle.name}</p>
+      </div>
+      <p className="text-[10px] text-stone-400 mt-0.5">{bundle.items.length} produk</p>
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-sm font-bold text-amber-600">
+          {new Intl.NumberFormat('id-ID', { style: 'currency', currency, minimumFractionDigits: 0 }).format(bundle.price)}
+        </span>
+      </div>
+    </button>
+  )
+}
+
+// ─── Bundle Row ───────────────────────────────────────────────────────────────
+
+function BundleRow({ bundle, currency, onAdd }: { bundle: Bundle; currency: string; onAdd: (b: Bundle) => void }) {
+  const available = bundle.items.some(i => i.product && (!i.product.trackStock || i.product.stock >= i.qty))
+  return (
+    <button
+      onClick={() => available && onAdd(bundle)}
+      disabled={!available}
+      className={cn(
+        'w-full flex items-center gap-4 px-4 py-3 text-left transition-colors',
+        !available ? 'opacity-40 cursor-not-allowed' : 'hover:bg-amber-50 cursor-pointer'
+      )}
+    >
+      <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+        <Package className="h-5 w-5 text-amber-500" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500 text-white uppercase tracking-wide">Bundle</span>
+          <p className="text-sm font-medium text-stone-700 truncate">{bundle.name}</p>
+        </div>
+        <p className="text-xs text-stone-400">{bundle.items.length} produk</p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-bold text-amber-600">
+          {new Intl.NumberFormat('id-ID', { style: 'currency', currency, minimumFractionDigits: 0 }).format(bundle.price)}
+        </p>
+      </div>
+    </button>
   )
 }
 

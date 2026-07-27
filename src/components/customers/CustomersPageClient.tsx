@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Users, UserPlus, Search, Loader2, Star } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { CustomerFormModal } from './CustomerFormModal'
-import { CustomerDetailModal } from './CustomerDetailModal'
 
 interface Customer {
   id: string
@@ -24,6 +24,7 @@ interface CustomersPageClientProps {
 }
 
 export function CustomersPageClient({ storeId, currency }: CustomersPageClientProps) {
+  const router = useRouter()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -32,8 +33,6 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
   const [pages, setPages] = useState(0)
 
   const [showFormModal, setShowFormModal] = useState(false)
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
 
   const fetchCustomers = async () => {
     setLoading(true)
@@ -70,14 +69,8 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
     fetchCustomers()
   }
 
-  const handleCustomerUpdated = () => {
-    setShowDetailModal(false)
-    fetchCustomers()
-  }
-
   const handleRowClick = (customer: Customer) => {
-    setSelectedCustomer(customer)
-    setShowDetailModal(true)
+    router.push(`/dashboard/customers/${customer.id}`)
   }
 
   return (
@@ -233,21 +226,12 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
         )}
       </div>
 
-      {/* Modals */}
+      {/* Add customer modal */}
       {showFormModal && (
         <CustomerFormModal
           storeId={storeId}
           onClose={() => setShowFormModal(false)}
           onSuccess={handleCustomerCreated}
-        />
-      )}
-
-      {showDetailModal && selectedCustomer && (
-        <CustomerDetailModal
-          customerId={selectedCustomer.id}
-          currency={currency}
-          onClose={() => setShowDetailModal(false)}
-          onUpdate={handleCustomerUpdated}
         />
       )}
     </div>

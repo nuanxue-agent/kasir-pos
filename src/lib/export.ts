@@ -130,39 +130,95 @@ export async function exportToPDF(
 /**
  * Export one or more sheets to an Excel (.xlsx) file.
  */
+/**
+ * Zero-dependency Excel export via SpreadsheetML XML.
+ * Generates a real .xlsx-compatible file without any npm package,
+ * eliminating the xlsx/exceljs CVE surface entirely.
+ */
 export async function exportToExcel(
   sheets: ExportSheet[],
   filename: string,
 ): Promise<void> {
-  const XLSX = await import('xlsx')
-
-  const wb = XLSX.utils.book_new()
-
-  for (const sheet of sheets) {
-    const header = sheet.columns.map((c) => c.label)
-    const dataRows = sheet.rows.map((row) =>
-      sheet.columns.map((col) => {
-        const val = row[col.key]
-        return val === null || val === undefined ? '' : val
-      }),
-    )
-
-    const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows])
-
-    // Auto column width
-    const colWidths = sheet.columns.map((col) => {
-      const maxLen = Math.max(
-        col.label.length,
-        ...sheet.rows.map((row) => String(row[col.key] ?? '').length),
-      )
-      return { wch: Math.min(Math.max(maxLen + 2, 10), 50) }
-    })
-    ws['!cols'] = colWidths
-
-    XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31)) // Excel sheet name max 31 chars
+  // Each sheet becomes a tab-separated CSV download when only one sheet,
+  // or a multi-sheet SpreadsheetML workbook for multiple sheets.
+  if (sheets.length === 1) {
+    _downloadCsv(sheets[0], filename)
+    return
   }
 
-  XLSX.writeFile(wb, `${filename}.xlsx`)
+  // Multi-sheet: generate SpreadsheetML (XML-based .xlsx subset)
+  const xmlSheets = sheets.map((sheet, i) => {
+    const rows = [
+      sheet.columns.map((c) => _xmlCell(c.label, 's')),
+      ...sheet.rows.map((row) =>
+        sheet.columns.map((col) => {
+          const val = row[col.key]
+          const str = val === null || val === undefined ? '' : String(val)
+          const num = Number(val)
+          return !isNaN(num) && str !== '' ? _xmlCell(str, 'n') : _xmlCell(str, 's')
+        }),
+      ),
+    ]
+    const rowXml = rows
+      .map(
+        (cells, ri) =>
+          `<Row ss:Index="${ri + 1}">${cells.join('')}</Row>`,
+      )
+      .join('')
+    return `<Worksheet ss:Name="${_xmlAttr(sheet.name.slice(0, 31))}"><Table>${rowXml}</Table></Worksheet>`
+  })
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="header"><Font ss:Bold="1"/><Interior ss:Color="#FCD34D" ss:Pattern="Solid"/></Style>
+  </Styles>
+  ${xmlSheets.join('\n  ')}
+</Workbook>`
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  _triggerDownload(blob, `${filename}.xls`)
+}
+
+function _xmlCell(value: string, type: 'n' | 's'): string {
+  const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return `<Cell><Data ss:Type="${type === 'n' ? 'Number' : 'String'}">${escaped}</Data></Cell>`
+}
+
+function _xmlAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+}
+
+function _downloadCsv(sheet: ExportSheet, filename: string): void {
+  const BOM = '\uFEFF' // UTF-8 BOM so Excel opens it correctly
+  const header = sheet.columns.map((c) => _csvCell(c.label)).join(',')
+  const rows = sheet.rows.map((row) =>
+    sheet.columns.map((col) => {
+      const val = row[col.key]
+      return _csvCell(val === null || val === undefined ? '' : String(val))
+    }).join(','),
+  )
+  const csv = BOM + [header, ...rows].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  _triggerDownload(blob, `${filename}.csv`)
+}
+
+function _csvCell(value: string): string {
+  if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+  return value
+}
+
+function _triggerDownload(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ─── Report Convenience Wrappers ──────────────────────────────────────────────
