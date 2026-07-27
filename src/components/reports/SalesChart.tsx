@@ -38,6 +38,21 @@ export function SalesChart({ data, currency }: SalesChartProps) {
     orders: Number(d.orders),
   }))
 
+  // Closed-over tooltip — avoids passing extra props to Recharts Tooltip
+  function TooltipContent(props: Record<string, unknown>) {
+    const active = props.active as boolean | undefined
+    const payload = props.payload as Array<{ value: number; payload: { orders: number } }> | undefined
+    const label = props.label as string | undefined
+    if (!active || !payload?.length) return null
+    return (
+      <div className="bg-slate-900 border border-slate-600 rounded-lg p-3 shadow-xl">
+        <p className="text-slate-400 text-xs mb-1.5">{label}</p>
+        <p className="text-white font-semibold">{formatCurrency(payload[0].value, currency)}</p>
+        <p className="text-slate-400 text-xs mt-0.5">{payload[0].payload.orders} orders</p>
+      </div>
+    )
+  }
+
   return (
     <ResponsiveContainer width="100%" height={256}>
       <LineChart data={formatted} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
@@ -59,16 +74,7 @@ export function SalesChart({ data, currency }: SalesChartProps) {
           }}
           width={60}
         />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: '#0f172a',
-            border: '1px solid #475569',
-            borderRadius: '8px',
-            color: '#fff',
-          }}
-          labelStyle={{ color: '#94a3b8', fontSize: 12, marginBottom: 4 }}
-          formatter={(value: number) => [formatCurrency(value, currency), 'Revenue']}
-        />
+        <Tooltip content={TooltipContent} />
         <Line
           type="monotone"
           dataKey="total"

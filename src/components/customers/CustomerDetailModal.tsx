@@ -58,7 +58,7 @@ interface CustomerDetailModalProps {
 
 const pointsSchema = z.object({
   delta: z
-    .number({ invalid_type_error: 'Enter a number' })
+    .number({ message: 'Enter a number' })
     .int('Must be a whole number')
     .refine((v) => v !== 0, 'Cannot add 0 points'),
 })
