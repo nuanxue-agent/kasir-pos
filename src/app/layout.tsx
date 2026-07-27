@@ -4,6 +4,7 @@ import './globals.css'
 import { Providers } from '@/components/providers'
 import { cookies } from 'next/headers'
 import { locales, defaultLocale, type Locale } from '@/i18n/routing'
+import WebVitalsTracker from '@/components/analytics/WebVitalsTracker'
 
 const inter = Inter({ subsets: ['latin', 'latin-ext'] })
 
@@ -58,6 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers locale={locale} messages={messages}>
           {children}
         </Providers>
+        <WebVitalsTracker />
       </body>
     </html>
   )

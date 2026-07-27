@@ -65,7 +65,27 @@ function fmt(amount: number, currency: string): string {
 // ── Browser print ──────────────────────────────────────────────────────────────
 
 export function printReceiptBrowser(data: ReceiptData): void {
-  const lines = buildReceiptLines(data)
+  // Load printer settings from localStorage (set in Settings > Printer tab)
+  let printWidth: 58 | 80 = 80
+  let baseFontSize = 12
+  let showLogo = true
+  let footerText = ''
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('receipt-settings')
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (s.printWidth === 58 || s.printWidth === 80) printWidth = s.printWidth
+        if (s.fontSize === 'small') baseFontSize = 10
+        else if (s.fontSize === 'large') baseFontSize = 14
+        if (typeof s.showLogo === 'boolean') showLogo = s.showLogo
+        if (typeof s.footerText === 'string') footerText = s.footerText
+      }
+    } catch { /* ignore */ }
+  }
+
+  const lines = buildReceiptLines(data, { showLogo, footerText: footerText || undefined })
+  const widthMm = `${printWidth}mm`
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -73,18 +93,18 @@ export function printReceiptBrowser(data: ReceiptData): void {
 <title>Receipt ${data.orderNumber}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 12px; width: 80mm; padding: 4mm; }
+  body { font-family: 'Courier New', monospace; font-size: ${baseFontSize}px; width: ${widthMm}; padding: 4mm; }
   .center { text-align: center; }
   .right { text-align: right; }
   .bold { font-weight: bold; }
-  .large { font-size: 16px; }
-  .small { font-size: 10px; }
+  .large { font-size: ${baseFontSize + 4}px; }
+  .small { font-size: ${Math.max(8, baseFontSize - 2)}px; }
   .divider { border-top: 1px dashed #000; margin: 4px 0; }
   .row { display: flex; justify-content: space-between; }
   .item-name { flex: 1; }
   .item-right { text-align: right; white-space: nowrap; padding-left: 8px; }
   @media print {
-    @page { margin: 0; size: 80mm auto; }
+    @page { margin: 0; size: ${widthMm} auto; }
     body { padding: 2mm; }
   }
 </style>
@@ -305,9 +325,17 @@ export function isSerialAvailable(): boolean {
 
 // ── Build receipt lines (shared by browser + ESC/POS) ─────────────────────────
 
-export function buildReceiptLines(data: ReceiptData): ReceiptLine[] {
+export function buildReceiptLines(
+  data: ReceiptData,
+  opts?: { showLogo?: boolean; footerText?: string },
+): ReceiptLine[] {
+  const showLogo = opts?.showLogo ?? true
+  const footerOverride = opts?.footerText
   const lines: ReceiptLine[] = []
 
+  if (showLogo && data.storeLogo) {
+    lines.push({ type: 'text', text: '[LOGO]', align: 'center', size: 'small' })
+  }
   lines.push({ type: 'text', text: data.storeName, align: 'center', bold: true, size: 'large' })
   if (data.storeAddress)
     lines.push({ type: 'text', text: data.storeAddress, align: 'center', size: 'small' })
@@ -376,6 +404,8 @@ export function buildReceiptLines(data: ReceiptData): ReceiptLine[] {
   if (data.orderNote) lines.push({ type: 'text', text: `Note: ${data.orderNote}`, size: 'small' })
   if (data.receiptNote)
     lines.push({ type: 'text', text: data.receiptNote, align: 'center', size: 'small' })
+  if (footerOverride)
+    lines.push({ type: 'text', text: footerOverride, align: 'center', size: 'small' })
   lines.push({ type: 'text', text: 'Thank you!', align: 'center', bold: true })
 
   return lines

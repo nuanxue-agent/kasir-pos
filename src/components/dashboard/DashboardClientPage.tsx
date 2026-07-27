@@ -24,7 +24,15 @@ import {
   UserCheck,
   TrendingDown,
   Minus,
+  Rocket,
 } from 'lucide-react'
+import OnboardingChecklist, {
+  CHECKLIST_ITEMS,
+  ONBOARDING_DISMISSED_KEY,
+  readCompletionFromStorage,
+  countCompleted,
+  shouldAutoShow,
+} from '@/components/dashboard/OnboardingChecklist'
 import {
   PieChart,
   Pie,
@@ -312,6 +320,24 @@ export default function DashboardClientPage({
   const hasInventory = enabledModules.includes('inventory')
   const hasCustomers = enabledModules.includes('customers')
 
+  // ── Onboarding checklist state ───────────────────────────────────────────
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(0)
+  const [onboardingDismissed, setOnboardingDismissed] = useState(true)
+
+  useEffect(() => {
+    // Read state from localStorage on client
+    const dismissed = localStorage.getItem(ONBOARDING_DISMISSED_KEY) === 'true'
+    setOnboardingDismissed(dismissed)
+    setOnboardingCompleted(countCompleted(readCompletionFromStorage()))
+    if (shouldAutoShow()) {
+      setShowOnboarding(true)
+    }
+  }, [])
+
+  const remainingCount = CHECKLIST_ITEMS.length - onboardingCompleted
+  const allDone = remainingCount <= 0
+
   // Active shift
   const {
     data: shiftData,
@@ -470,6 +496,19 @@ export default function DashboardClientPage({
           <span className="hidden sm:inline">Catat Penjualan</span>
           <span className="sm:hidden">Jual</span>
         </Link>
+        {/* Getting Started button — only show when not all done and not dismissed */}
+        {!allDone && !onboardingDismissed && (
+          <button
+            onClick={() => setShowOnboarding(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-700 transition-all hover:bg-amber-100 active:scale-95"
+          >
+            <Rocket className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              Getting Started ({remainingCount} left)
+            </span>
+            <span className="sm:hidden">{remainingCount}</span>
+          </button>
+        )}
       </div>
 
       {/* ── Shift status widget ── */}
@@ -1003,6 +1042,17 @@ export default function DashboardClientPage({
 
       {/* ── Bottom padding for mobile nav ── */}
       <div className="h-4 lg:h-0" />
+
+      {/* ── Onboarding Checklist panel ── */}
+      <OnboardingChecklist
+        open={showOnboarding}
+        onClose={() => {
+          setShowOnboarding(false)
+          // Re-read completion & dismissed state after closing
+          setOnboardingCompleted(countCompleted(readCompletionFromStorage()))
+          setOnboardingDismissed(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === 'true')
+        }}
+      />
     </div>
   )
 }

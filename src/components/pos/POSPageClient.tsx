@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import Image from 'next/image'
 import {
   Search,
   Grid3x3,
@@ -33,6 +34,7 @@ import { cn } from '@/lib/utils'
 import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 import BarcodeScanner from './BarcodeScanner'
 import { useCurrentStore } from '@/context/StoreContext'
+import POSTour, { shouldShowTour } from './POSTour'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -152,6 +154,7 @@ export default function POSPageClient({
   const receiptNote = currentStore?.receiptNote ?? receiptNoteProp
   const [products] = useState<Product[]>(initialProducts)
   const [bundles] = useState<Bundle[]>(initialBundles)
+  const [productsLoaded, setProductsLoaded] = useState(false)
   const [search, setSearch] = useState('')
   const [recentProducts, setRecentProducts] = useState<Product[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -192,6 +195,15 @@ export default function POSPageClient({
   // Manual discount state
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
   const [discountValue, setDiscountValue] = useState('')
+
+  // POS tour state — show for first-time users with no orders
+  const [showTour, setShowTour] = useState(false)
+
+  useEffect(() => {
+    if (shouldShowTour()) {
+      setShowTour(true)
+    }
+  }, [])
 
   // Computed manual discount amount
   const manualDiscountAmt = () => {
@@ -289,6 +301,70 @@ export default function POSPageClient({
     return () => window.removeEventListener('keydown', onShortcut)
   }, [cart.length, showBarcodeScanner, showCheckout, showCustomerSearch, showHeldOrders])
 
+  // ── Mark products as loaded after first render ────────────────────────────
+  useEffect(() => {
+    // Defer to next frame so the shell renders first
+    const id = requestAnimationFrame(() => setProductsLoaded(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  // ── Windowed rendering for product grid ───────────────────────────────────
+  const CARD_HEIGHT_APPROX = 200 // px — approximate card height for row estimation
+  const COLS_DEFAULT = 4 // default grid cols (lg)
+  const BUFFER_ROWS = 2
+
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+  const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({
+    start: 0,
+    end: 40, // show first 40 items before observer kicks in
+  })
+
+  useEffect(() => {
+    const container = gridContainerRef.current
+    if (!container) return
+
+    const updateRange = () => {
+      const cols = Math.max(
+        1,
+        getComputedStyle(container).gridTemplateColumns.split(' ').length,
+      )
+      const scrollTop = container.parentElement?.scrollTop ?? 0
+      const viewH = container.parentElement?.clientHeight ?? window.innerHeight
+      const rowH = CARD_HEIGHT_APPROX
+      const startRow = Math.max(0, Math.floor(scrollTop / rowH) - BUFFER_ROWS)
+      const endRow = Math.ceil((scrollTop + viewH) / rowH) + BUFFER_ROWS
+      setVisibleRange({ start: startRow * cols, end: endRow * cols })
+    }
+
+    updateRange()
+    const scrollEl = container.parentElement
+    scrollEl?.addEventListener('scroll', updateRange, { passive: true })
+    window.addEventListener('resize', updateRange)
+    return () => {
+      scrollEl?.removeEventListener('scroll', updateRange)
+      window.removeEventListener('resize', updateRange)
+    }
+  }, [productsLoaded])
+
+  // ── Filtered lists ────────────────────────────────────────────────────────
+  const filtered = useMemo(
+    () =>
+      products.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
+        const matchCat = !selectedCategory || p.category?.id === selectedCategory
+        return matchSearch && matchCat
+      }),
+    [products, search, selectedCategory],
+  )
+
+  const filteredBundles = useMemo(
+    () =>
+      bundles.filter(
+        b => b.name.toLowerCase().includes(search.toLowerCase()) && !selectedCategory,
+      ),
+    [bundles, search, selectedCategory],
+  )
+
   // ── Fetch recently sold products ──────────────────────────────────────────
   useEffect(() => {
     fetch(`/api/products/recent?storeId=${storeId}&limit=5`)
@@ -357,16 +433,6 @@ export default function POSPageClient({
   const deleteHeldOrder = (id: string) => {
     saveHeldOrders(heldOrders.filter(h => h.id !== id))
   }
-
-  const filtered = products.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    const matchCat = !selectedCategory || p.category?.id === selectedCategory
-    return matchSearch && matchCat
-  })
-
-  const filteredBundles = bundles.filter(
-    b => b.name.toLowerCase().includes(search.toLowerCase()) && !selectedCategory,
-  )
 
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0)
   const taxAmt = Math.round(subtotal * taxRate)
@@ -585,7 +651,7 @@ export default function POSPageClient({
       >
         {/* Toolbar */}
         <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-card)] px-4 py-3">
-          <div className="relative max-w-xs flex-1">
+          <div className="relative max-w-xs flex-1" data-tour="search">
             <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               ref={searchRef}
@@ -725,14 +791,14 @@ export default function POSPageClient({
                   )}
                 >
                   {p.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={p.image}
                       alt={p.name}
+                      width={24}
+                      height={24}
+                      sizes="24px"
                       className="h-6 w-6 shrink-0 rounded object-cover"
-                      onError={e => {
-                        ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                      }}
+                      loading="lazy"
                     />
                   ) : (
                     <span className="text-base">{p.category?.icon ?? '📦'}</span>
@@ -747,14 +813,30 @@ export default function POSPageClient({
         )}
 
         {/* Products */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {filtered.length === 0 && filteredBundles.length === 0 ? (
+        <div className="flex-1 overflow-y-auto p-4" data-tour="product-grid">
+          {!productsLoaded ? (
+            /* Skeleton cards during initial load */
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3.5 animate-pulse"
+                >
+                  <div className="mb-3 aspect-square w-full rounded-lg bg-[var(--bg-muted)]" />
+                  <div className="h-3 w-3/4 rounded bg-[var(--bg-muted)]" />
+                  <div className="mt-1.5 h-2.5 w-1/2 rounded bg-[var(--bg-muted)]" />
+                  <div className="mt-2 h-4 w-2/3 rounded bg-[var(--bg-muted)]" />
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 && filteredBundles.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center text-[var(--text-3)]">
               <Search className="mb-3 h-10 w-10" />
               <p className="text-sm">Produk tidak ditemukan</p>
             </div>
           ) : viewMode === 'grid' ? (
             <div
+              ref={gridContainerRef}
               className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
               role="grid"
               aria-label="Product grid"
@@ -782,9 +864,24 @@ export default function POSPageClient({
               {filteredBundles.map(b => (
                 <BundleCard key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />
               ))}
-              {filtered.map(p => (
-                <ProductCard key={p.id} product={p} currency={currency} onAdd={addToCart} />
-              ))}
+              {filtered.map((p, idx) => {
+                // Windowed rendering: only render items in the visible range
+                const absIdx = filteredBundles.length + idx
+                if (absIdx < visibleRange.start || absIdx >= visibleRange.end) {
+                  // Placeholder preserves layout height so scroll calculations stay correct
+                  return (
+                    <div
+                      key={p.id}
+                      className="rounded-xl border border-[var(--border)] bg-transparent"
+                      style={{ minHeight: 180 }}
+                      aria-hidden="true"
+                    />
+                  )
+                }
+                return (
+                  <ProductCard key={p.id} product={p} currency={currency} onAdd={addToCart} />
+                )
+              })}
             </div>
           ) : (
             <div className="divide-y divide-white/5 overflow-hidden rounded-xl border border-[var(--border)]">
@@ -801,6 +898,7 @@ export default function POSPageClient({
 
       {/* ── Right: Cart ── */}
       <div
+        data-tour="cart-panel"
         className={cn(
           'flex flex-col border-l border-[var(--border)] bg-[var(--bg-card)]',
           // Desktop: fixed width sidebar
@@ -939,14 +1037,16 @@ export default function POSPageClient({
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-1 items-start gap-2">
                       {item.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={item.image}
                           alt={item.name}
+                          width={32}
+                          height={32}
+                          sizes="32px"
                           className="mt-0.5 h-8 w-8 shrink-0 rounded-md object-cover"
-                          onError={e => {
-                            ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                          }}
+                          loading="lazy"
+                          placeholder="blur"
+                          blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2Y1ZjVmNCIvPjwvc3ZnPg=="
                         />
                       ) : (
                         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--bg-muted)] text-sm">
@@ -1173,10 +1273,11 @@ export default function POSPageClient({
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowCheckout(true)}
-                className="mt-1 flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-opacity hover:opacity-90"
-              >
+            <button
+              data-tour="checkout-button"
+              onClick={() => setShowCheckout(true)}
+              className="mt-1 flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-opacity hover:opacity-90"
+            >
                 <span>Bayar — {fmt(total, currency)}</span>
                 <kbd className="rounded border border-white/30 bg-[var(--bg-card)]/20 px-1.5 py-0.5 font-mono text-[10px]">
                   F2
@@ -1522,19 +1623,16 @@ function ProductCard({
       )}
       <div className="mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-subtle)] text-2xl">
         {product.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={product.image}
             alt={product.name}
+            width={160}
+            height={160}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             className="h-full w-full object-cover"
-            onError={e => {
-              const el = e.currentTarget as HTMLImageElement
-              el.style.display = 'none'
-              const parent = el.parentElement
-              if (parent) {
-                parent.textContent = product.category?.icon || '📦'
-              }
-            }}
+            loading="lazy"
+            placeholder="blur"
+            blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjE2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjVmNWY0Ii8+PC9zdmc+"
           />
         ) : (
           product.category?.icon || '📦'
