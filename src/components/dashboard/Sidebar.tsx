@@ -121,18 +121,18 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
   }
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white border-r border-stone-100">
+    <div className="flex flex-col h-full bg-[var(--bg-card)] border-r border-[var(--border)]">
       {/* Logo */}
-      <div className="flex items-center justify-between h-14 px-4 shrink-0 border-b border-stone-100">
+      <div className="flex items-center justify-between h-14 px-4 shrink-0 border-b border-[var(--border)]">
         <a href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-amber-200">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm shadow-amber-200/60">
             <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-stone-800 font-bold text-base tracking-tight">Lakoo</span>
+          <span className="text-[var(--text-1)] font-bold text-base tracking-tight">Lakoo</span>
         </a>
         <button
           onClick={onClose}
-          className="lg:hidden text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition-colors"
+          className="lg:hidden text-[var(--text-3)] hover:text-[var(--text-1)] p-1 rounded-lg hover:bg-[var(--bg-subtle)] transition-colors"
           aria-label="Tutup sidebar"
         >
           <X className="h-4 w-4" />
@@ -141,7 +141,7 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
 
       {/* Store switcher */}
       {stores.length > 0 && (
-        <div className="px-3 pt-3 pb-1 border-b border-stone-100">
+        <div className="px-3 pt-3 pb-1 border-b border-[var(--border)]">
           <StoreSwitcher
             stores={stores}
             currentStoreId={currentStoreId ?? stores[0]?.id}
@@ -157,7 +157,7 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
             if (visibleItems.length === 0) return null
             return (
           <div key={group.title}>
-            <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-widest text-stone-400">
+            <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-3)]">
               {group.title}
             </p>
             <ul className="space-y-0.5">
@@ -169,15 +169,15 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150',
+                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                         active
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
+                          ? 'bg-[var(--primary-subtle)] text-amber-700 border border-amber-200/60'
+                          : 'text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-subtle)]'
                       )}
                     >
-                      <item.icon className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-amber-500' : 'text-stone-400')} />
+                      <item.icon className={cn('h-[17px] w-[17px] shrink-0', active ? 'text-amber-600' : 'text-[var(--text-3)]')} />
                       <span className="truncate">{item.label}</span>
-                      {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+                      {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500/70 shrink-0" />}
                     </Link>
                   </li>
                 )
@@ -194,32 +194,31 @@ export function Sidebar({ userRole, isSuperAdmin, userName, userEmail, open, onC
           href="/dashboard/settings"
           onClick={onClose}
           className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150',
+            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
             pathname.startsWith('/dashboard/settings')
-              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-              : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
+              ? 'bg-[var(--primary-subtle)] text-amber-700 border border-amber-200/60'
+              : 'text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-subtle)]'
           )}
         >
-          <Settings className={cn('h-[18px] w-[18px] shrink-0', pathname.startsWith('/dashboard/settings') ? 'text-amber-500' : 'text-stone-400')} />
+          <Settings className={cn('h-[17px] w-[17px] shrink-0', pathname.startsWith('/dashboard/settings') ? 'text-amber-600' : 'text-[var(--text-3)]')} />
           Pengaturan
         </Link>
       </div>
 
       {/* User section */}
-      <div className="shrink-0 border-t border-stone-100 p-3 space-y-2">
-        {/* Locale switcher */}
+      <div className="shrink-0 border-t border-[var(--border)] p-3 space-y-2">
         <LocaleSwitcher showName={true} />
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-stone-50">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-[var(--bg-subtle)]">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-stone-800 truncate">{userName ?? 'Pengguna'}</p>
-            {userEmail && <p className="text-xs text-stone-400 truncate">{userEmail}</p>}
+            <p className="text-sm font-medium text-[var(--text-1)] truncate">{userName ?? 'Pengguna'}</p>
+            {userEmail && <p className="text-xs text-[var(--text-3)] truncate">{userEmail}</p>}
           </div>
           <button
             onClick={handleLogout}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+            className="p-1.5 rounded-md text-[var(--text-3)] hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
             aria-label="Keluar"
             title="Keluar"
           >
