@@ -1,10 +1,10 @@
-import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getRequestContext } from '@cloudflare/next-on-pages'
+import { query, exec, toSQLiteDate } from '@/lib/db'
 
 export const runtime = 'edge'
-
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -38,22 +38,58 @@ export async function PATCH(
     }
 
     const data = parsed.data
+    const { env } = getRequestContext()
+    const db = env.DB
 
-    // Filter out undefined values
-    const updateData: any = {}
+    // Build SET clause dynamically
+    const updates: string[] = []
+    const values: any[] = []
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined) {
-        updateData[key] = value
+        updates.push(`${key} = ?`)
+        // Convert booleans to integers for SQLite
+        if (typeof value === 'boolean') {
+          values.push(value ? 1 : 0)
+        } else {
+          values.push(value)
+        }
       }
     })
 
-    const product = await prisma.product.update({
-      where: { id },
-      data: updateData,
-      include: { category: true },
-    })
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
 
-    return NextResponse.json(product)
+    updates.push('updatedAt = ?')
+    values.push(toSQLiteDate(new Date()))
+
+    // Add id to params
+    values.push(id)
+
+    const sql = `UPDATE Product SET ${updates.join(', ')} WHERE id = ?`
+    await exec(db, sql, values)
+
+    // Fetch updated product with category
+    const product = await query(
+      db,
+      `
+        SELECT 
+          p.*,
+          c.name as categoryName,
+          c.color as categoryColor
+        FROM Product p
+        LEFT JOIN Category c ON p.categoryId = c.id
+        WHERE p.id = ?
+      `,
+      [id]
+    )
+
+    if (product.length === 0) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(product[0])
   } catch (error: any) {
     console.error('Error updating product:', error)
     return NextResponse.json(
@@ -74,13 +110,32 @@ export async function DELETE(
   const { id } = await params
 
   try {
-    const product = await prisma.product.update({
-      where: { id },
-      data: { active: false },
-      include: { category: true },
-    })
+    const { env } = getRequestContext()
+    const db = env.DB
 
-    return NextResponse.json(product)
+    const now = toSQLiteDate(new Date())
+    await exec(db, 'UPDATE Product SET active = 0, updatedAt = ? WHERE id = ?', [now, id])
+
+    // Fetch updated product with category
+    const product = await query(
+      db,
+      `
+        SELECT 
+          p.*,
+          c.name as categoryName,
+          c.color as categoryColor
+        FROM Product p
+        LEFT JOIN Category c ON p.categoryId = c.id
+        WHERE p.id = ?
+      `,
+      [id]
+    )
+
+    if (product.length === 0) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(product[0])
   } catch (error: any) {
     console.error('Error deleting product:', error)
     return NextResponse.json(

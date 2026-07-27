@@ -1,6 +1,7 @@
-import { prisma } from '@/lib/prisma'
+import { getRequestContext } from '@cloudflare/next-on-pages'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { query, queryOne } from '@/lib/db'
 
 export const runtime = 'edge'
 
@@ -17,16 +18,25 @@ export async function GET(
   const { searchParams } = new URL(req.url)
   const page = parseInt(searchParams.get('page') ?? '1')
   const limit = parseInt(searchParams.get('limit') ?? '20')
+  const offset = (page - 1) * limit
 
-  const [logs, total] = await Promise.all([
-    prisma.stockLog.findMany({
-      where: { productId },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.stockLog.count({ where: { productId } }),
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
+
+  const [logs, countRow] = await Promise.all([
+    query(db, `
+      SELECT * FROM StockLog
+      WHERE productId = ?
+      ORDER BY createdAt DESC
+      LIMIT ? OFFSET ?
+    `, [productId, limit, offset]),
+    queryOne<{ total: number }>(db,
+      `SELECT COUNT(*) as total FROM StockLog WHERE productId = ?`,
+      [productId]
+    ),
   ])
+
+  const total = countRow?.total ?? 0
 
   return NextResponse.json({ logs, total, page, pages: Math.ceil(total / limit) })
 }

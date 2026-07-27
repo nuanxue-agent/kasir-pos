@@ -1,7 +1,8 @@
-import { prisma } from '@/lib/prisma'
+import { getRequestContext } from '@cloudflare/next-on-pages'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { query, queryOne, exec, batch, newId, toSQLiteDate } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 
 export const runtime = 'edge'
@@ -15,11 +16,18 @@ export async function GET(req: NextRequest) {
   const storeId = new URL(req.url).searchParams.get('storeId')
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
-  const staff = await prisma.storeUser.findMany({
-    where: { storeId },
-    include: { user: { select: { id: true, name: true, email: true, role: true, active: true, createdAt: true } } },
-    orderBy: { user: { name: 'asc' } },
-  })
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
+
+  const staff = await query(db, `
+    SELECT
+      u.id, u.name, u.email, u.role, u.active, u.createdAt,
+      su.role as storeRole, su.storeId
+    FROM User u
+    JOIN StoreUser su ON u.id = su.userId
+    WHERE su.storeId = ?
+    ORDER BY u.name ASC
+  `, [storeId])
 
   return NextResponse.json(staff)
 }
@@ -44,23 +52,38 @@ export async function POST(req: NextRequest) {
 
   const { storeId, name, email, password, pin, role } = parsed.data
 
-  // Check tenant
-  const store = await prisma.store.findUnique({ where: { id: storeId } })
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
+
+  // Check store exists and get tenantId
+  const store = await queryOne<{ id: string; tenantId: string }>(db,
+    `SELECT id, tenantId FROM Store WHERE id = ?`, [storeId]
+  )
   if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 })
 
-  const existing = await prisma.user.findUnique({ where: { email } })
+  // Check email uniqueness
+  const existing = await queryOne(db, `SELECT id FROM User WHERE email = ?`, [email])
   if (existing) return NextResponse.json({ error: 'Email already in use' }, { status: 400 })
 
   const hashedPassword = await bcrypt.hash(password, 12)
-  const hashedPin = pin ? await bcrypt.hash(pin, 10) : undefined
+  const hashedPin = pin ? await bcrypt.hash(pin, 10) : null
 
-  const user = await prisma.user.create({
-    data: {
-      name, email, password: hashedPassword, pin: hashedPin,
-      role, tenantId: store.tenantId,
-      storeAccess: { create: { storeId, role } },
+  const userId = newId()
+  const suId = newId()
+  const now = toSQLiteDate(new Date())
+
+  await batch(db, [
+    {
+      sql: `INSERT INTO User (id, name, email, password, pin, role, tenantId, active, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      params: [userId, name, email, hashedPassword, hashedPin, role, store.tenantId, now, now],
     },
-  })
+    {
+      sql: `INSERT INTO StoreUser (id, userId, storeId, role, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      params: [suId, userId, storeId, role, now, now],
+    },
+  ])
 
-  return NextResponse.json({ id: user.id, name: user.name, email: user.email, role: user.role }, { status: 201 })
+  return NextResponse.json({ id: userId, name, email, role }, { status: 201 })
 }

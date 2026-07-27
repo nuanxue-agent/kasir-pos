@@ -1,7 +1,8 @@
-import { prisma } from '@/lib/prisma'
+import { getRequestContext } from '@cloudflare/next-on-pages'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { query, queryOne, batch, newId, toSQLiteDate } from '@/lib/db'
 
 export const runtime = 'edge'
 
@@ -30,10 +31,13 @@ export async function POST(
 
   const { type, qty, note } = parsed.data
 
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
+
   // Get product
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-  })
+  const product = await queryOne<{
+    id: string; stock: number; trackStock: number
+  }>(db, `SELECT id, stock, trackStock FROM Product WHERE id = ?`, [productId])
 
   if (!product) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -45,26 +49,29 @@ export async function POST(
 
   // Calculate new stock
   const newStock = Math.max(0, product.stock + qty)
+  const now = toSQLiteDate(new Date())
+  const logId = newId()
 
-  // Update product and create log in transaction
-  const updatedProduct = await prisma.$transaction(async (tx) => {
-    const updated = await tx.product.update({
-      where: { id: productId },
-      data: { stock: newStock },
-      include: { category: true },
-    })
+  // Update product and create log in batch
+  await batch(db, [
+    {
+      sql: `UPDATE Product SET stock = ?, updatedAt = ? WHERE id = ?`,
+      params: [newStock, now, productId],
+    },
+    {
+      sql: `INSERT INTO StockLog (id, productId, type, qty, note, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      params: [logId, productId, type, qty, note || (type === 'RESTOCK' ? 'Stock restock' : 'Stock adjustment'), now],
+    },
+  ])
 
-    await tx.stockLog.create({
-      data: {
-        productId,
-        type,
-        qty,
-        note: note || (type === 'RESTOCK' ? 'Stock restock' : 'Stock adjustment'),
-      },
-    })
-
-    return updated
-  })
+  // Return updated product with category
+  const updatedProduct = await queryOne(db, `
+    SELECT p.*, c.name as categoryName
+    FROM Product p
+    LEFT JOIN Category c ON p.categoryId = c.id
+    WHERE p.id = ?
+  `, [productId])
 
   return NextResponse.json(updatedProduct)
 }

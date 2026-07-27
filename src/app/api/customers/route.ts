@@ -1,7 +1,8 @@
-import { prisma } from '@/lib/prisma'
+import { getRequestContext } from '@cloudflare/next-on-pages'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { query, queryOne, exec, newId, toSQLiteDate } from '@/lib/db'
 
 export const runtime = 'edge'
 
@@ -16,55 +17,44 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q')
   const page = parseInt(searchParams.get('page') ?? '1')
   const limit = parseInt(searchParams.get('limit') ?? '20')
+  const offset = (page - 1) * limit
 
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
-  const where = {
-    storeId,
-    ...(q
-      ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' as const } },
-            { phone: { contains: q, mode: 'insensitive' as const } },
-            { email: { contains: q, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
-  }
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
 
-  const [customers, total] = await Promise.all([
-    prisma.customer.findMany({
-      where,
-      include: {
-        _count: { select: { orders: true } },
-        orders: {
-          select: { total: true },
-          where: { status: 'PAID' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.customer.count({ where }),
+  const search = q ? `%${q}%` : '%'
+
+  const [customers, countRow] = await Promise.all([
+    query<{
+      id: string; storeId: string; name: string; phone: string | null
+      email: string | null; address: string | null; points: number
+      createdAt: string; updatedAt: string
+      totalOrders: number; totalSpent: number
+    }>(db, `
+      SELECT
+        c.*,
+        COUNT(DISTINCT o.id) as totalOrders,
+        COALESCE(SUM(CASE WHEN o.status = 'PAID' THEN o.total ELSE 0 END), 0) as totalSpent
+      FROM Customer c
+      LEFT JOIN \`Order\` o ON o.customerId = c.id
+      WHERE c.storeId = ?
+        AND (c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)
+      GROUP BY c.id
+      ORDER BY c.createdAt DESC
+      LIMIT ? OFFSET ?
+    `, [storeId, search, search, search, limit, offset]),
+    queryOne<{ total: number }>(db, `
+      SELECT COUNT(*) as total FROM Customer
+      WHERE storeId = ?
+        AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)
+    `, [storeId, search, search, search]),
   ])
 
-  // Flatten aggregates
-  const result = customers.map((c) => ({
-    id: c.id,
-    storeId: c.storeId,
-    name: c.name,
-    phone: c.phone,
-    email: c.email,
-    address: c.address,
-    points: c.points,
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-    totalOrders: c._count.orders,
-    totalSpent: c.orders.reduce((sum, o) => sum + o.total, 0),
-  }))
+  const total = countRow?.total ?? 0
 
-  return NextResponse.json({ customers: result, total, page, pages: Math.ceil(total / limit) })
+  return NextResponse.json({ customers, total, page, pages: Math.ceil(total / limit) })
 }
 
 // POST /api/customers
@@ -84,21 +74,23 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const data = parsed.data
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
+
+  const { storeId, name, phone, email, address } = parsed.data
+  const id = newId()
+  const now = toSQLiteDate(new Date())
 
   try {
-    const customer = await prisma.customer.create({
-      data: {
-        storeId: data.storeId,
-        name: data.name,
-        phone: data.phone || null,
-        email: data.email || null,
-        address: data.address || null,
-      },
-    })
+    await exec(db,
+      `INSERT INTO Customer (id, storeId, name, phone, email, address, points, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      [id, storeId, name, phone ?? null, email || null, address ?? null, now, now]
+    )
+    const customer = await queryOne(db, `SELECT * FROM Customer WHERE id = ?`, [id])
     return NextResponse.json(customer, { status: 201 })
   } catch (err: any) {
-    if (err.code === 'P2002') {
+    if (err?.message?.includes('UNIQUE')) {
       return NextResponse.json(
         { error: 'A customer with that phone or email already exists' },
         { status: 409 }

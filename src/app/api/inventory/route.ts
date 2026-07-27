@@ -1,11 +1,12 @@
-import { prisma } from '@/lib/prisma'
+import { getRequestContext } from '@cloudflare/next-on-pages'
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { query, queryOne } from '@/lib/db'
 
 export const runtime = 'edge'
 
 
-// GET /api/inventory?storeId=xxx&lowStockOnly=true&page=1
+// GET /api/inventory?storeId=xxx&lowStockOnly=true&page=1&q=search
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,35 +20,48 @@ export async function GET(req: NextRequest) {
 
   if (!storeId) return NextResponse.json({ error: 'storeId required' }, { status: 400 })
 
-  let where: any = {
-    storeId,
-    active: true,
-    trackStock: true,
-  }
+  const { env } = getRequestContext()
+  const db = env.DB as D1Database
 
-  // Add search filter
+  const offset = (page - 1) * limit
+
+  let whereClauses = ['p.storeId = ?', 'p.active = 1', 'p.trackStock = 1']
+  const params: any[] = [storeId]
+
   if (q) {
-    where.OR = [
-      { name: { contains: q, mode: 'insensitive' as const } },
-      { sku: { contains: q, mode: 'insensitive' as const } },
-    ]
+    whereClauses.push('(p.name LIKE ? OR p.sku LIKE ?)')
+    params.push(`%${q}%`, `%${q}%`)
   }
 
-  let [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      include: { category: true },
-      orderBy: { name: 'asc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.product.count({ where }),
+  if (lowStockOnly) {
+    whereClauses.push('p.stock <= p.lowStock')
+  }
+
+  const whereClause = whereClauses.join(' AND ')
+
+  const [products, countRow] = await Promise.all([
+    query<{
+      id: string; storeId: string; categoryId: string | null
+      name: string; sku: string | null; price: number; cost: number
+      stock: number; lowStock: number; trackStock: number
+      active: number; createdAt: string; updatedAt: string
+      categoryName: string | null
+    }>(db, `
+      SELECT p.*, c.name as categoryName
+      FROM Product p
+      LEFT JOIN Category c ON p.categoryId = c.id
+      WHERE ${whereClause}
+      ORDER BY p.name ASC
+      LIMIT ? OFFSET ?
+    `, [...params, limit, offset]),
+    queryOne<{ total: number }>(db, `
+      SELECT COUNT(*) as total
+      FROM Product p
+      WHERE ${whereClause}
+    `, params),
   ])
 
-  // Apply low stock filter client-side
-  if (lowStockOnly) {
-    products = products.filter(p => p.stock <= p.lowStock || p.stock === 0)
-  }
+  const total = countRow?.total ?? 0
 
   return NextResponse.json({ products, total, page, pages: Math.ceil(total / limit) })
 }

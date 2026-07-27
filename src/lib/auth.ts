@@ -1,15 +1,7 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import { prisma } from '@/lib/prisma'
-import * as bcrypt from 'bcryptjs'
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-  },
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
@@ -19,33 +11,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-          include: {
-            tenant: { include: { plan: true } },
-            storeAccess: { include: { store: true } },
-          },
-        })
+        try {
+          // Get D1 binding via getRequestContext in edge runtime
+          const { getRequestContext } = await import('@cloudflare/next-on-pages')
+          const { env } = getRequestContext()
+          const db = (env as any).DB as D1Database
 
-        if (!user || !user.password || !user.active) return null
+          const { queryOne, query } = await import('@/lib/db')
 
-        const valid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        )
+          const user = await queryOne<any>(db,
+            `SELECT * FROM User WHERE email = ? AND active = 1 LIMIT 1`,
+            [credentials.email]
+          )
 
-        if (!valid) return null
+          if (!user) return null
 
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-          role: user.role,
-          isSuperAdmin: user.isSuperAdmin,
-          tenantId: user.tenantId,
-          tenant: user.tenant,
-          stores: user.storeAccess.map(sa => sa.store),
+          const bcrypt = await import('bcryptjs')
+          const valid = await bcrypt.compare(credentials.password as string, user.password ?? '')
+          if (!valid) return null
+
+          // Get all store access
+          const stores = await query<any>(db,
+            `SELECT su.storeId as id, s.name, su.role, s.currency, s.taxRate
+             FROM StoreUser su JOIN Store s ON su.storeId = s.id
+             WHERE su.userId = ?`,
+            [user.id]
+          )
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            stores,
+          }
+        } catch (e) {
+          console.error('Auth error:', e)
+          return null
         }
       },
     }),
@@ -53,24 +55,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role
-        token.isSuperAdmin = user.isSuperAdmin
-        token.tenantId = user.tenantId
-        token.tenant = user.tenant
-        token.stores = user.stores
+        token.id = (user as any).id
+        token.role = (user as any).role
+        token.stores = (user as any).stores ?? []
       }
       return token
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub!
-        session.user.role = token.role as any
-        session.user.isSuperAdmin = token.isSuperAdmin as boolean
-        session.user.tenantId = token.tenantId as string | null
-        session.user.tenant = token.tenant as any
-        session.user.stores = token.stores as any
+      if (token) {
+        session.user.id = token.id as string
+        ;(session.user as any).role = token.role as string
+        ;(session.user as any).stores = (token.stores as any[]) ?? []
       }
       return session
     },
   },
+  pages: {
+    signIn: '/login',
+  },
+  session: { strategy: 'jwt' },
+  secret: process.env.NEXTAUTH_SECRET,
 })
