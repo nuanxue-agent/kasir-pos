@@ -124,7 +124,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: placeholder
       CLOUDFLARE_ACCOUNT_ID: placeholder
       D1_DATABASE_ID: placeholder
-      BASE_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -145,13 +144,10 @@ jobs:
           name: nextjs-build
           path: .next/
 
-      - name: Start app and run E2E tests
-        run: |
-          npm run start &
-          npx wait-on http://localhost:3000 --timeout 30000
-          npm run test:e2e
+      - name: Run E2E tests
+        run: npm run test:e2e
         env:
-          NODE_ENV: production
+          BASE_URL: http://localhost:3000
 
       - name: Upload Playwright report
         if: always()
