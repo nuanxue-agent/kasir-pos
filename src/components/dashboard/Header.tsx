@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Store, User, LogOut, Menu, Settings } from 'lucide-react'
+import { ChevronDown, Store, User, LogOut, Menu, Settings, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/permissions'
 import { NotificationCenter } from '@/components/ui/NotificationCenter'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { countUnread, loadNotifications } from '@/components/ui/NotificationCenter'
 
 interface StoreOption {
   id: string
@@ -64,6 +65,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/settings': 'Pengaturan',
   '/dashboard/expenses': 'Pengeluaran',
   '/dashboard/shifts': 'Shift & Kas',
+  '/dashboard/notifications': 'Notifikasi',
   '/admin/tenants': 'Tenant',
 }
 
@@ -113,6 +115,35 @@ export function Header({
     staleTime: 4 * 60_000,
   })
   const alertCount = lowStockItems.length
+
+  // Unread count badge — server count + local storage merged, auto-refresh every 30s
+  const { data: serverUnread = 0 } = useQuery<number>({
+    queryKey: ['unread-count', storeId],
+    queryFn: async () => {
+      if (!storeId) return 0
+      try {
+        const res = await fetch(`/api/notifications/unread-count?storeId=${storeId}`)
+        const json = await res.json()
+        return (json as { count: number }).count ?? 0
+      } catch {
+        return 0
+      }
+    },
+    enabled: !!storeId,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
+
+  const [localUnread, setLocalUnread] = useState(0)
+  useEffect(() => {
+    setLocalUnread(countUnread(loadNotifications()))
+    const id = setInterval(() => {
+      setLocalUnread(countUnread(loadNotifications()))
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const totalUnread = Math.max(serverUnread, localUnread)
 
   const pageTitle = PAGE_TITLES[pathname] ?? 'Dashboard'
   const initials = userName
@@ -189,9 +220,20 @@ export function Header({
         )}
 
         {/* Notifications */}
-        <NotificationCenter
-          lowStockProducts={lowStockItems.map(p => ({ id: p.id, name: p.name, stock: p.stock }))}
-        />
+        <div className="relative">
+          <NotificationCenter
+            lowStockProducts={lowStockItems.map(p => ({ id: p.id, name: p.name, stock: p.stock }))}
+          />
+          {totalUnread > 0 && (
+            <Link
+              href="/dashboard/notifications"
+              className="pointer-events-none absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white"
+              aria-label={`${totalUnread} notifikasi belum dibaca`}
+            >
+              {totalUnread > 9 ? '9+' : totalUnread}
+            </Link>
+          )}
+        </div>
 
         {/* Theme toggle */}
         <ThemeToggle />

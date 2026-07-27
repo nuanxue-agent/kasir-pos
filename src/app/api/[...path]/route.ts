@@ -256,11 +256,12 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           validatePositive(b.price, 'price')
 
           // ── Plan limit: check product count for FREE plan ──────────────────
-          const storePlan = (user.stores?.find((s: any) => s.id === storeId)?.plan ?? 'FREE') as Plan
-          const [countRow] = await query(
+          const storePlan = (user.stores?.find((s: any) => s.id === storeId)?.plan ??
+            'FREE') as Plan
+          const [countRow] = (await query(
             `SELECT COUNT(*) as cnt FROM Product WHERE storeId = ? AND active = 1`,
             [storeId],
-          ) as any[]
+          )) as any[]
           const currentCount = Number(countRow?.cnt ?? 0)
           if (!checkProductLimit(storePlan, currentCount)) {
             return NextResponse.json(
@@ -751,14 +752,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             })
             stmts.push({
               sql: `INSERT INTO StockLog (id,productId,type,qty,note,createdAt) VALUES (?,?,?,?,?,?)`,
-              params: [
-                newId(),
-                item.productId,
-                'REFUND',
-                refundQty,
-                `Refund ${order.number}`,
-                t,
-              ],
+              params: [newId(), item.productId, 'REFUND', refundQty, `Refund ${order.number}`, t],
             })
           }
         }
@@ -798,7 +792,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           storeId,
         ])
         if (!order) return err('Order not found', 404)
-        if (order.status !== 'PENDING') return err('Only PENDING orders can be voided via PATCH', 400)
+        if (order.status !== 'PENDING')
+          return err('Only PENDING orders can be voided via PATCH', 400)
         const t = nowISO()
         await batchExec([
           {
@@ -2261,10 +2256,11 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
       // DELETE /api/suppliers/:id/products/:productId
       if (segs[1] && segs[2] === 'products' && segs[3] && method === 'DELETE') {
-        await exec(
-          `DELETE FROM SupplierProduct WHERE supplierId=? AND productId=? AND storeId=?`,
-          [segs[1], segs[3], storeId],
-        )
+        await exec(`DELETE FROM SupplierProduct WHERE supplierId=? AND productId=? AND storeId=?`, [
+          segs[1],
+          segs[3],
+          storeId,
+        ])
         return ok({ success: true })
       }
 
@@ -2300,8 +2296,17 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
       if (segs[1] && !segs[2] && method === 'PATCH') {
         const b = (await req.json()) as any
-        const allowed = new Set(['name', 'email', 'phone', 'address', 'taxId', 'notes', 'active',
-          'contactPerson', 'city'])
+        const allowed = new Set([
+          'name',
+          'email',
+          'phone',
+          'address',
+          'taxId',
+          'notes',
+          'active',
+          'contactPerson',
+          'city',
+        ])
         const cols = filterCols(b, allowed)
         if (Object.keys(cols).length === 0) return err('No valid fields')
         const { setClauses, values } = buildUpdate(cols)
@@ -2332,8 +2337,14 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const offset = parseInt(url.searchParams.get('offset') ?? '0')
         const conditions: string[] = ['po.storeId=?']
         const params: any[] = [storeId]
-        if (status) { conditions.push('po.status=?'); params.push(status) }
-        if (supplierId) { conditions.push('po.supplierId=?'); params.push(supplierId) }
+        if (status) {
+          conditions.push('po.status=?')
+          params.push(status)
+        }
+        if (supplierId) {
+          conditions.push('po.supplierId=?')
+          params.push(supplierId)
+        }
         const where = conditions.join(' AND ')
         const rows = await query(
           `SELECT po.*, s.name as supplierName
@@ -3610,8 +3621,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           [b.customerId, storeId],
         )
         if (!customer) return err('Customer not found', 404)
-        if (customer.points < reward.pointsCost)
-          return err('Insufficient points', 400)
+        if (customer.points < reward.pointsCost) return err('Insufficient points', 400)
 
         // Generate voucher code
         const voucherCode = `RWD-${crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`
@@ -4527,7 +4537,16 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           [id, storeId, tableNumber, JSON.stringify(b.items), b.note ?? null, t, t],
         )
         return ok(
-          { id, storeId, tableNumber, items: b.items, status: 'PENDING', note: b.note ?? null, createdAt: t, updatedAt: t },
+          {
+            id,
+            storeId,
+            tableNumber,
+            items: b.items,
+            status: 'PENDING',
+            note: b.note ?? null,
+            createdAt: t,
+            updatedAt: t,
+          },
           201,
         )
       }
@@ -4627,7 +4646,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
       if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
       const fromStr = `${year}-01-01T00:00:00.000Z`
-      const toStr   = `${year}-12-31T23:59:59.999Z`
+      const toStr = `${year}-12-31T23:59:59.999Z`
       const monthRows = await query<any>(
         `SELECT
            CAST(strftime('%m', datetime(createdAt)) AS INTEGER) AS month,
@@ -4644,15 +4663,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       )
       const result = monthRows.map((r: any) => {
         const gross = Number(r.grossRevenue ?? 0)
-        const tax   = Number(r.taxCollected ?? 0)
+        const tax = Number(r.taxCollected ?? 0)
         // taxableRevenue = DPP = gross × 100/111
         const taxable = Math.round((gross * 100) / 111)
         return {
-          month:          Number(r.month),
-          grossRevenue:   gross,
+          month: Number(r.month),
+          grossRevenue: gross,
           taxableRevenue: taxable,
-          taxCollected:   tax,
-          orderCount:     Number(r.orderCount ?? 0),
+          taxCollected: tax,
+          orderCount: Number(r.orderCount ?? 0),
         }
       })
       return okCached(result, 'private, max-age=60')
@@ -4662,10 +4681,10 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'reports' && segs[1] === 'annual' && method === 'GET') {
       const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
       if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
-      const fromStr  = `${year}-01-01T00:00:00.000Z`
-      const toStr    = `${year}-12-31T23:59:59.999Z`
+      const fromStr = `${year}-01-01T00:00:00.000Z`
+      const toStr = `${year}-12-31T23:59:59.999Z`
       const dateFrom = `${year}-01-01`
-      const dateTo   = `${year}-12-31`
+      const dateTo = `${year}-12-31`
       const [revenueRow, expensesRow] = await Promise.all([
         queryOne<any>(
           `SELECT
@@ -4684,12 +4703,19 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           [storeId, dateFrom, dateTo],
         ),
       ])
-      const totalRevenue  = Number(revenueRow?.totalRevenue  ?? 0)
-      const totalTax      = Number(revenueRow?.totalTax      ?? 0)
+      const totalRevenue = Number(revenueRow?.totalRevenue ?? 0)
+      const totalTax = Number(revenueRow?.totalTax ?? 0)
       const totalExpenses = Number(expensesRow?.totalExpenses ?? 0)
-      const netProfit     = totalRevenue - totalExpenses
+      const netProfit = totalRevenue - totalExpenses
       return okCached(
-        { year, totalRevenue, totalTax, totalExpenses, netProfit, orderCount: Number(revenueRow?.orderCount ?? 0) },
+        {
+          year,
+          totalRevenue,
+          totalTax,
+          totalExpenses,
+          netProfit,
+          orderCount: Number(revenueRow?.orderCount ?? 0),
+        },
         'private, max-age=60',
       )
     }
@@ -4697,7 +4723,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     // ─── DELIVERY ORDERS ──────────────────────────────────────────────────────
     if (segs[0] === 'delivery-orders') {
       // Lazy-create the DeliveryOrder table
-      await exec(`
+      await exec(
+        `
         CREATE TABLE IF NOT EXISTS DeliveryOrder (
           id               TEXT PRIMARY KEY,
           storeId          TEXT NOT NULL,
@@ -4715,7 +4742,9 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           orderNumber      TEXT,
           createdAt        TEXT NOT NULL
         )
-      `, [])
+      `,
+        [],
+      )
 
       // GET /api/delivery-orders?storeId=&status=
       if (segs.length === 1 && method === 'GET') {
@@ -4767,13 +4796,19 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const orderId = segs[1]
         const b: any = await req.json()
 
-        const VALID_DELIVERY_STATUSES = ['PENDING', 'PREPARING', 'ON_DELIVERY', 'DELIVERED', 'CANCELLED']
+        const VALID_DELIVERY_STATUSES = [
+          'PENDING',
+          'PREPARING',
+          'ON_DELIVERY',
+          'DELIVERED',
+          'CANCELLED',
+        ]
         const STATUS_TRANSITIONS_MAP: Record<string, string[]> = {
-          PENDING:     ['PREPARING', 'CANCELLED'],
-          PREPARING:   ['ON_DELIVERY', 'CANCELLED'],
+          PENDING: ['PREPARING', 'CANCELLED'],
+          PREPARING: ['ON_DELIVERY', 'CANCELLED'],
           ON_DELIVERY: ['DELIVERED', 'CANCELLED'],
-          DELIVERED:   [],
-          CANCELLED:   [],
+          DELIVERED: [],
+          CANCELLED: [],
         }
 
         // Fetch existing order
@@ -4809,10 +4844,10 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           updates.driverId = b.driverId
           // Resolve driver name
           if (b.driverId) {
-            const emp = await query<any>(
-              `SELECT name FROM Employee WHERE id = ? AND storeId = ?`,
-              [b.driverId, storeId],
-            )
+            const emp = await query<any>(`SELECT name FROM Employee WHERE id = ? AND storeId = ?`, [
+              b.driverId,
+              storeId,
+            ])
             updates.driverName = emp[0]?.name ?? null
           } else {
             updates.driverName = null
@@ -4827,12 +4862,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           return err('No valid fields to update', 400, 'MISSING_FIELD', requestId, startMs)
         }
 
-        const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ')
+        const setClauses = Object.keys(updates)
+          .map(k => `${k} = ?`)
+          .join(', ')
         const values = Object.values(updates)
-        await exec(
-          `UPDATE DeliveryOrder SET ${setClauses} WHERE id = ? AND storeId = ?`,
-          [...values, orderId, storeId],
-        )
+        await exec(`UPDATE DeliveryOrder SET ${setClauses} WHERE id = ? AND storeId = ?`, [
+          ...values,
+          orderId,
+          storeId,
+        ])
         return ok({ success: true, ...updates })
       }
     }
@@ -4840,17 +4878,17 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     // ─── REPORTS / RFM ───────────────────────────────────────────────────────
     if (segs[0] === 'reports' && segs[1] === 'rfm' && method === 'GET') {
       // Pull all customers for this store
-      const customers = await query(
+      const customers = (await query(
         `SELECT id, name, phone, email FROM Customer WHERE storeId = ?`,
         [storeId],
-      ) as any[]
+      )) as any[]
 
       if (customers.length === 0) return ok([])
 
       const now = Date.now()
 
       // Per-customer order stats in one query
-      const stats = await query(
+      const stats = (await query(
         `SELECT customerId,
                 COUNT(*)        AS frequency,
                 SUM(total)      AS monetary,
@@ -4859,7 +4897,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
          WHERE storeId = ? AND status = 'PAID' AND customerId IS NOT NULL
          GROUP BY customerId`,
         [storeId],
-      ) as any[]
+      )) as any[]
 
       // Build stats map
       const statsMap = new Map<string, { frequency: number; monetary: number; recency: number }>()
@@ -4868,8 +4906,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const recency = Math.floor((now - lastMs) / 86400000)
         statsMap.set(r.customerId, {
           frequency: Number(r.frequency),
-          monetary:  Number(r.monetary),
-          recency:   Math.max(0, recency),
+          monetary: Number(r.monetary),
+          recency: Math.max(0, recency),
         })
       }
 
@@ -4877,13 +4915,13 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const rawStats = customers.map((c: any) => {
         const s = statsMap.get(c.id)
         return {
-          id:        c.id,
-          name:      c.name,
-          phone:     c.phone ?? null,
-          email:     c.email ?? null,
-          recency:   s?.recency   ?? 9999,
+          id: c.id,
+          name: c.name,
+          phone: c.phone ?? null,
+          email: c.email ?? null,
+          recency: s?.recency ?? 9999,
           frequency: s?.frequency ?? 0,
-          monetary:  s?.monetary  ?? 0,
+          monetary: s?.monetary ?? 0,
         }
       })
 
@@ -4891,33 +4929,33 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       function scoreMetricLocal(value: number, allValues: number[], invert: boolean): number {
         if (allValues.length === 0) return 3
         const sorted = [...allValues].sort((a, b) => a - b)
-        const rank   = sorted.filter((v) => v <= value).length
-        const pct    = rank / sorted.length
-        const score  = Math.max(1, Math.min(5, Math.ceil(pct * 5)))
+        const rank = sorted.filter(v => v <= value).length
+        const pct = rank / sorted.length
+        const score = Math.max(1, Math.min(5, Math.ceil(pct * 5)))
         return invert ? 6 - score : score
       }
 
       function assignSegmentLocal(r: number, f: number, m: number): string {
         const avg = (r + f + m) / 3
         if (r >= 4 && f >= 4 && m >= 4) return 'Champions'
-        if (avg >= 3.5 && f >= 3)        return 'Loyal'
-        if (r >= 4 && f <= 2)            return 'New'
-        if (r <= 2 && f >= 3)            return 'AtRisk'
-        if (r <= 2 && f <= 2)            return 'Lost'
+        if (avg >= 3.5 && f >= 3) return 'Loyal'
+        if (r >= 4 && f <= 2) return 'New'
+        if (r <= 2 && f >= 3) return 'AtRisk'
+        if (r <= 2 && f <= 2) return 'Lost'
         return avg >= 2.5 ? 'Loyal' : 'AtRisk'
       }
 
-      const recencies   = rawStats.map((c) => c.recency)
-      const frequencies = rawStats.map((c) => c.frequency)
-      const monetaries  = rawStats.map((c) => c.monetary)
+      const recencies = rawStats.map(c => c.recency)
+      const frequencies = rawStats.map(c => c.frequency)
+      const monetaries = rawStats.map(c => c.monetary)
 
-      const result = rawStats.map((c) => {
-        const rScore = scoreMetricLocal(c.recency,   recencies,   true)
+      const result = rawStats.map(c => {
+        const rScore = scoreMetricLocal(c.recency, recencies, true)
         const fScore = scoreMetricLocal(c.frequency, frequencies, false)
-        const mScore = scoreMetricLocal(c.monetary,  monetaries,  false)
+        const mScore = scoreMetricLocal(c.monetary, monetaries, false)
         return {
           ...c,
-          scores:  { recencyScore: rScore, frequencyScore: fScore, monetaryScore: mScore },
+          scores: { recencyScore: rScore, frequencyScore: fScore, monetaryScore: mScore },
           segment: assignSegmentLocal(rScore, fScore, mScore),
         }
       })
@@ -4931,14 +4969,14 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       if (!customerId) return err('customerId required', 400, 'MISSING_FIELD', requestId, startMs)
 
       // Verify the customer belongs to this store
-      const customer = await queryOne(
-        `SELECT id FROM Customer WHERE id = ? AND storeId = ?`,
-        [customerId, storeId],
-      )
+      const customer = await queryOne(`SELECT id FROM Customer WHERE id = ? AND storeId = ?`, [
+        customerId,
+        storeId,
+      ])
       if (!customer) return err('Customer not found', 404, 'NOT_FOUND', requestId, startMs)
 
       // Fetch referrals where this customer is the referrer
-      const rows = await query(
+      const rows = (await query(
         `SELECT r.id,
                 r.referredCustomerId,
                 c.name      AS referredCustomerName,
@@ -4950,15 +4988,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
          WHERE r.referrerId = ? AND r.storeId = ?
          ORDER BY r.createdAt DESC`,
         [customerId, storeId],
-      ) as any[]
+      )) as any[]
 
       const referrals = rows.map((r: any) => ({
-        id:                   r.id,
-        referredCustomerId:   r.referredCustomerId,
+        id: r.id,
+        referredCustomerId: r.referredCustomerId,
         referredCustomerName: r.referredCustomerName ?? 'Unknown',
-        createdAt:            r.createdAt,
-        rewarded:             Boolean(r.rewarded),
-        pointsAwarded:        Number(r.pointsAwarded ?? 0),
+        createdAt: r.createdAt,
+        rewarded: Boolean(r.rewarded),
+        pointsAwarded: Number(r.pointsAwarded ?? 0),
       }))
 
       return ok(referrals)
@@ -4983,26 +5021,26 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
       if (method === 'GET') {
         const month = parseInt(sp.get('month') ?? String(new Date().getMonth() + 1))
-        const year  = parseInt(sp.get('year')  ?? String(new Date().getFullYear()))
+        const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
         if (isNaN(month) || month < 1 || month > 12) return err('Invalid month', 400)
-        if (isNaN(year)  || year  < 2000 || year > 2100) return err('Invalid year', 400)
+        if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
 
         // Fetch budget rows
-        const budgetRows = await query(
+        const budgetRows = (await query(
           `SELECT * FROM Budget WHERE storeId=? AND month=? AND year=?`,
           [storeId, month, year],
-        ) as any[]
+        )) as any[]
 
         // Compute actual per category for the month
         const firstDay = `${year}-${String(month).padStart(2, '0')}-01`
-        const lastDay  = new Date(year, month, 0).toISOString().slice(0, 10)
-        const actuals  = await query(
+        const lastDay = new Date(year, month, 0).toISOString().slice(0, 10)
+        const actuals = (await query(
           `SELECT category, COALESCE(SUM(amount),0) as actual
              FROM Expense
             WHERE storeId=? AND date BETWEEN ? AND ?
             GROUP BY category`,
           [storeId, firstDay, lastDay],
-        ) as any[]
+        )) as any[]
 
         const actualMap = new Map<string, number>()
         for (const a of actuals) actualMap.set(a.category, Number(a.actual))
@@ -5018,9 +5056,9 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const b = (await req.json()) as any
         if (!b.category || b.budgetAmount === undefined) return err('Missing required fields', 400)
         const month = parseInt(b.month ?? new Date().getMonth() + 1)
-        const year  = parseInt(b.year  ?? new Date().getFullYear())
-        const id    = newId()
-        const t     = nowISO()
+        const year = parseInt(b.year ?? new Date().getFullYear())
+        const id = newId()
+        const t = nowISO()
         // Upsert: replace on conflict
         await exec(
           `INSERT INTO Budget (id,storeId,month,year,category,budgetAmount,createdAt,updatedAt)
@@ -5034,10 +5072,12 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       if (segs[1] && method === 'PATCH') {
         const b = (await req.json()) as any
         if (b.budgetAmount === undefined) return err('budgetAmount is required', 400)
-        await exec(
-          `UPDATE Budget SET budgetAmount=?, updatedAt=? WHERE id=? AND storeId=?`,
-          [Number(b.budgetAmount), nowISO(), segs[1], storeId],
-        )
+        await exec(`UPDATE Budget SET budgetAmount=?, updatedAt=? WHERE id=? AND storeId=?`, [
+          Number(b.budgetAmount),
+          nowISO(),
+          segs[1],
+          storeId,
+        ])
         return ok({ success: true })
       }
 
@@ -5052,7 +5092,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const months = Math.min(6, Math.max(1, parseInt(sp.get('months') ?? '3')))
 
       // Revenue: last 3 months grouped by month
-      const revenueRows = await query(
+      const revenueRows = (await query(
         `SELECT strftime('%Y-%m', createdAt) as ym, SUM(total) as revenue
            FROM "Order"
           WHERE storeId=? AND status='PAID'
@@ -5060,23 +5100,29 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           GROUP BY ym
           ORDER BY ym`,
         [storeId],
-      ) as any[]
+      )) as any[]
 
       // Expenses: last 3 months grouped by month
-      const expenseRows = await query(
+      const expenseRows = (await query(
         `SELECT strftime('%Y-%m', date) as ym, SUM(amount) as expenses
            FROM Expense
           WHERE storeId=? AND date >= date('now', '-3 months')
           GROUP BY ym
           ORDER BY ym`,
         [storeId],
-      ) as any[]
+      )) as any[]
 
-      const revenueValues  = revenueRows.map((r: any) => Number(r.revenue))
-      const expenseValues  = expenseRows.map((r: any) => Number(r.expenses))
+      const revenueValues = revenueRows.map((r: any) => Number(r.revenue))
+      const expenseValues = expenseRows.map((r: any) => Number(r.expenses))
 
-      const avgRevenue  = revenueValues.length  > 0 ? revenueValues.reduce((a, b) => a + b, 0)  / revenueValues.length  : 0
-      const avgExpenses = expenseValues.length  > 0 ? expenseValues.reduce((a, b) => a + b, 0) / expenseValues.length : 0
+      const avgRevenue =
+        revenueValues.length > 0
+          ? revenueValues.reduce((a, b) => a + b, 0) / revenueValues.length
+          : 0
+      const avgExpenses =
+        expenseValues.length > 0
+          ? expenseValues.reduce((a, b) => a + b, 0) / expenseValues.length
+          : 0
 
       // Build projections for next `months` months
       const now2 = new Date()
@@ -5085,9 +5131,9 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const label = d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })
         return {
           month: label,
-          projectedIncome:   Math.max(0, avgRevenue),
+          projectedIncome: Math.max(0, avgRevenue),
           projectedExpenses: Math.max(0, avgExpenses),
-          projectedNet:      avgRevenue - avgExpenses,
+          projectedNet: avgRevenue - avgExpenses,
         }
       })
 
@@ -5166,22 +5212,23 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           const olderOrders = s ? Number(s.older_orders) : 0
           const recentRate = recentOrders / 30
           const olderRate = olderOrders / 60
-          const frequencyTrend = olderRate === 0
-            ? (recentRate > 0 ? 1 : 0.5)
-            : Math.min(1, recentRate / olderRate)
+          const frequencyTrend =
+            olderRate === 0 ? (recentRate > 0 ? 1 : 0.5) : Math.min(1, recentRate / olderRate)
 
           // Value trend negative: how much avg order value dropped
           const recentAvg = s ? Number(s.recent_avg_value ?? 0) : 0
           const olderAvg = s ? Number(s.older_avg_value ?? 0) : 0
-          const valueTrendNeg = olderAvg > 0
-            ? Math.min(1, Math.max(0, (olderAvg - recentAvg) / olderAvg))
-            : 0
+          const valueTrendNeg =
+            olderAvg > 0 ? Math.min(1, Math.max(0, (olderAvg - recentAvg) / olderAvg)) : 0
 
           // score = (recency/90 * 40) + ((1 - freq_trend) * 30) + (value_neg * 30), cap 100
           const recencyComponent = Math.min(1, daysSince / 90) * 40
           const frequencyComponent = (1 - Math.min(1, Math.max(0, frequencyTrend))) * 30
           const valueComponent = Math.min(1, Math.max(0, valueTrendNeg)) * 30
-          const churn_score = Math.min(100, Math.round(recencyComponent + frequencyComponent + valueComponent))
+          const churn_score = Math.min(
+            100,
+            Math.round(recencyComponent + frequencyComponent + valueComponent),
+          )
 
           const risk_level: 'LOW' | 'MEDIUM' | 'HIGH' =
             churn_score >= 70 ? 'HIGH' : churn_score >= 40 ? 'MEDIUM' : 'LOW'
@@ -5222,7 +5269,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const to = sp.get('to') ?? new Date().toISOString()
 
       // Aggregate OrderItems → product totals for the period
-      const rows = await query(
+      const rows = (await query(
         `SELECT
           oi.productId,
           MAX(oi.name)                          AS name,
@@ -5237,15 +5284,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         GROUP BY oi.productId
         ORDER BY totalRevenue DESC`,
         [storeId, from, to],
-      ) as any[]
+      )) as any[]
 
       // Also fetch products with 0 sales (slow movers) in the same period
-      const allProducts = await query(
+      const allProducts = (await query(
         `SELECT id AS productId, name, stock AS avgStock
          FROM Product
          WHERE storeId = ? AND active = 1`,
         [storeId],
-      ) as any[]
+      )) as any[]
 
       // Merge: products not in rows get qtySold=0 / totalRevenue=0
       const soldIds = new Set(rows.map((r: any) => r.productId))
@@ -5281,8 +5328,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const abcClass: 'A' | 'B' | 'C' = pct <= 80 ? 'A' : pct <= 95 ? 'B' : 'C'
         const percentOfTotal =
           grandTotal > 0 ? Math.round((r.totalRevenue / grandTotal) * 10000) / 100 : 0
-        const turnoverRate =
-          r.avgStock > 0 ? Math.round((r.qtySold / r.avgStock) * 100) / 100 : 0
+        const turnoverRate = r.avgStock > 0 ? Math.round((r.qtySold / r.avgStock) * 100) / 100 : 0
         return {
           productId: r.productId,
           name: r.name,
@@ -5301,7 +5347,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     // ─── HR / PAYROLL ─────────────────────────────────────────────────────────
     // Tables created lazily on first access
     if (segs[0] === 'hr' && segs[1] === 'payroll') {
-      await exec(`CREATE TABLE IF NOT EXISTS PayrollRecord (
+      await exec(
+        `CREATE TABLE IF NOT EXISTS PayrollRecord (
         id            TEXT PRIMARY KEY,
         storeId       TEXT NOT NULL,
         employeeId    TEXT NOT NULL,
@@ -5321,12 +5368,14 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         generatedAt   TEXT,
         createdAt     TEXT NOT NULL,
         updatedAt     TEXT NOT NULL
-      )`, [])
+      )`,
+        [],
+      )
 
       // GET /api/hr/payroll?storeId=&month=&year=
       if (method === 'GET') {
         const month = parseInt(sp.get('month') ?? '0')
-        const year  = parseInt(sp.get('year')  ?? '0')
+        const year = parseInt(sp.get('year') ?? '0')
         if (!month || !year) return err('month and year required')
         const rows = await query<any>(
           `SELECT pr.*, e.name as employeeName, e.position, e.baseSalary as empBaseSalary
@@ -5343,9 +5392,9 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       if (method === 'POST' && segs[2] === 'generate') {
         const b = (await req.json()) as any
         const month = parseInt(b.month ?? '0')
-        const year  = parseInt(b.year  ?? '0')
+        const year = parseInt(b.year ?? '0')
         if (!month || month < 1 || month > 12) return err('month must be 1-12')
-        if (!year  || year < 2000)             return err('year invalid')
+        if (!year || year < 2000) return err('year invalid')
 
         const LATE_DEDUCTION_PER_DAY = 50_000 // Rp 50K per late day
 
@@ -5355,8 +5404,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         )
         if (!employees.length) return err('Tidak ada karyawan aktif')
 
-        const periodStart = `${year}-${String(month).padStart(2,'0')}-01`
-        const periodEnd   = new Date(year, month, 0).toISOString().slice(0,10)
+        const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
+        const periodEnd = new Date(year, month, 0).toISOString().slice(0, 10)
 
         // Delete existing draft records for this period before regenerating
         await exec(
@@ -5389,8 +5438,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             [periodEnd, periodStart, storeId, emp.id, periodEnd, periodStart],
           )
           const unpaidLeaveDays = Math.max(0, Math.round(Number(leaveRow?.days ?? 0)))
-          const dailySalary     = Math.round((emp.baseSalary ?? 0) / 26)
-          const leaveDeduction  = unpaidLeaveDays * dailySalary
+          const dailySalary = Math.round((emp.baseSalary ?? 0) / 26)
+          const leaveDeduction = unpaidLeaveDays * dailySalary
 
           // Commission from sales in this period
           const [commRow] = await query<any>(
@@ -5414,11 +5463,22 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
                 netPay,lateDays,unpaidLeaveDays,status,createdAt,updatedAt)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?)`,
             [
-              recId, storeId, emp.id, month, year,
-              emp.baseSalary ?? 0, commission,
-              lateDeduction, leaveDeduction, 0, totalDeductions,
-              netPay, lateDays, unpaidLeaveDays,
-              t, t,
+              recId,
+              storeId,
+              emp.id,
+              month,
+              year,
+              emp.baseSalary ?? 0,
+              commission,
+              lateDeduction,
+              leaveDeduction,
+              0,
+              totalDeductions,
+              netPay,
+              lateDays,
+              unpaidLeaveDays,
+              t,
+              t,
             ],
           )
           results.push({
@@ -5442,7 +5502,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── HR / REVIEWS (Performance Reviews) ──────────────────────────────────
     if (segs[0] === 'hr' && segs[1] === 'reviews') {
-      await exec(`CREATE TABLE IF NOT EXISTS PerformanceReview (
+      await exec(
+        `CREATE TABLE IF NOT EXISTS PerformanceReview (
         id           TEXT PRIMARY KEY,
         storeId      TEXT NOT NULL,
         employeeId   TEXT NOT NULL,
@@ -5456,24 +5517,30 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         reviewDate   TEXT NOT NULL,
         createdAt    TEXT NOT NULL,
         updatedAt    TEXT NOT NULL
-      )`, [])
+      )`,
+        [],
+      )
 
       // GET /api/hr/reviews?storeId=&employeeId=&month=&year=
       if (method === 'GET') {
         const employeeId = sp.get('employeeId')
-        const month      = sp.get('month')
-        const year       = sp.get('year')
+        const month = sp.get('month')
+        const year = sp.get('year')
         let q = `SELECT pr.*, e.name as employeeName, e.position
                  FROM PerformanceReview pr
                  JOIN Employee e ON pr.employeeId = e.id
                  WHERE pr.storeId=?`
         const params: any[] = [storeId]
-        if (employeeId) { q += ` AND pr.employeeId=?`; params.push(employeeId) }
-        if (year  && month) {
+        if (employeeId) {
+          q += ` AND pr.employeeId=?`
+          params.push(employeeId)
+        }
+        if (year && month) {
           q += ` AND strftime('%Y-%m', pr.reviewDate)=?`
-          params.push(`${year}-${String(month).padStart(2,'0')}`)
+          params.push(`${year}-${String(month).padStart(2, '0')}`)
         } else if (year) {
-          q += ` AND strftime('%Y', pr.reviewDate)=?`; params.push(year)
+          q += ` AND strftime('%Y', pr.reviewDate)=?`
+          params.push(year)
         }
         q += ` ORDER BY pr.reviewDate DESC`
         return ok(await query(q, params))
@@ -5482,18 +5549,18 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       // POST /api/hr/reviews
       if (method === 'POST') {
         const b = (await req.json()) as any
-        if (!b.employeeId)             return err('employeeId wajib diisi')
-        if (!b.reviewDate)             return err('reviewDate wajib diisi')
+        if (!b.employeeId) return err('employeeId wajib diisi')
+        if (!b.reviewDate) return err('reviewDate wajib diisi')
         const score = parseInt(b.score ?? '3')
-        if (score < 1 || score > 5)    return err('score harus antara 1-5')
+        if (score < 1 || score > 5) return err('score harus antara 1-5')
 
-        const emp = await queryOne<any>(
-          `SELECT id, name FROM Employee WHERE id=? AND storeId=?`,
-          [b.employeeId, storeId],
-        )
+        const emp = await queryOne<any>(`SELECT id, name FROM Employee WHERE id=? AND storeId=?`, [
+          b.employeeId,
+          storeId,
+        ])
         if (!emp) return err('Karyawan tidak ditemukan', 404)
 
-        const t   = nowISO()
+        const t = nowISO()
         const rid = newId()
         await exec(
           `INSERT INTO PerformanceReview
@@ -5501,15 +5568,19 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
               strengths,improvements,goals,notes,reviewDate,createdAt,updatedAt)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
-            rid, storeId, b.employeeId,
-            user.id ?? null, user.name ?? null,
+            rid,
+            storeId,
+            b.employeeId,
+            user.id ?? null,
+            user.name ?? null,
             score,
-            b.strengths    ?? null,
+            b.strengths ?? null,
             b.improvements ?? null,
-            b.goals        ?? null,
-            b.notes        ?? null,
+            b.goals ?? null,
+            b.notes ?? null,
             b.reviewDate,
-            t, t,
+            t,
+            t,
           ],
         )
         return ok({ id: rid, employeeName: emp.name, score }, 201)
@@ -5551,31 +5622,37 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'system' && segs[1] === 'health') {
       if (method === 'GET') {
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(callerRole))
-          return err('Forbidden', 403)
+        if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(callerRole)) return err('Forbidden', 403)
 
         // Row counts
         const [orderCount] = await query<{ c: number }>(
-          `SELECT COUNT(*) as c FROM "Order" WHERE storeId = ?`, [storeId])
+          `SELECT COUNT(*) as c FROM "Order" WHERE storeId = ?`,
+          [storeId],
+        )
         const [productCount] = await query<{ c: number }>(
-          `SELECT COUNT(*) as c FROM Product WHERE storeId = ?`, [storeId])
+          `SELECT COUNT(*) as c FROM Product WHERE storeId = ?`,
+          [storeId],
+        )
         const [customerCount] = await query<{ c: number }>(
-          `SELECT COUNT(*) as c FROM Customer WHERE storeId = ?`, [storeId])
+          `SELECT COUNT(*) as c FROM Customer WHERE storeId = ?`,
+          [storeId],
+        )
         const [employeeCount] = await query<{ c: number }>(
           `SELECT COUNT(*) as c FROM User u
            JOIN UserStore us ON us.userId = u.id
-           WHERE us.storeId = ?`, [storeId])
+           WHERE us.storeId = ?`,
+          [storeId],
+        )
 
-        const orders    = orderCount?.c    ?? 0
-        const products  = productCount?.c  ?? 0
+        const orders = orderCount?.c ?? 0
+        const products = productCount?.c ?? 0
         const customers = customerCount?.c ?? 0
         const employees = employeeCount?.c ?? 0
 
         // Storage estimate: assume avg row sizes in bytes
         // Order≈512, Product≈256, Customer≈256, User≈128
         const totalRows = orders + products + customers + employees
-        const estimatedBytes =
-          orders * 512 + products * 256 + customers * 256 + employees * 128
+        const estimatedBytes = orders * 512 + products * 256 + customers * 256 + employees * 128
         const estimatedKB = Math.round(estimatedBytes / 1024)
 
         return ok({
@@ -5730,10 +5807,9 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         // Submit: mark COMPLETED + apply stock adjustments
         if (b.action === 'submit') {
           // Get all items with variance
-          const opnameItems = await query<any>(
-            `SELECT * FROM StockOpnameItem WHERE opnameId = ?`,
-            [sessionId],
-          )
+          const opnameItems = await query<any>(`SELECT * FROM StockOpnameItem WHERE opnameId = ?`, [
+            sessionId,
+          ])
           const withVariance = opnameItems.filter(
             (i: any) => i.countedQty !== null && i.variance !== 0,
           )
@@ -5760,10 +5836,10 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             )
           }
 
-          await exec(
-            `UPDATE StockOpname SET status = 'COMPLETED', completedAt = ? WHERE id = ?`,
-            [t, sessionId],
-          )
+          await exec(`UPDATE StockOpname SET status = 'COMPLETED', completedAt = ? WHERE id = ?`, [
+            t,
+            sessionId,
+          ])
 
           logAudit({
             storeId,
@@ -5796,7 +5872,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     //      body: { bankId, systemId }  → creates a reconciliation match record
     if (segs[0] === 'accounting' && segs[1] === 'reconciliation') {
       // Lazy-create BankStatement table if it doesn't exist yet
-      await exec(`
+      await exec(
+        `
         CREATE TABLE IF NOT EXISTS BankStatement (
           id TEXT PRIMARY KEY,
           storeId TEXT NOT NULL,
@@ -5809,10 +5886,13 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           createdAt TEXT NOT NULL,
           updatedAt TEXT NOT NULL
         )
-      `, [])
+      `,
+        [],
+      )
 
       // Lazy-create ReconciliationMatch table
-      await exec(`
+      await exec(
+        `
         CREATE TABLE IF NOT EXISTS ReconciliationMatch (
           id TEXT PRIMARY KEY,
           storeId TEXT NOT NULL,
@@ -5822,10 +5902,14 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           matchedAt TEXT NOT NULL,
           createdAt TEXT NOT NULL
         )
-      `, [])
+      `,
+        [],
+      )
 
       if (method === 'GET') {
-        const from = sp.get('from') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+        const from =
+          sp.get('from') ??
+          new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
         const to = sp.get('to') ?? new Date().toISOString().slice(0, 10)
 
         // Collect unmatched system transactions from Orders (PAID) and JournalEntries
@@ -5895,7 +5979,6 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
-
     // ── Marketing Campaigns ───────────────────────────────────────────────────
     if (segs[0] === 'marketing-campaigns') {
       // Lazy init table
@@ -5942,11 +6025,18 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
            (id,storeId,name,type,status,message,audience,audienceValue,scheduledAt,sentCount,createdAt,updatedAt)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
-            id, storeId, b.name.trim(), type, status,
-            b.message.trim(), audience,
+            id,
+            storeId,
+            b.name.trim(),
+            type,
+            status,
+            b.message.trim(),
+            audience,
             b.audienceValue ?? null,
             b.scheduledAt ?? null,
-            0, t, t,
+            0,
+            t,
+            t,
           ],
         )
         return ok({ id, status }, 201)
@@ -5955,36 +6045,40 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       // POST /api/marketing-campaigns/send/:id
       if (segs[1] === 'send' && segs[2] && method === 'POST') {
         const campaignId = segs[2]
-        const campaign = await queryOne(
+        const campaign = (await queryOne(
           `SELECT * FROM MarketingCampaign WHERE id=? AND storeId=?`,
           [campaignId, storeId],
-        ) as any
+        )) as any
         if (!campaign) return err('Campaign not found', 404)
 
         // Count audience size
         let audienceCount = 0
         if (campaign.audience === 'ALL') {
-          const row = await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [storeId]) as any
+          const row = (await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [
+            storeId,
+          ])) as any
           audienceCount = Number(row?.cnt ?? 0)
         } else if (campaign.audience === 'SEGMENT') {
           // RFM segment — approximate via loyalty members or all customers fallback
-          const row = await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [storeId]) as any
+          const row = (await queryOne(`SELECT COUNT(*) as cnt FROM Customer WHERE storeId=?`, [
+            storeId,
+          ])) as any
           audienceCount = Math.max(1, Math.floor(Number(row?.cnt ?? 10) * 0.3))
         } else if (campaign.audience === 'LOYALTY_TIER') {
-          const row = await queryOne(
+          const row = (await queryOne(
             `SELECT COUNT(*) as cnt FROM LoyaltyMember WHERE storeId=? AND tierId=?`,
             [storeId, campaign.audienceValue ?? ''],
-          ) as any
+          )) as any
           audienceCount = Number(row?.cnt ?? 0)
         }
         if (audienceCount === 0) audienceCount = 1 // always send to at least 1
 
         // Simulate delivery stats
         const deliveryRate = 0.92 + Math.random() * 0.06
-        const openRate    = 0.18 + Math.random() * 0.22
-        const delivered   = Math.round(audienceCount * deliveryRate)
-        const failed      = audienceCount - delivered
-        const opened      = Math.round(delivered * openRate)
+        const openRate = 0.18 + Math.random() * 0.22
+        const delivered = Math.round(audienceCount * deliveryRate)
+        const failed = audienceCount - delivered
+        const opened = Math.round(delivered * openRate)
 
         const t2 = nowISO()
         await exec(
@@ -6002,7 +6096,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       // PATCH /api/marketing-campaigns/:id
       if (segs[1] && segs[1] !== 'send' && method === 'PATCH') {
         const b = (await req.json()) as any
-        const allowed = new Set(['name', 'message', 'type', 'status', 'audience', 'audienceValue', 'scheduledAt'])
+        const allowed = new Set([
+          'name',
+          'message',
+          'type',
+          'status',
+          'audience',
+          'audienceValue',
+          'scheduledAt',
+        ])
         const cols = filterCols(b, allowed)
         if (Object.keys(cols).length === 0) return err('No valid fields')
         const { setClauses, values } = buildUpdate(cols)
@@ -6020,278 +6122,566 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
-    // ─── EXCHANGE RATES ───────────────────────────────────────────────────────
-    if (segs[0] === 'exchange-rates') {
-      // Lazy-create ExchangeRate table if it doesn't exist yet
-      await exec(`CREATE TABLE IF NOT EXISTS ExchangeRate (
-        id TEXT PRIMARY KEY,
-        storeId TEXT NOT NULL,
-        fromCurrency TEXT NOT NULL,
-        toCurrency TEXT NOT NULL,
-        rate REAL NOT NULL,
-        updatedAt TEXT NOT NULL
-      )`)
+    // ── FRANCHISE CONFIG ──────────────────────────────────────────────────────
+    if (segs[0] === 'franchise-configs') {
+      // Lazy-init FranchiseConfig table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS FranchiseConfig (
+          id            TEXT PRIMARY KEY,
+          storeId       TEXT NOT NULL,
+          parentStoreId TEXT NOT NULL,
+          royaltyRate   REAL NOT NULL DEFAULT 5,
+          contractStart TEXT,
+          contractEnd   TEXT,
+          createdAt     TEXT NOT NULL,
+          updatedAt     TEXT NOT NULL
+        )
+      `)
 
-      // GET /api/exchange-rates?storeId=...
-      if (method === 'GET' && segs.length === 1) {
+      // GET /api/franchise-configs?parentStoreId= — list franchise configs
+      if (segs.length === 1 && method === 'GET') {
+        const parentId = sp.get('parentStoreId') ?? storeId
         const rows = await query(
-          `SELECT * FROM ExchangeRate WHERE storeId = ? ORDER BY fromCurrency, toCurrency`,
-          [storeId],
+          `SELECT fc.*, s.name as storeName
+             FROM FranchiseConfig fc
+             JOIN Store s ON fc.storeId = s.id
+            WHERE fc.parentStoreId = ?
+            ORDER BY s.name`,
+          [parentId],
         )
         return ok(rows)
       }
 
-      // POST /api/exchange-rates — upsert a rate
-      if (method === 'POST' && segs.length === 1) {
+      // POST /api/franchise-configs — create or update franchise config
+      if (segs.length === 1 && method === 'POST') {
         const b = (await req.json()) as any
-        validateRequired(b, ['fromCurrency', 'toCurrency', 'rate'])
-        validatePositive(b.rate, 'rate')
-        const from = String(b.fromCurrency).toUpperCase()
-        const to = String(b.toCurrency).toUpperCase()
-        if (from === to) return err('fromCurrency and toCurrency must differ')
-        const t = nowISO()
-        // Upsert: if pair already exists, update; otherwise insert
+        validateRequired(b, ['storeId', 'royaltyRate'])
+        const now = nowISO()
         const existing = await queryOne(
-          `SELECT id FROM ExchangeRate WHERE storeId=? AND fromCurrency=? AND toCurrency=?`,
-          [storeId, from, to],
+          `SELECT id FROM FranchiseConfig WHERE storeId = ? AND parentStoreId = ?`,
+          [b.storeId, storeId],
         )
         if (existing) {
           await exec(
-            `UPDATE ExchangeRate SET rate=?, updatedAt=? WHERE storeId=? AND fromCurrency=? AND toCurrency=?`,
-            [Number(b.rate), t, storeId, from, to],
+            `UPDATE FranchiseConfig SET royaltyRate=?, contractStart=?, contractEnd=?, updatedAt=?
+              WHERE storeId=? AND parentStoreId=?`,
+            [
+              b.royaltyRate,
+              b.contractStart ?? null,
+              b.contractEnd ?? null,
+              now,
+              b.storeId,
+              storeId,
+            ],
           )
-          return ok({ success: true, id: (existing as any).id })
+          return ok({ success: true, updated: true })
         }
         const id = newId()
         await exec(
-          `INSERT INTO ExchangeRate (id, storeId, fromCurrency, toCurrency, rate, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [id, storeId, from, to, Number(b.rate), t],
+          `INSERT INTO FranchiseConfig (id, storeId, parentStoreId, royaltyRate, contractStart, contractEnd, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            b.storeId,
+            storeId,
+            b.royaltyRate,
+            b.contractStart ?? null,
+            b.contractEnd ?? null,
+            now,
+            now,
+          ],
         )
-        return ok({ success: true, id }, 201)
+        return ok({ id, success: true }, 201)
       }
 
-      // DELETE /api/exchange-rates/:id
-      if (method === 'DELETE' && segs.length === 2) {
-        await exec(`DELETE FROM ExchangeRate WHERE id=? AND storeId=?`, [segs[1], storeId])
-        return ok({ success: true })
-      }
-    }
+      // POST /api/franchise-configs/royalty-invoice — issue royalty invoice
+      if (segs[1] === 'royalty-invoice' && method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['franchiseStoreId', 'parentStoreId'])
 
-    // ─── GOALS ────────────────────────────────────────────────────────────────
-    if (segs[0] === 'goals') {
-      // Lazy-init GoalEntry table
-      await exec(`
-        CREATE TABLE IF NOT EXISTS GoalEntry (
-          id TEXT PRIMARY KEY,
-          storeId TEXT NOT NULL,
-          type TEXT NOT NULL,
-          period TEXT NOT NULL,
-          targetValue REAL NOT NULL,
-          startDate TEXT NOT NULL,
-          endDate TEXT NOT NULL,
-          createdAt TEXT NOT NULL,
-          updatedAt TEXT NOT NULL
-        )
-      `)
+        const config = (await queryOne(
+          `SELECT * FROM FranchiseConfig WHERE storeId = ? AND parentStoreId = ?`,
+          [b.franchiseStoreId, b.parentStoreId],
+        )) as any
+        if (!config) return err('Franchise config not found', 404)
 
-      // GET /api/goals?storeId=&period=
-      if (method === 'GET' && segs.length === 1) {
-        const period = sp.get('period') ?? 'MONTHLY'
-        const goals = await query(
-          `SELECT * FROM GoalEntry WHERE storeId = ? AND period = ? ORDER BY createdAt DESC`,
-          [storeId, period],
-        )
-
-        // Build date range for current period
+        // Sum revenue for the current month
         const now = new Date()
-        let periodStart: Date, periodEnd: Date
-        if (period === 'MONTHLY') {
-          periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-          periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-        } else {
-          const q = Math.floor(now.getMonth() / 3)
-          periodStart = new Date(now.getFullYear(), q * 3, 1)
-          periodEnd = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59, 999)
-        }
-        const from = periodStart.toISOString()
-        const to = periodEnd.toISOString()
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+          .toISOString()
+          .slice(0, 10)
 
-        // Fetch actuals for this period once
-        const [revenueRow, ordersRow, customersRow, aovRow, profitRow] = await Promise.all([
-          queryOne(
-            `SELECT COALESCE(SUM(total),0) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
-            [storeId, from, to],
-          ),
-          queryOne(
-            `SELECT COUNT(*) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
-            [storeId, from, to],
-          ),
-          queryOne(
-            `SELECT COUNT(*) as v FROM Customer WHERE storeId=? AND createdAt BETWEEN ? AND ?`,
-            [storeId, from, to],
-          ),
-          queryOne(
-            `SELECT COALESCE(AVG(total),0) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
-            [storeId, from, to],
-          ),
-          queryOne(
-            `SELECT COALESCE(SUM(o.total - COALESCE(cogs.cogs,0)),0) as v
-             FROM "Order" o
-             LEFT JOIN (
-               SELECT oi.orderId, SUM(oi.qty * COALESCE(p.cost,0)) as cogs
-               FROM OrderItem oi JOIN Product p ON oi.productId=p.id
-               GROUP BY oi.orderId
-             ) cogs ON cogs.orderId=o.id
-             WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ?`,
-            [storeId, from, to],
-          ),
-        ])
+        const revRow = (await queryOne(
+          `SELECT COALESCE(SUM(totalAmount),0) as revenue
+             FROM "Order"
+            WHERE storeId = ? AND status = 'COMPLETED'
+              AND createdAt >= ? AND createdAt <= ?`,
+          [b.franchiseStoreId, monthStart, monthEnd + 'T23:59:59Z'],
+        )) as any
+        const revenue = Number(revRow?.revenue ?? 0)
+        const royaltyFee = revenue * (config.royaltyRate / 100)
 
-        const actuals: Record<string, number> = {
-          REVENUE: Number((revenueRow as any)?.v ?? 0),
-          ORDERS: Number((ordersRow as any)?.v ?? 0),
-          NEW_CUSTOMERS: Number((customersRow as any)?.v ?? 0),
-          AVG_ORDER_VALUE: Number((aovRow as any)?.v ?? 0),
-          GROSS_PROFIT: Number((profitRow as any)?.v ?? 0),
-        }
-
-        const result = (goals as any[]).map(g => {
-          const current = actuals[g.type] ?? 0
-          const pct = g.targetValue > 0 ? (current / g.targetValue) * 100 : 0
-          const overdue = new Date(g.endDate) < now
-          let status = 'ON_TRACK'
-          if (pct >= 100) status = 'ACHIEVED'
-          else if (overdue && pct < 50) status = 'OVERDUE_LOW'
-          else if (pct >= 90) status = 'ALMOST'
-          return { goal: g, currentValue: current, progressPct: pct, status }
-        })
-        return ok(result)
-      }
-
-      // POST /api/goals
-      if (method === 'POST' && segs.length === 1) {
-        const b: any = await req.json()
-        validateRequired(b, ['type', 'period', 'targetValue', 'startDate', 'endDate'])
-        validatePositive(b.targetValue, 'targetValue')
-        const validTypes = ['REVENUE', 'ORDERS', 'NEW_CUSTOMERS', 'AVG_ORDER_VALUE', 'GROSS_PROFIT']
-        if (!validTypes.includes(b.type))
-          return err(`type must be one of ${validTypes.join(', ')}`)
-        if (!['MONTHLY', 'QUARTERLY'].includes(b.period))
-          return err('period must be MONTHLY or QUARTERLY')
-        const id = newId()
-        const t = nowISO()
+        // Create invoice record (reuse Invoice table if it exists, else create)
+        await exec(`
+          CREATE TABLE IF NOT EXISTS RoyaltyInvoice (
+            id              TEXT PRIMARY KEY,
+            franchiseStoreId TEXT NOT NULL,
+            parentStoreId   TEXT NOT NULL,
+            period          TEXT NOT NULL,
+            revenue         REAL NOT NULL,
+            royaltyRate     REAL NOT NULL,
+            royaltyFee      REAL NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'UNPAID',
+            createdAt       TEXT NOT NULL
+          )
+        `)
+        const invId = newId()
+        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
         await exec(
-          `INSERT INTO GoalEntry (id,storeId,type,period,targetValue,startDate,endDate,createdAt,updatedAt)
-           VALUES (?,?,?,?,?,?,?,?,?)`,
-          [id, storeId, b.type, b.period, Number(b.targetValue), b.startDate, b.endDate, t, t],
+          `INSERT INTO RoyaltyInvoice (id, franchiseStoreId, parentStoreId, period, revenue, royaltyRate, royaltyFee, status, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'UNPAID', ?)`,
+          [
+            invId,
+            b.franchiseStoreId,
+            b.parentStoreId,
+            period,
+            revenue,
+            config.royaltyRate,
+            royaltyFee,
+            nowISO(),
+          ],
         )
-        return ok({ id, type: b.type, period: b.period }, 201)
-      }
-
-      // PATCH /api/goals/:id
-      if (method === 'PATCH' && segs.length === 2) {
-        const gid = segs[1]
-        const b: any = await req.json()
-        const allowed = new Set(['targetValue', 'startDate', 'endDate', 'type', 'period'])
-        const cols = filterCols(b, allowed)
-        if (Object.keys(cols).length === 0) return err('No valid fields to update')
-        const { setClauses, values } = buildUpdate(cols)
-        await exec(
-          `UPDATE GoalEntry SET ${setClauses}, updatedAt = ? WHERE id = ? AND storeId = ?`,
-          [...values, nowISO(), gid, storeId],
-        )
-        return ok({ success: true })
-      }
-
-      // DELETE /api/goals/:id
-      if (method === 'DELETE' && segs.length === 2) {
-        await exec(`DELETE FROM GoalEntry WHERE id = ? AND storeId = ?`, [segs[1], storeId])
-        return ok({ success: true })
+        return ok({ id: invId, period, revenue, royaltyRate: config.royaltyRate, royaltyFee }, 201)
       }
     }
 
-    // ─── REPORTS / KPI ────────────────────────────────────────────────────────
-    if (segs[0] === 'reports' && segs[1] === 'kpi' && method === 'GET') {
-      const period = sp.get('period') ?? 'MONTHLY'
-
-      // Lazy-init GoalEntry in case not created yet
+    // ── STOCK TRANSFERS ───────────────────────────────────────────────────────
+    if (segs[0] === 'stock-transfers') {
+      // Lazy-init StockTransfer table
       await exec(`
-        CREATE TABLE IF NOT EXISTS GoalEntry (
-          id TEXT PRIMARY KEY,
-          storeId TEXT NOT NULL,
-          type TEXT NOT NULL,
-          period TEXT NOT NULL,
-          targetValue REAL NOT NULL,
-          startDate TEXT NOT NULL,
-          endDate TEXT NOT NULL,
-          createdAt TEXT NOT NULL,
-          updatedAt TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS StockTransfer (
+          id          TEXT PRIMARY KEY,
+          fromStoreId TEXT NOT NULL,
+          toStoreId   TEXT NOT NULL,
+          productId   TEXT NOT NULL,
+          qty         INTEGER NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          requestedAt TEXT NOT NULL,
+          completedAt TEXT
         )
       `)
 
-      // Current period range
-      const now = new Date()
-      let periodStart: Date, periodEnd: Date
-      if (period === 'MONTHLY') {
-        periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-      } else {
-        const q = Math.floor(now.getMonth() / 3)
-        periodStart = new Date(now.getFullYear(), q * 3, 1)
-        periodEnd = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59, 999)
+      // GET /api/stock-transfers?storeId= — list transfers involving this store
+      if (segs.length === 1 && method === 'GET') {
+        const rows = await query(
+          `SELECT st.*,
+                  fs.name as fromStoreName,
+                  ts.name as toStoreName,
+                  p.name  as productName
+             FROM StockTransfer st
+             JOIN Store fs   ON st.fromStoreId = fs.id
+             JOIN Store ts   ON st.toStoreId   = ts.id
+             JOIN Product p  ON st.productId   = p.id
+            WHERE st.fromStoreId = ? OR st.toStoreId = ?
+            ORDER BY st.requestedAt DESC
+            LIMIT 100`,
+          [storeId, storeId],
+        )
+        return ok(rows)
       }
-      const from = periodStart.toISOString()
-      const to = periodEnd.toISOString()
 
-      const [goals, revenueRow, ordersRow, customersRow] = await Promise.all([
-        query(
-          `SELECT type, targetValue FROM GoalEntry WHERE storeId=? AND period=?`,
-          [storeId, period],
-        ),
-        queryOne(
-          `SELECT COALESCE(SUM(total),0) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
-          [storeId, from, to],
-        ),
-        queryOne(
-          `SELECT COUNT(*) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
-          [storeId, from, to],
-        ),
-        queryOne(
-          `SELECT COUNT(*) as v FROM Customer WHERE storeId=? AND createdAt BETWEEN ? AND ?`,
-          [storeId, from, to],
-        ),
-      ])
+      // POST /api/stock-transfers — request a transfer
+      if (segs.length === 1 && method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['fromStoreId', 'toStoreId', 'productId', 'qty'])
+        validatePositive(b.qty, 'qty')
+        if (b.fromStoreId === b.toStoreId) return err('fromStoreId and toStoreId must differ', 400)
 
-      const goalMap = new Map((goals as any[]).map((g: any) => [g.type, Number(g.targetValue)]))
-      const revenueTarget = goalMap.get('REVENUE') ?? 0
-      const ordersTarget = goalMap.get('ORDERS') ?? 0
-      const customersTarget = goalMap.get('NEW_CUSTOMERS') ?? 0
+        // Check sufficient stock
+        const prod = (await queryOne(`SELECT stock FROM Product WHERE id = ? AND storeId = ?`, [
+          b.productId,
+          b.fromStoreId,
+        ])) as any
+        if (!prod) return err('Product not found in source store', 404)
+        if (prod.stock < b.qty) return err(`Insufficient stock (available: ${prod.stock})`, 400)
 
-      const revenueCurrent = Number((revenueRow as any)?.v ?? 0)
-      const ordersCurrent = Number((ordersRow as any)?.v ?? 0)
-      const customersCurrent = Number((customersRow as any)?.v ?? 0)
+        const id = newId()
+        await exec(
+          `INSERT INTO StockTransfer (id, fromStoreId, toStoreId, productId, qty, status, requestedAt)
+           VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+          [id, b.fromStoreId, b.toStoreId, b.productId, b.qty, nowISO()],
+        )
+        return ok({ id, status: 'PENDING' }, 201)
+      }
 
-      return okCached(
-        {
-          revenue: {
-            current: revenueCurrent,
-            target: revenueTarget,
-            pct: revenueTarget > 0 ? (revenueCurrent / revenueTarget) * 100 : 0,
-          },
-          orders: {
-            current: ordersCurrent,
-            target: ordersTarget,
-            pct: ordersTarget > 0 ? (ordersCurrent / ordersTarget) * 100 : 0,
-          },
-          newCustomers: {
-            current: customersCurrent,
-            target: customersTarget,
-            pct: customersTarget > 0 ? (customersCurrent / customersTarget) * 100 : 0,
-          },
-        },
-        'private, max-age=60',
+      // PATCH /api/stock-transfers/:id — approve / reject / complete
+      if (segs.length === 2 && method === 'PATCH') {
+        const transferId = segs[1]
+        const b = (await req.json()) as any
+        validateRequired(b, ['status'])
+
+        const allowed = new Set(['APPROVED', 'REJECTED', 'COMPLETED'])
+        if (!allowed.has(b.status)) return err('Invalid status', 400)
+
+        const transfer = (await queryOne(`SELECT * FROM StockTransfer WHERE id = ?`, [
+          transferId,
+        ])) as any
+        if (!transfer) return err('Transfer not found', 404)
+        if (transfer.status !== 'PENDING' && b.status !== 'COMPLETED') {
+          return err('Only PENDING transfers can be approved/rejected', 400)
+        }
+
+        const now2 = nowISO()
+
+        if (b.status === 'APPROVED') {
+          await exec(`UPDATE StockTransfer SET status='APPROVED' WHERE id=?`, [transferId])
+        } else if (b.status === 'REJECTED') {
+          await exec(`UPDATE StockTransfer SET status='REJECTED', completedAt=? WHERE id=?`, [
+            now2,
+            transferId,
+          ])
+        } else if (b.status === 'COMPLETED') {
+          if (transfer.status !== 'APPROVED')
+            return err('Transfer must be APPROVED before completing', 400)
+          // Deduct from source, add to destination
+          await exec(
+            `UPDATE Product SET stock = stock - ? WHERE id = ? AND storeId = ? AND stock >= ?`,
+            [transfer.qty, transfer.productId, transfer.fromStoreId, transfer.qty],
+          )
+          // Add to destination (upsert stock)
+          const destProd = await queryOne(`SELECT id FROM Product WHERE id = ? AND storeId = ?`, [
+            transfer.productId,
+            transfer.toStoreId,
+          ])
+          if (destProd) {
+            await exec(`UPDATE Product SET stock = stock + ? WHERE id = ? AND storeId = ?`, [
+              transfer.qty,
+              transfer.productId,
+              transfer.toStoreId,
+            ])
+          }
+          await exec(`UPDATE StockTransfer SET status='COMPLETED', completedAt=? WHERE id=?`, [
+            now2,
+            transferId,
+          ])
+        }
+
+        return ok({ success: true, status: b.status })
+      }
+    }
+
+    // ── CONSOLIDATED REPORT ───────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'consolidated' && method === 'GET') {
+      const parentStoreId = sp.get('parentStoreId') ?? storeId
+
+      // Ensure FranchiseConfig table exists
+      await exec(`
+        CREATE TABLE IF NOT EXISTS FranchiseConfig (
+          id            TEXT PRIMARY KEY,
+          storeId       TEXT NOT NULL,
+          parentStoreId TEXT NOT NULL,
+          royaltyRate   REAL NOT NULL DEFAULT 5,
+          contractStart TEXT,
+          contractEnd   TEXT,
+          createdAt     TEXT NOT NULL,
+          updatedAt     TEXT NOT NULL
+        )
+      `)
+
+      // Get all child store IDs (including the parent itself)
+      const childConfigs = (await query(
+        `SELECT fc.storeId, fc.royaltyRate, fc.contractEnd, s.name
+           FROM FranchiseConfig fc
+           JOIN Store s ON fc.storeId = s.id
+          WHERE fc.parentStoreId = ?`,
+        [parentStoreId],
+      )) as any[]
+
+      // Build storeId list: parent + all children
+      const allStoreIds = [parentStoreId, ...childConfigs.map((c: any) => c.storeId)]
+      const configMap = new Map(childConfigs.map((c: any) => [c.storeId, c]))
+
+      if (allStoreIds.length === 0) {
+        return ok({
+          totalRevenue: 0,
+          totalOrders: 0,
+          totalExpenses: 0,
+          netProfit: 0,
+          locations: [],
+        })
+      }
+
+      const placeholders = allStoreIds.map(() => '?').join(',')
+
+      // Sum revenue and orders per store
+      const revenueRows = (await query(
+        `SELECT storeId,
+                COALESCE(SUM(totalAmount), 0) as revenue,
+                COUNT(*) as orders
+           FROM "Order"
+          WHERE storeId IN (${placeholders}) AND status = 'COMPLETED'
+          GROUP BY storeId`,
+        allStoreIds,
+      )) as any[]
+
+      // Sum expenses per store
+      const expenseRows = (await query(
+        `SELECT storeId, COALESCE(SUM(amount), 0) as expenses
+           FROM Expense
+          WHERE storeId IN (${placeholders})
+          GROUP BY storeId`,
+        allStoreIds,
+      )) as any[]
+
+      // Staff count per store
+      const staffRows = (await query(
+        `SELECT storeId, COUNT(*) as staffCount
+           FROM Staff
+          WHERE storeId IN (${placeholders}) AND active = 1
+          GROUP BY storeId`,
+        allStoreIds,
+      )) as any[]
+
+      const revenueMap = new Map(revenueRows.map((r: any) => [r.storeId, r]))
+      const expenseMap = new Map(expenseRows.map((r: any) => [r.storeId, r]))
+      const staffMap = new Map(staffRows.map((r: any) => [r.storeId, r]))
+
+      // Fetch store names for parent + children
+      const storeNames = (await query(
+        `SELECT id, name FROM Store WHERE id IN (${placeholders})`,
+        allStoreIds,
+      )) as any[]
+      const nameMap = new Map(storeNames.map((s: any) => [s.id, s.name]))
+
+      let totalRevenue = 0
+      let totalOrders = 0
+      let totalExpenses = 0
+
+      const locations = allStoreIds.map(sid => {
+        const rev = revenueMap.get(sid)
+        const exp = expenseMap.get(sid)
+        const stf = staffMap.get(sid)
+        const cfg = configMap.get(sid)
+        const revenue = Number(rev?.revenue ?? 0)
+        const orders = Number(rev?.orders ?? 0)
+        const expenses = Number(exp?.expenses ?? 0)
+        totalRevenue += revenue
+        totalOrders += orders
+        totalExpenses += expenses
+        return {
+          id: sid,
+          name: nameMap.get(sid) ?? cfg?.name ?? sid,
+          revenue,
+          orders,
+          expenses,
+          staffCount: Number(stf?.staffCount ?? 0),
+          royaltyRate: Number(cfg?.royaltyRate ?? 0),
+          contractEnd: cfg?.contractEnd ?? null,
+        }
+      })
+
+      return ok({
+        totalRevenue,
+        totalOrders,
+        totalExpenses,
+        netProfit: totalRevenue - totalExpenses,
+        locations,
+      })
+    }
+
+    // ─── INVOICES ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'invoices') {
+      // Lazy schema creation
+      await exec(
+        `CREATE TABLE IF NOT EXISTS Invoice (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        customerId TEXT NOT NULL,
+        number TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        issueDate TEXT NOT NULL,
+        dueDate TEXT NOT NULL,
+        terms TEXT NOT NULL DEFAULT 'NET30',
+        notes TEXT,
+        subtotal REAL NOT NULL DEFAULT 0,
+        taxAmount REAL NOT NULL DEFAULT 0,
+        total REAL NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`,
+        [],
       )
+      await exec(
+        `CREATE TABLE IF NOT EXISTS InvoiceItem (
+        id TEXT PRIMARY KEY,
+        invoiceId TEXT NOT NULL,
+        description TEXT NOT NULL,
+        qty REAL NOT NULL DEFAULT 1,
+        unitPrice REAL NOT NULL DEFAULT 0,
+        taxRate REAL NOT NULL DEFAULT 0,
+        subtotal REAL NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL
+      )`,
+        [],
+      )
+
+      // GET /api/invoices
+      if (!segs[1] && method === 'GET') {
+        const status = sp.get('status') ?? ''
+        const limit = parseInt(sp.get('limit') ?? '50')
+        const offset = parseInt(sp.get('offset') ?? '0')
+        const conditions: string[] = ['inv.storeId=?']
+        const params: any[] = [storeId]
+        if (status) {
+          conditions.push('inv.status=?')
+          params.push(status)
+        }
+        const where = conditions.join(' AND ')
+        const rows = await query(
+          `SELECT inv.*, c.name as customerName
+           FROM Invoice inv
+           LEFT JOIN Customer c ON inv.customerId = c.id
+           WHERE ${where}
+           ORDER BY inv.createdAt DESC LIMIT ? OFFSET ?`,
+          [...params, limit, offset],
+        )
+        const totalRow = await queryOne<any>(
+          `SELECT COUNT(*) as count FROM Invoice inv WHERE ${where}`,
+          params,
+        )
+        return ok({ invoices: rows, total: totalRow?.count ?? 0 })
+      }
+
+      // POST /api/invoices
+      if (!segs[1] && method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['customerId', 'issueDate', 'dueDate', 'terms'])
+        if (!b.items || !Array.isArray(b.items) || b.items.length === 0) {
+          return err('Minimal 1 item')
+        }
+        // Generate invoice number: INV-YYYYMMDD-XXXX
+        const dateStr = (b.issueDate as string).replace(/-/g, '')
+        const countRow = await queryOne<any>(`SELECT COUNT(*) as c FROM Invoice WHERE storeId=?`, [
+          storeId,
+        ])
+        const seq = String((countRow?.c ?? 0) + 1).padStart(4, '0')
+        const number = `INV-${dateStr}-${seq}`
+        const subtotal = (b.items as any[]).reduce(
+          (s: number, i: any) => s + Number(i.qty) * Number(i.unitPrice),
+          0,
+        )
+        const taxAmount = (b.items as any[]).reduce(
+          (s: number, i: any) =>
+            s + Math.round(Number(i.qty) * Number(i.unitPrice) * (Number(i.taxRate) / 100)),
+          0,
+        )
+        const total = subtotal + taxAmount
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO Invoice (id,storeId,customerId,number,status,issueDate,dueDate,terms,notes,subtotal,taxAmount,total,createdAt,updatedAt)
+           VALUES (?,?,?,?,'DRAFT',?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            b.customerId,
+            number,
+            b.issueDate,
+            b.dueDate,
+            b.terms,
+            b.notes ?? null,
+            subtotal,
+            taxAmount,
+            total,
+            t,
+            t,
+          ],
+        )
+        for (const item of b.items as any[]) {
+          await exec(
+            `INSERT INTO InvoiceItem (id,invoiceId,description,qty,unitPrice,taxRate,subtotal,createdAt) VALUES (?,?,?,?,?,?,?,?)`,
+            [
+              newId(),
+              id,
+              item.description,
+              Number(item.qty),
+              Number(item.unitPrice),
+              Number(item.taxRate ?? 0),
+              Number(item.qty) * Number(item.unitPrice),
+              t,
+            ],
+          )
+        }
+        return ok({ id, number }, 201)
+      }
+
+      // GET /api/invoices/:id
+      if (segs[1] && !segs[2] && method === 'GET') {
+        const inv = await queryOne<any>(
+          `SELECT inv.*, c.name as customerName FROM Invoice inv LEFT JOIN Customer c ON inv.customerId=c.id WHERE inv.id=? AND inv.storeId=?`,
+          [segs[1], storeId],
+        )
+        if (!inv) return err('Invoice tidak ditemukan', 404)
+        const items = await query(`SELECT * FROM InvoiceItem WHERE invoiceId=? ORDER BY rowid`, [
+          segs[1],
+        ])
+        return ok({ ...inv, items })
+      }
+
+      // PATCH /api/invoices/:id
+      if (segs[1] && !segs[2] && method === 'PATCH') {
+        const b = (await req.json()) as any
+        const allowed = new Set(['status', 'notes', 'dueDate', 'terms'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Invoice SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [
+          ...values,
+          nowISO(),
+          segs[1],
+          storeId,
+        ])
+        return ok({ success: true })
+      }
+
+      // POST /api/invoices/:id/send
+      if (segs[1] && segs[2] === 'send' && method === 'POST') {
+        const inv = await queryOne<any>(`SELECT * FROM Invoice WHERE id=? AND storeId=?`, [
+          segs[1],
+          storeId,
+        ])
+        if (!inv) return err('Invoice tidak ditemukan', 404)
+        if (inv.status !== 'DRAFT') return err('Hanya invoice DRAFT yang bisa dikirim')
+        await exec(`UPDATE Invoice SET status='SENT', updatedAt=? WHERE id=? AND storeId=?`, [
+          nowISO(),
+          segs[1],
+          storeId,
+        ])
+        return ok({ success: true, status: 'SENT' })
+      }
+
+      // POST /api/invoices/:id/pay
+      if (segs[1] && segs[2] === 'pay' && method === 'POST') {
+        const inv = await queryOne<any>(`SELECT * FROM Invoice WHERE id=? AND storeId=?`, [
+          segs[1],
+          storeId,
+        ])
+        if (!inv) return err('Invoice tidak ditemukan', 404)
+        if (inv.status === 'PAID') return err('Invoice sudah lunas')
+        if (inv.status === 'DRAFT') return err('Invoice harus dikirim terlebih dahulu')
+        await exec(`UPDATE Invoice SET status='PAID', updatedAt=? WHERE id=? AND storeId=?`, [
+          nowISO(),
+          segs[1],
+          storeId,
+        ])
+        // Post journal entry: Debit Cash (1100), Credit Revenue (4100)
+        await postJournalEntry(storeId, `Invoice Payment: ${inv.number}`, [
+          { accountCode: '1100', debit: Number(inv.total) || 0, credit: 0 },
+          { accountCode: '4100', debit: 0, credit: Number(inv.total) || 0 },
+        ])
+        return ok({ success: true, status: 'PAID' })
+      }
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)

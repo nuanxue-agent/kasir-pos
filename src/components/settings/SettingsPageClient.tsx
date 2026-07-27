@@ -5,11 +5,28 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
-  Save, Store, Printer, CreditCard, Bell,
-  Zap, Crown, Copy, Check, RefreshCw,
-  Globe, Palette, ImageIcon, LayoutGrid,
-  ShoppingCart, Boxes, Users, Percent, BarChart3, CheckCircle2,
+  Save,
+  Store,
+  Printer,
+  CreditCard,
+  Bell,
+  Zap,
+  Crown,
+  Copy,
+  Check,
+  RefreshCw,
+  Globe,
+  Palette,
+  ImageIcon,
+  LayoutGrid,
+  ShoppingCart,
+  Boxes,
+  Users,
+  Percent,
+  BarChart3,
+  CheckCircle2,
 } from 'lucide-react'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import { toast } from '@/components/ui/Toaster'
 import {
   loadReceiptSettings,
@@ -60,26 +77,90 @@ const COLOR_SWATCHES = [
 
 type AccentKey = 'amber' | 'blue' | 'green' | 'purple' | 'red'
 
-const ACCENT_PRESETS: { key: AccentKey; label: string; primary: string; accent: string; swatch: string }[] = [
-  { key: 'amber',  label: 'Amber (Default)', primary: '#f59e0b', accent: '#ea580c', swatch: 'bg-amber-400' },
-  { key: 'blue',   label: 'Biru',            primary: '#3b82f6', accent: '#2563eb', swatch: 'bg-blue-500' },
-  { key: 'green',  label: 'Hijau',           primary: '#22c55e', accent: '#16a34a', swatch: 'bg-green-500' },
-  { key: 'purple', label: 'Ungu',            primary: '#8b5cf6', accent: '#7c3aed', swatch: 'bg-violet-500' },
-  { key: 'red',    label: 'Merah',           primary: '#ef4444', accent: '#dc2626', swatch: 'bg-red-500' },
+const ACCENT_PRESETS: {
+  key: AccentKey
+  label: string
+  primary: string
+  accent: string
+  swatch: string
+}[] = [
+  {
+    key: 'amber',
+    label: 'Amber (Default)',
+    primary: '#f59e0b',
+    accent: '#ea580c',
+    swatch: 'bg-amber-400',
+  },
+  { key: 'blue', label: 'Biru', primary: '#3b82f6', accent: '#2563eb', swatch: 'bg-blue-500' },
+  { key: 'green', label: 'Hijau', primary: '#22c55e', accent: '#16a34a', swatch: 'bg-green-500' },
+  { key: 'purple', label: 'Ungu', primary: '#8b5cf6', accent: '#7c3aed', swatch: 'bg-violet-500' },
+  { key: 'red', label: 'Merah', primary: '#ef4444', accent: '#dc2626', swatch: 'bg-red-500' },
 ]
 
 const ALL_MODULES = [
-  { key: 'pos', label: 'Kasir (POS)', desc: 'Terminal kasir untuk catat penjualan', icon: ShoppingCart, required: false },
-  { key: 'inventory', label: 'Stok & Inventori', desc: 'Kelola stok dan notifikasi stok menipis', icon: Boxes, required: false },
-  { key: 'customers', label: 'Pelanggan & Poin', desc: 'Database pelanggan dan poin loyalitas', icon: Users, required: false },
-  { key: 'discounts', label: 'Diskon & Promo', desc: 'Buat kode diskon dan promo otomatis', icon: Percent, required: false },
-  { key: 'reports', label: 'Laporan', desc: 'Laporan omzet, produk terlaris, dan lainnya', icon: BarChart3, required: true },
+  {
+    key: 'pos',
+    label: 'Kasir (POS)',
+    desc: 'Terminal kasir untuk catat penjualan',
+    icon: ShoppingCart,
+    required: false,
+  },
+  {
+    key: 'inventory',
+    label: 'Stok & Inventori',
+    desc: 'Kelola stok dan notifikasi stok menipis',
+    icon: Boxes,
+    required: false,
+  },
+  {
+    key: 'customers',
+    label: 'Pelanggan & Poin',
+    desc: 'Database pelanggan dan poin loyalitas',
+    icon: Users,
+    required: false,
+  },
+  {
+    key: 'discounts',
+    label: 'Diskon & Promo',
+    desc: 'Buat kode diskon dan promo otomatis',
+    icon: Percent,
+    required: false,
+  },
+  {
+    key: 'reports',
+    label: 'Laporan',
+    desc: 'Laporan omzet, produk terlaris, dan lainnya',
+    icon: BarChart3,
+    required: true,
+  },
 ]
 
 const PLAN_FEATURES = {
-  FREE: { label: 'Gratis', color: 'text-stone-500', bg: 'bg-stone-100', features: ['1 Toko', '500 Produk', '1 Kasir', 'Laporan Dasar'] },
-  PRO: { label: 'Pro', color: 'text-amber-600', bg: 'bg-amber-100', features: ['3 Toko', '5.000 Produk', '5 Kasir', 'Laporan Lengkap', 'Export Excel', 'Webhook'] },
-  ENTERPRISE: { label: 'Enterprise', color: 'text-violet-600', bg: 'bg-violet-100', features: ['Toko Tak Terbatas', 'Produk Tak Terbatas', 'Kasir Tak Terbatas', 'API Penuh', 'SLA 99.9%', 'Dukungan Prioritas'] },
+  FREE: {
+    label: 'Gratis',
+    color: 'text-stone-500',
+    bg: 'bg-stone-100',
+    features: ['1 Toko', '500 Produk', '1 Kasir', 'Laporan Dasar'],
+  },
+  PRO: {
+    label: 'Pro',
+    color: 'text-amber-600',
+    bg: 'bg-amber-100',
+    features: ['3 Toko', '5.000 Produk', '5 Kasir', 'Laporan Lengkap', 'Export Excel', 'Webhook'],
+  },
+  ENTERPRISE: {
+    label: 'Enterprise',
+    color: 'text-violet-600',
+    bg: 'bg-violet-100',
+    features: [
+      'Toko Tak Terbatas',
+      'Produk Tak Terbatas',
+      'Kasir Tak Terbatas',
+      'API Penuh',
+      'SLA 99.9%',
+      'Dukungan Prioritas',
+    ],
+  },
 }
 
 interface SettingsPageClientProps {
@@ -121,7 +202,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   })
 
   // Printer tab
-  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(() => loadReceiptSettings())
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(() =>
+    loadReceiptSettings(),
+  )
 
   // Payment tab
   const [paymentMethods, setPaymentMethods] = useState(DEFAULT_PAYMENT_METHODS)
@@ -260,7 +343,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
     <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
       <div>
         <h1 className="text-xl font-bold text-[var(--text-1)] sm:text-2xl">Pengaturan</h1>
-        <p className="mt-1 text-sm text-[var(--text-2)]">Konfigurasi toko, printer, pembayaran, dan integrasi</p>
+        <p className="mt-1 text-sm text-[var(--text-2)]">
+          Konfigurasi toko, printer, pembayaran, dan integrasi
+        </p>
       </div>
 
       {/* Tab bar */}
@@ -307,7 +392,22 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
             <SectionHead icon={Globe} label="Pajak &amp; Mata Uang" />
             <div className="grid grid-cols-2 gap-4">
               <Field label="Tarif Pajak (%)" error={errors.taxRate?.message}>
-                <input type="number" step="0.1" min="0" max="100" {...register('taxRate')} className={inputCls} />
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    {...register('taxRate')}
+                    className={inputCls}
+                  />
+                  <span className="absolute top-1/2 right-3 -translate-y-1/2">
+                    <HelpTooltip
+                      text="Persentase PPN yang dikenakan pada setiap transaksi. Di Indonesia tarif standar adalah 11%. Masukkan 0 jika toko Anda tidak memungut pajak."
+                      side="left"
+                    />
+                  </span>
+                </div>
               </Field>
               <Field label="Mata Uang" error={errors.currency?.message}>
                 <select {...register('currency')} className={inputCls}>
@@ -332,20 +432,34 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
             <SectionHead icon={Palette} label="Branding" />
             <Field label="Header Struk" error={errors.receiptHeader?.message}>
-              <input {...register('receiptHeader')} placeholder={watch('name') || 'Nama toko'} className={inputCls} />
+              <input
+                {...register('receiptHeader')}
+                placeholder={watch('name') || 'Nama toko'}
+                className={inputCls}
+              />
             </Field>
             <Field label="Footer Struk" error={errors.receiptFooter?.message}>
-              <textarea {...register('receiptFooter')} rows={2} placeholder="Terima kasih sudah berbelanja!" className={inputCls} />
+              <textarea
+                {...register('receiptFooter')}
+                rows={2}
+                placeholder="Terima kasih sudah berbelanja!"
+                className={inputCls}
+              />
             </Field>
             <div>
-              <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">Warna Utama</label>
+              <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">
+                Warna Utama
+              </label>
               <div className="flex flex-wrap items-center gap-2.5">
                 {COLOR_SWATCHES.map(sw => (
                   <button
                     key={sw.value}
                     type="button"
                     title={sw.label}
-                    onClick={() => { setPrimaryColor(sw.value); setValue('primaryColor', sw.value) }}
+                    onClick={() => {
+                      setPrimaryColor(sw.value)
+                      setValue('primaryColor', sw.value)
+                    }}
                     className={`h-8 w-8 rounded-full ${sw.bg} transition-all hover:scale-110 focus:outline-none ${primaryColor === sw.value ? `ring-2 ring-offset-2 ${sw.ring}` : ''}`}
                     aria-label={`Pilih warna ${sw.label}`}
                   />
@@ -373,7 +487,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   src={logoUrlValue}
                   alt="Logo preview"
                   className="h-14 w-14 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] object-contain p-1"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  onError={e => {
+                    ;(e.target as HTMLImageElement).style.display = 'none'
+                  }}
                 />
                 <div className="flex items-center gap-1.5 text-xs text-[var(--text-3)]">
                   <ImageIcon className="h-3.5 w-3.5" />
@@ -388,7 +504,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
               <LayoutGrid className="h-4 w-4 text-amber-500" />
               Fitur yang Diaktifkan
             </div>
-            <p className="mb-4 text-xs text-[var(--text-3)]">Pilih fitur yang sesuai dengan kebutuhan bisnis kamu.</p>
+            <p className="mb-4 text-xs text-[var(--text-3)]">
+              Pilih fitur yang sesuai dengan kebutuhan bisnis kamu.
+            </p>
             <div className="space-y-2">
               {ALL_MODULES.map(({ key, label, desc, icon: Icon, required }) => {
                 const enabled = modules.includes(key)
@@ -404,21 +522,35 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                         : 'border-[var(--border)] bg-[var(--bg-subtle)] opacity-60'
                     } ${required ? 'cursor-default' : 'cursor-pointer hover:border-amber-300'}`}
                   >
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${enabled ? 'bg-amber-100' : 'bg-[var(--bg-muted)]'}`}>
-                      <Icon className={`h-4 w-4 ${enabled ? 'text-amber-600' : 'text-[var(--text-3)]'}`} />
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${enabled ? 'bg-amber-100' : 'bg-[var(--bg-muted)]'}`}
+                    >
+                      <Icon
+                        className={`h-4 w-4 ${enabled ? 'text-amber-600' : 'text-[var(--text-3)]'}`}
+                      />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className={`text-sm font-semibold ${enabled ? 'text-[var(--text-1)]' : 'text-[var(--text-2)]'}`}>{label}</p>
+                        <p
+                          className={`text-sm font-semibold ${enabled ? 'text-[var(--text-1)]' : 'text-[var(--text-2)]'}`}
+                        >
+                          {label}
+                        </p>
                         {required && (
-                          <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-3)]">Wajib</span>
+                          <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-3)]">
+                            Wajib
+                          </span>
                         )}
                       </div>
                       <p className="mt-0.5 truncate text-xs text-[var(--text-3)]">{desc}</p>
                     </div>
-                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                      enabled ? 'border-amber-500 bg-amber-500' : 'border-stone-300 bg-[var(--bg-card)]'
-                    }`}>
+                    <div
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                        enabled
+                          ? 'border-amber-500 bg-amber-500'
+                          : 'border-stone-300 bg-[var(--bg-card)]'
+                      }`}
+                    >
                       {enabled && <CheckCircle2 className="h-3 w-3 text-white" />}
                     </div>
                   </button>
@@ -428,7 +560,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           </section>
 
           {error && (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-500">{error}</p>
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-500">
+              {error}
+            </p>
           )}
           <SaveButton saving={saving} label="Simpan Pengaturan Toko" />
         </form>
@@ -442,7 +576,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
 
             {/* Print width */}
             <div>
-              <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">Lebar Kertas</label>
+              <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">
+                Lebar Kertas
+              </label>
               <div className="flex gap-3">
                 {([58, 80] as const).map(w => (
                   <button
@@ -463,7 +599,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
 
             {/* Font size */}
             <div>
-              <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">Ukuran Font</label>
+              <label className="mb-2 block text-xs font-medium text-[var(--text-2)]">
+                Ukuran Font
+              </label>
               <div className="flex gap-2">
                 {(['small', 'medium', 'large'] as const).map(size => (
                   <button
@@ -497,15 +635,19 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   receiptSettings.showLogo ? 'bg-amber-500' : 'bg-stone-300'
                 }`}
               >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  receiptSettings.showLogo ? 'translate-x-5' : 'translate-x-0.5'
-                }`} />
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    receiptSettings.showLogo ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
               </button>
             </div>
 
             {/* Footer text */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">Teks Footer Struk</label>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">
+                Teks Footer Struk
+              </label>
               <textarea
                 value={receiptSettings.footerText}
                 onChange={e => setReceiptSettings(s => ({ ...s, footerText: e.target.value }))}
@@ -522,7 +664,12 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                 className="mx-auto rounded border border-stone-200 bg-white p-3 font-mono text-stone-700"
                 style={{
                   width: receiptSettings.printWidth === 58 ? '160px' : '220px',
-                  fontSize: receiptSettings.fontSize === 'small' ? '10px' : receiptSettings.fontSize === 'large' ? '14px' : '12px',
+                  fontSize:
+                    receiptSettings.fontSize === 'small'
+                      ? '10px'
+                      : receiptSettings.fontSize === 'large'
+                        ? '14px'
+                        : '12px',
                 }}
               >
                 {receiptSettings.showLogo && (
@@ -530,11 +677,19 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                 )}
                 <div className="text-center font-bold">Nama Toko</div>
                 <div className="my-1 border-t border-dashed border-stone-300" />
-                <div className="flex justify-between"><span>Produk A</span><span>Rp 50.000</span></div>
+                <div className="flex justify-between">
+                  <span>Produk A</span>
+                  <span>Rp 50.000</span>
+                </div>
                 <div className="my-1 border-t border-dashed border-stone-300" />
-                <div className="flex justify-between font-bold"><span>TOTAL</span><span>Rp 50.000</span></div>
+                <div className="flex justify-between font-bold">
+                  <span>TOTAL</span>
+                  <span>Rp 50.000</span>
+                </div>
                 <div className="my-1 border-t border-dashed border-stone-300" />
-                <div className="text-center text-[10px]">{receiptSettings.footerText || 'Footer teks...'}</div>
+                <div className="text-center text-[10px]">
+                  {receiptSettings.footerText || 'Footer teks...'}
+                </div>
               </div>
             </div>
           </section>
@@ -555,8 +710,15 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         <div className="space-y-5">
           <section className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
             <SectionHead icon={CreditCard} label="Metode Pembayaran" />
-            <p className="text-xs text-[var(--text-3)]">Aktifkan metode pembayaran yang tersedia di kasir.</p>
-            {(Object.entries(paymentMethods) as [PaymentMethod, typeof paymentMethods[PaymentMethod]][]).map(([method, cfg]) => (
+            <p className="text-xs text-[var(--text-3)]">
+              Aktifkan metode pembayaran yang tersedia di kasir.
+            </p>
+            {(
+              Object.entries(paymentMethods) as [
+                PaymentMethod,
+                (typeof paymentMethods)[PaymentMethod],
+              ][]
+            ).map(([method, cfg]) => (
               <div
                 key={method}
                 className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-4"
@@ -574,14 +736,20 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                     cfg.enabled ? 'bg-amber-500' : 'bg-stone-300'
                   }`}
                 >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    cfg.enabled ? 'translate-x-5' : 'translate-x-0.5'
-                  }`} />
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      cfg.enabled ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
                 </button>
               </div>
             ))}
           </section>
-          <SaveButton saving={saving} label="Simpan Metode Pembayaran" onClick={savePaymentMethods} />
+          <SaveButton
+            saving={saving}
+            label="Simpan Metode Pembayaran"
+            onClick={savePaymentMethods}
+          />
         </div>
       )}
 
@@ -590,7 +758,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         <div className="space-y-5">
           <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
             <SectionHead icon={Bell} label="Notifikasi" />
-            <p className="text-xs text-[var(--text-3)]">Pengaturan notifikasi stok dan email. Fitur lengkap segera hadir.</p>
+            <p className="text-xs text-[var(--text-3)]">
+              Pengaturan notifikasi stok dan email. Fitur lengkap segera hadir.
+            </p>
 
             {/* Low stock threshold */}
             <div>
@@ -614,7 +784,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
             <div className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-4">
               <div>
                 <p className="text-sm font-semibold text-[var(--text-1)]">Notifikasi Email</p>
-                <p className="text-xs text-[var(--text-3)]">Kirim email saat stok menipis (segera hadir)</p>
+                <p className="text-xs text-[var(--text-3)]">
+                  Kirim email saat stok menipis (segera hadir)
+                </p>
               </div>
               <button
                 type="button"
@@ -622,13 +794,15 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                 aria-checked={emailAlerts}
                 onClick={() => setEmailAlerts(v => !v)}
                 disabled
-                className={`relative h-6 w-11 rounded-full transition-colors opacity-50 cursor-not-allowed ${
+                className={`relative h-6 w-11 cursor-not-allowed rounded-full opacity-50 transition-colors ${
                   emailAlerts ? 'bg-amber-500' : 'bg-stone-300'
                 }`}
               >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  emailAlerts ? 'translate-x-5' : 'translate-x-0.5'
-                }`} />
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    emailAlerts ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
               </button>
             </div>
 
@@ -636,7 +810,11 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
               Fitur notifikasi email sedang dalam pengembangan. Tersedia di plan Pro.
             </div>
           </section>
-          <SaveButton saving={false} label="Simpan Notifikasi" onClick={() => toast.success('Pengaturan notifikasi disimpan')} />
+          <SaveButton
+            saving={false}
+            label="Simpan Notifikasi"
+            onClick={() => toast.success('Pengaturan notifikasi disimpan')}
+          />
         </div>
       )}
 
@@ -648,7 +826,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
 
             {/* API Key */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">API Key</label>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">
+                API Key
+              </label>
               <div className="flex gap-2">
                 <input
                   value={apiKey}
@@ -663,7 +843,11 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-2)] transition-all hover:border-amber-400 hover:text-amber-600 disabled:opacity-40"
                   title="Salin API Key"
                 >
-                  {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
                   {copied ? 'Disalin!' : 'Salin'}
                 </button>
                 <button
@@ -683,17 +867,20 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
 
             {/* Webhook URL */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">Webhook URL</label>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-2)]">
+                Webhook URL
+              </label>
               <input
                 type="url"
                 value={webhookUrl}
-                onChange={e => { setWebhookUrl(e.target.value); setWebhookError('') }}
+                onChange={e => {
+                  setWebhookUrl(e.target.value)
+                  setWebhookError('')
+                }}
                 placeholder="https://your-server.com/webhook/orders"
                 className={inputCls}
               />
-              {webhookError && (
-                <p className="mt-1 text-xs text-red-500">{webhookError}</p>
-              )}
+              {webhookError && <p className="mt-1 text-xs text-red-500">{webhookError}</p>}
               <p className="mt-1 text-xs text-[var(--text-3)]">
                 Kasir akan mengirim POST request ke URL ini setiap kali ada order baru.
               </p>
@@ -720,14 +907,21 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
             <SectionHead icon={Crown} label="Paket Langganan" />
 
             {/* Current plan badge */}
-            <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-bold ${planInfo.bg} ${planInfo.color}`}>
+            <div
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-bold ${planInfo.bg} ${planInfo.color}`}
+            >
               <Crown className="h-4 w-4" />
               Paket {planInfo.label}
             </div>
 
             {/* Plan cards */}
             <div className="grid gap-3 sm:grid-cols-3">
-              {(Object.entries(PLAN_FEATURES) as [keyof typeof PLAN_FEATURES, typeof PLAN_FEATURES[keyof typeof PLAN_FEATURES]][]).map(([key, info]) => (
+              {(
+                Object.entries(PLAN_FEATURES) as [
+                  keyof typeof PLAN_FEATURES,
+                  (typeof PLAN_FEATURES)[keyof typeof PLAN_FEATURES],
+                ][]
+              ).map(([key, info]) => (
                 <div
                   key={key}
                   className={`rounded-xl border p-4 ${
@@ -739,7 +933,10 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   <div className={`mb-2 text-sm font-bold ${info.color}`}>{info.label}</div>
                   <ul className="space-y-1">
                     {info.features.map(f => (
-                      <li key={f} className="flex items-center gap-1.5 text-xs text-[var(--text-2)]">
+                      <li
+                        key={f}
+                        className="flex items-center gap-1.5 text-xs text-[var(--text-2)]"
+                      >
                         <CheckCircle2 className="h-3 w-3 shrink-0 text-amber-500" />
                         {f}
                       </li>
@@ -765,7 +962,9 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
 
             <p className="text-xs text-[var(--text-3)]">
               Untuk upgrade atau pertanyaan langganan, hubungi{' '}
-              <a href="mailto:sales@kasir.app" className="text-amber-600 underline">sales@kasir.app</a>
+              <a href="mailto:sales@kasir.app" className="text-amber-600 underline">
+                sales@kasir.app
+              </a>
             </p>
           </section>
         </div>

@@ -245,3 +245,51 @@ self.addEventListener('message', (event) => {
     })
   }
 })
+
+// ── Push notifications ────────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  let data = { title: 'Notifikasi Baru', body: '', icon: '/icons/icon-192.png', tag: 'default' }
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json()
+      data = { ...data, ...parsed }
+    } catch {
+      data.body = event.data.text()
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon ?? '/icons/icon-192.png',
+      badge: '/icons/icon-72.png',
+      tag: data.tag ?? 'kasir-notification',
+      data: data,
+      vibrate: [200, 100, 200],
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+
+  const url = event.notification.data?.url ?? '/dashboard/notifications'
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // Focus existing tab if open
+      for (const client of clients) {
+        if (client.url.includes('/dashboard') && 'focus' in client) {
+          client.focus()
+          client.navigate(url)
+          return
+        }
+      }
+      // Otherwise open a new tab
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url)
+      }
+    })
+  )
+})
