@@ -176,7 +176,21 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
               params: [newId(), oid, pay.method, Number(pay.amount), pay.reference||null, Number(pay.change)||0, t] })
           }
           await batchExec(stmts)
-          return ok({ id: oid, number, status: 'PAID' }, 201)
+          // Return full order with items and payments for receipt display
+          const orderItems = await query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid])
+          const orderPayments = await query(`SELECT * FROM Payment WHERE orderId = ?`, [oid])
+          return ok({
+            id: oid,
+            number,
+            status: 'PAID',
+            createdAt: t,
+            subtotal: Number(b.subtotal) || 0,
+            taxAmt: Number(b.taxAmt) || 0,
+            discountAmt: Number(b.discountAmt) || 0,
+            total: Number(b.total) || 0,
+            items: orderItems,
+            payments: orderPayments,
+          }, 201)
         }
       }
       if (segs.length === 3 && segs[2] === 'void' && method === 'POST') {

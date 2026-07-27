@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { query } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 import POSPageClient from '@/components/pos/POSPageClient'
 
 export default async function POSPage() {
@@ -12,6 +12,13 @@ export default async function POSPage() {
   const storeId = store?.id ?? ''
   const taxRate = store?.taxRate ?? 0
   const currency = store?.currency ?? 'IDR'
+  const storeName = store?.name ?? 'Store'
+
+  // Fetch store settings for receiptNote (not stored in session JWT)
+  const storeSettings = storeId
+    ? await queryOne(`SELECT receiptNote FROM Store WHERE id = ?`, [storeId])
+    : null
+  const receiptNote: string | null = (storeSettings as any)?.receiptNote ?? null
 
   // Pre-fetch products and categories server-side
   const [products, categories] = await Promise.all([
@@ -49,11 +56,13 @@ export default async function POSPage() {
   return (
     <POSPageClient
       storeId={storeId}
+      storeName={storeName}
       taxRate={taxRate}
       currency={currency}
       staffId={user.id}
       initialProducts={shaped}
       categories={categories as any}
+      receiptNote={receiptNote}
     />
   )
 }
