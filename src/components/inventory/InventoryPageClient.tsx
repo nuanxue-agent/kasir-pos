@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatCurrency, cn } from '@/lib/utils'
 import {
   Search,
@@ -10,20 +10,13 @@ import {
   History,
   Upload,
   X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import StockAdjustModal from './StockAdjustModal'
 import StockLogsModal from './StockLogsModal'
 import { toast } from '@/components/ui/Toaster'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 interface Product {
   id: string
@@ -35,32 +28,166 @@ interface Product {
   category?: { id: string; name: string } | null
 }
 
+interface StockHistoryDay {
+  date: string
+  in: number
+  out: number
+}
+
 interface InventoryPageClientProps {
   storeId: string
 }
 
 type FilterMode = 'all' | 'low' | 'out'
 
-// Generate mock 30-day stock history for chart preview
-function generateMockHistory(products: Product[]) {
-  const today = new Date()
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() - (29 - i))
-    const label = `${d.getMonth() + 1}/${d.getDate()}`
-    const entry: Record<string, number | string> = { date: label }
-    // Show top-3 products by stock fluctuation
-    products.slice(0, 3).forEach(p => {
-      entry[p.name.slice(0, 12)] = Math.max(
-        0,
-        p.stock + Math.round((Math.random() - 0.5) * 10 * (i / 30))
-      )
-    })
-    return entry
-  })
+// ── Date helpers ─────────────────────────────────────────────────────────────
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10).replace(/-/g, '')
 }
 
-const CHART_COLORS = ['#f59e0b', '#3b82f6', '#10b981']
+function getLowStockDismissedKey(): string {
+  return `low-stock-dismissed-${todayKey()}`
+}
+
+// ── Low Stock Alert Banner ───────────────────────────────────────────────────
+
+interface LowStockBannerProps {
+  lowStockProducts: Product[]
+  onDismiss: () => void
+  onAdjust: (product: Product) => void
+}
+
+function LowStockBanner({ lowStockProducts, onDismiss, onAdjust }: LowStockBannerProps) {
+  if (lowStockProducts.length === 0) return null
+  return (
+    <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+          <h2 className="text-sm font-semibold text-amber-800">
+            Low Stock Alerts — {lowStockProducts.length} produk perlu perhatian
+          </h2>
+        </div>
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss low stock alerts"
+          className="shrink-0 p-1 text-amber-500 transition-colors hover:text-amber-700"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <ul className="flex flex-wrap gap-2">
+        {lowStockProducts.map(p => (
+          <li
+            key={p.id}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs"
+          >
+            <span className="font-medium text-amber-900">{p.name}</span>
+            <span className="text-amber-600">({p.stock} sisa)</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => onAdjust(lowStockProducts[0])}
+          className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+        >
+          Atur Ulang Stok
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Per-row Stock History Mini-chart ─────────────────────────────────────────
+
+interface StockHistoryRowProps {
+  productId: string
+}
+
+function StockHistoryRow({ productId }: StockHistoryRowProps) {
+  const [data, setData] = useState<StockHistoryDay[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch(`/api/inventory/${productId}/history?days=30`)
+      .then(r => r.json())
+      .then((d: unknown) => {
+        if (!cancelled) {
+          setData(d as StockHistoryDay[])
+          setLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [productId])
+
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={7} className="px-6 pb-3 text-xs text-[var(--text-3)]">
+          Loading history…
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <tr>
+      <td colSpan={7} className="px-4 pt-0 pb-3">
+        <div className="rounded-lg bg-[var(--bg-subtle)] px-3 py-2">
+          <p className="mb-1 text-xs font-medium text-[var(--text-3)]">
+            Stock history — last 30 days
+          </p>
+          <ResponsiveContainer width="100%" height={80}>
+            <BarChart
+              data={data}
+              margin={{ top: 2, right: 8, left: -24, bottom: 0 }}
+              barCategoryGap="20%"
+            >
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 9, fill: '#9ca3af' }}
+                tickLine={false}
+                axisLine={false}
+                interval={6}
+                tickFormatter={(v: string) => v.slice(5)}
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: '#9ca3af' }}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 11 }}
+                labelFormatter={l => `Date: ${l}`}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={7}
+                wrapperStyle={{ fontSize: 10, paddingTop: 2 }}
+              />
+              <Bar dataKey="in" fill="#10b981" name="In" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="out" fill="#f59e0b" name="Out" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function InventoryPageClient({ storeId }: InventoryPageClientProps) {
   const [products, setProducts] = useState<Product[]>([])
@@ -72,9 +199,13 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [showAdjustModal, setShowAdjustModal] = useState(false)
   const [showLogsModal, setShowLogsModal] = useState(false)
-  const [showChart, setShowChart] = useState(false)
   const [csvImporting, setCsvImporting] = useState(false)
   const [csvResult, setCsvResult] = useState<{ success: number; errors: string[] } | null>(null)
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [alertDismissed, setAlertDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(getLowStockDismissedKey()) === '1'
+  })
   const csvInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -94,7 +225,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       if (filter === 'low') params.set('lowStockOnly', 'true')
 
       const res = await fetch(`/api/inventory?${params}`)
-      const data = await res.json() as { products?: Product[]; total?: number }
+      const data = (await res.json()) as { products?: Product[]; total?: number }
 
       let filtered: Product[] = data.products || []
 
@@ -113,7 +244,8 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
   const getStockStatus = (product: Product) => {
     if (product.stock === 0) return { label: 'OUT', color: 'bg-red-500/20 text-red-400' }
-    if (product.stock <= product.lowStock) return { label: 'LOW', color: 'bg-orange-500/20 text-orange-400' }
+    if (product.stock <= product.lowStock)
+      return { label: 'LOW', color: 'bg-orange-500/20 text-orange-400' }
     return { label: 'OK', color: 'bg-green-500/20 text-green-400' }
   }
 
@@ -133,6 +265,15 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
     fetchProducts()
   }
 
+  const handleDismissAlert = useCallback(() => {
+    localStorage.setItem(getLowStockDismissedKey(), '1')
+    setAlertDismissed(true)
+  }, [])
+
+  const toggleRow = (productId: string) => {
+    setExpandedRow(prev => (prev === productId ? null : productId))
+  }
+
   // ── CSV Import ──────────────────────────────────────────────────────────────
   const handleCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -142,14 +283,17 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
     try {
       const text = await file.text()
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+      const lines = text
+        .split('\n')
+        .map(l => l.trim())
+        .filter(Boolean)
       if (lines.length < 2) throw new Error('CSV must have header + at least one row')
 
       const header = lines[0].split(',').map(h => h.trim().toLowerCase())
-      const nameIdx   = header.indexOf('name')
-      const skuIdx    = header.indexOf('sku')
-      const stockIdx  = header.indexOf('stock')
-      const lowIdx    = header.indexOf('lowstock')
+      const nameIdx = header.indexOf('name')
+      const skuIdx = header.indexOf('sku')
+      const stockIdx = header.indexOf('stock')
+      const lowIdx = header.indexOf('lowstock')
 
       if (nameIdx === -1 || stockIdx === -1) {
         throw new Error('CSV must contain "name" and "stock" columns')
@@ -160,10 +304,10 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.trim())
-        const name      = cols[nameIdx] ?? ''
-        const sku       = skuIdx !== -1 ? cols[skuIdx] : undefined
-        const stock     = parseInt(cols[stockIdx] ?? '', 10)
-        const lowStock  = lowIdx !== -1 ? parseInt(cols[lowIdx] ?? '', 10) : undefined
+        const name = cols[nameIdx] ?? ''
+        const sku = skuIdx !== -1 ? cols[skuIdx] : undefined
+        const stock = parseInt(cols[stockIdx] ?? '', 10)
+        const lowStock = lowIdx !== -1 ? parseInt(cols[lowIdx] ?? '', 10) : undefined
 
         if (!name || isNaN(stock)) {
           errors.push(`Row ${i + 1}: invalid name or stock`)
@@ -194,32 +338,27 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
   }
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= p.lowStock)
-  const outOfStockProducts = products.filter(p => p.stock === 0)
-  const alertProducts = [...outOfStockProducts, ...lowStockProducts]
-
-  const chartData = showChart ? generateMockHistory(products) : []
-  const chartKeys = products.slice(0, 3).map(p => p.name.slice(0, 12))
+  const lowStockProducts = products.filter(p => p.stock <= p.lowStock)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-1)] flex items-center gap-2">
-            <Boxes className="w-7 h-7" />
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-[var(--text-1)]">
+            <Boxes className="h-7 w-7" />
             Inventory Management
           </h1>
-          <p className="text-[var(--text-3)] text-sm mt-1">Track and manage product stock levels</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Track and manage product stock levels</p>
         </div>
         <div className="flex items-center gap-2">
           {/* CSV Import button */}
           <button
             onClick={() => csvInputRef.current?.click()}
             disabled={csvImporting}
-            className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-2)] text-sm rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-[var(--bg-muted)] px-3 py-2 text-sm text-[var(--text-2)] transition-colors hover:bg-stone-200 disabled:opacity-50"
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="h-4 w-4" />
             {csvImporting ? 'Importing…' : 'Import CSV'}
           </button>
           <input
@@ -229,168 +368,101 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
             className="hidden"
             onChange={handleCsvFile}
           />
-          {/* Toggle chart */}
-          <button
-            onClick={() => setShowChart(v => !v)}
-            className={cn(
-              'flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors',
-              showChart
-                ? 'bg-amber-500 text-white'
-                : 'bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-2)]'
-            )}
-          >
-            <TrendingUp className="w-4 h-4" />
-            Stock Chart
-          </button>
         </div>
       </div>
 
       {/* CSV import result */}
       {csvResult && (
-        <div className={cn(
-          'flex items-start gap-3 p-4 rounded-xl border text-sm',
-          csvResult.errors.length === 0
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-            : 'bg-amber-50 border-amber-200 text-amber-700'
-        )}>
+        <div
+          className={cn(
+            'flex items-start gap-3 rounded-xl border p-4 text-sm',
+            csvResult.errors.length === 0
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-amber-200 bg-amber-50 text-amber-700',
+          )}
+        >
           <div className="flex-1">
             <p className="font-semibold">{csvResult.success} row(s) imported successfully.</p>
             {csvResult.errors.length > 0 && (
-              <ul className="mt-1 list-disc list-inside text-xs space-y-0.5">
-                {csvResult.errors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
+              <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs">
+                {csvResult.errors.slice(0, 5).map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
                 {csvResult.errors.length > 5 && <li>…and {csvResult.errors.length - 5} more</li>}
               </ul>
             )}
           </div>
           <button onClick={() => setCsvResult(null)} className="shrink-0 p-0.5 hover:opacity-70">
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* ── Low Stock Alerts ─────────────────────────────────────────────────── */}
-      {alertProducts.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-orange-500" />
-            <h2 className="font-semibold text-orange-700 text-sm">
-              Low Stock Alerts ({alertProducts.length})
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {alertProducts.map(p => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between bg-[var(--bg-card)] border border-orange-100 rounded-lg px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-1)] truncate">{p.name}</p>
-                  {p.sku && <p className="text-xs text-[var(--text-3)]">{p.sku}</p>}
-                </div>
-                <div className="ml-3 shrink-0 text-right">
-                  <span className={cn(
-                    'text-xs font-bold px-2 py-0.5 rounded-full',
-                    p.stock === 0
-                      ? 'bg-red-100 text-red-600'
-                      : 'bg-orange-100 text-orange-600'
-                  )}>
-                    {p.stock === 0 ? 'OUT' : `${p.stock} left`}
-                  </span>
-                  <p className="text-xs text-[var(--text-3)] mt-0.5">min {p.lowStock}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Stock History Chart ──────────────────────────────────────────────── */}
-      {showChart && products.length > 0 && (
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-[var(--text-1)] mb-4">Stock History — Last 30 Days (top 3 products)</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 10, fill: '#9ca3af' }}
-                interval={4}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: '#9ca3af' }}
-                tickLine={false}
-                axisLine={false}
-                width={32}
-              />
-              <Tooltip
-                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-              />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-              {chartKeys.map((key, i) => (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      {/* ── Low Stock Alerts Banner ──────────────────────────────────────────── */}
+      {!alertDismissed && lowStockProducts.length > 0 && (
+        <LowStockBanner
+          lowStockProducts={lowStockProducts}
+          onDismiss={handleDismissAlert}
+          onAdjust={handleAdjustStock}
+        />
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-2)]" />
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-[var(--text-2)]" />
           <input
             type="text"
             placeholder="Search by name or SKU..."
             value={search}
-            onChange={(e) => {
+            onChange={e => {
               setSearch(e.target.value)
               setPage(1)
             }}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] py-2 pr-4 pl-10 text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:ring-2 focus:ring-amber-400 focus:outline-none"
           />
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={() => { setFilter('all'); setPage(1) }}
+            onClick={() => {
+              setFilter('all')
+              setPage(1)
+            }}
             className={cn(
-              'px-4 py-2 rounded-lg font-medium transition-colors',
+              'rounded-lg px-4 py-2 font-medium transition-colors',
               filter === 'all'
                 ? 'bg-amber-500 text-white'
-                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700'
+                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700',
             )}
           >
             All
           </button>
           <button
-            onClick={() => { setFilter('low'); setPage(1) }}
+            onClick={() => {
+              setFilter('low')
+              setPage(1)
+            }}
             className={cn(
-              'px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2',
+              'flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors',
               filter === 'low'
                 ? 'bg-orange-600 text-white'
-                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700'
+                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700',
             )}
           >
-            <AlertTriangle className="w-4 h-4" />
+            <AlertTriangle className="h-4 w-4" />
             Low Stock
           </button>
           <button
-            onClick={() => { setFilter('out'); setPage(1) }}
+            onClick={() => {
+              setFilter('out')
+              setPage(1)
+            }}
             className={cn(
-              'px-4 py-2 rounded-lg font-medium transition-colors',
+              'rounded-lg px-4 py-2 font-medium transition-colors',
               filter === 'out'
                 ? 'bg-red-600 text-white'
-                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700'
+                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700',
             )}
           >
             Out of Stock
@@ -399,83 +471,118 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-muted)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-[var(--bg-subtle)] border-b border-[var(--border)]">
-                <th className="text-left px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Product</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-[var(--text-3)]">SKU</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Category</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Current Stock</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Low Stock Alert</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Status</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Actions</th>
+              <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)]">
+                <th className="w-6 px-4 py-3 text-left text-sm font-semibold text-[var(--text-3)]"></th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-3)]">
+                  Product
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-3)]">
+                  SKU
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-3)]">
+                  Category
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-semibold text-[var(--text-3)]">
+                  Current Stock
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-semibold text-[var(--text-3)]">
+                  Low Stock Alert
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-semibold text-[var(--text-3)]">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-[var(--text-3)]">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[var(--text-2)]">
+                  <td colSpan={8} className="px-4 py-12 text-center text-[var(--text-2)]">
                     Loading...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[var(--text-2)]">
+                  <td colSpan={8} className="px-4 py-12 text-center text-[var(--text-2)]">
                     No products found
                   </td>
                 </tr>
               ) : (
-                products.map((product) => {
+                products.map(product => {
                   const status = getStockStatus(product)
+                  const isExpanded = expandedRow === product.id
                   return (
-                    <tr key={product.id} className="border-b border-[var(--border)] hover:bg-stone-700/50">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-[var(--text-1)]">{product.name}</div>
-                        <div className="text-sm text-[var(--text-3)]">{formatCurrency(product.price)}</div>
-                      </td>
-                      <td className="px-4 py-3 text-stone-300 text-sm">
-                        {product.sku || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-stone-300 text-sm">
-                        {product.category?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-lg font-semibold text-[var(--text-1)]">
-                          {product.stock}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-[var(--text-3)]">
-                        {product.lowStock}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cn(
-                          'inline-flex px-2 py-1 rounded-full text-xs font-medium',
-                          status.color
-                        )}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleAdjustStock(product)}
-                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
+                    <>
+                      <tr
+                        key={product.id}
+                        className="cursor-pointer border-b border-[var(--border)] hover:bg-stone-700/50"
+                        onClick={() => toggleRow(product.id)}
+                      >
+                        {/* Expand toggle */}
+                        <td className="py-3 pr-0 pl-4 text-[var(--text-3)]">
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-[var(--text-1)]">{product.name}</div>
+                          <div className="text-sm text-[var(--text-3)]">
+                            {formatCurrency(product.price)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-stone-300">{product.sku || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-stone-300">
+                          {product.category?.name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-lg font-semibold text-[var(--text-1)]">
+                            {product.stock}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-[var(--text-3)]">
+                          {product.lowStock}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-1 text-xs font-medium',
+                              status.color,
+                            )}
                           >
-                            <TrendingUp className="w-4 h-4" />
-                            Adjust
-                          </button>
-                          <button
-                            onClick={() => handleViewLogs(product)}
-                            className="px-3 py-1.5 bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-1)] text-sm rounded-lg transition-colors flex items-center gap-1.5"
-                          >
-                            <History className="w-4 h-4" />
-                            Logs
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleAdjustStock(product)}
+                              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-amber-600"
+                            >
+                              <TrendingUp className="h-4 w-4" />
+                              Adjust
+                            </button>
+                            <button
+                              onClick={() => handleViewLogs(product)}
+                              className="flex items-center gap-1.5 rounded-lg bg-[var(--bg-muted)] px-3 py-1.5 text-sm text-[var(--text-1)] transition-colors hover:bg-stone-200"
+                            >
+                              <History className="h-4 w-4" />
+                              Logs
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <StockHistoryRow key={`hist-${product.id}`} productId={product.id} />
+                      )}
+                    </>
                   )
                 })
               )}
@@ -485,7 +592,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
         {/* Pagination */}
         {!loading && products.length > 0 && (
-          <div className="px-4 py-3 bg-[var(--bg-subtle)] border-t border-[var(--border)] flex items-center justify-between">
+          <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3">
             <div className="text-sm text-[var(--text-3)]">
               Showing {products.length} of {total} products
             </div>
@@ -503,10 +610,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       )}
 
       {showLogsModal && selectedProduct && (
-        <StockLogsModal
-          product={selectedProduct}
-          onClose={() => setShowLogsModal(false)}
-        />
+        <StockLogsModal product={selectedProduct} onClose={() => setShowLogsModal(false)} />
       )}
     </div>
   )

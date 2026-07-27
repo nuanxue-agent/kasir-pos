@@ -74,6 +74,7 @@ interface CartItem {
   qty: number
   subtotal: number
   bundleId?: string
+  image?: string | null
 }
 
 interface Customer {
@@ -144,6 +145,7 @@ export default function POSPageClient({
   const [products] = useState<Product[]>(initialProducts)
   const [bundles] = useState<Bundle[]>(initialBundles)
   const [search, setSearch] = useState('')
+  const [recentProducts, setRecentProducts] = useState<Product[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [cart, setCart] = useState<CartItem[]>([])
@@ -274,6 +276,16 @@ export default function POSPageClient({
     return () => window.removeEventListener('keydown', onShortcut)
   }, [cart.length, showBarcodeScanner, showCheckout, showCustomerSearch, showHeldOrders])
 
+  // ── Fetch recently sold products ──────────────────────────────────────────
+  useEffect(() => {
+    fetch(`/api/products/recent?storeId=${storeId}&limit=5`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((data: unknown) => {
+        if (Array.isArray(data)) setRecentProducts(data as Product[])
+      })
+      .catch(() => {})
+  }, [storeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Hold / Recall helpers ─────────────────────────────────────────────────
   const saveHeldOrders = (orders: HeldOrder[]) => {
     setHeldOrders(orders)
@@ -371,6 +383,7 @@ export default function POSPageClient({
           price: product.price,
           qty: 1,
           subtotal: product.price,
+          image: product.image ?? null,
         },
       ]
     })
@@ -593,6 +606,47 @@ export default function POSPageClient({
           ))}
         </div>
 
+        {/* Recently sold */}
+        {recentProducts.length > 0 && !search && !selectedCategory && (
+          <div className="border-b border-[var(--border)] px-4 py-2.5">
+            <p className="mb-2 text-[10px] font-semibold tracking-wider text-[var(--text-3)] uppercase">
+              Terjual hari ini
+            </p>
+            <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+              {recentProducts.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => addToCart(p)}
+                  disabled={p.trackStock && p.stock <= 0}
+                  className={cn(
+                    'flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
+                    p.trackStock && p.stock <= 0
+                      ? 'cursor-not-allowed border-[var(--border)] opacity-40'
+                      : 'border-[var(--border)] bg-[var(--bg-subtle)] hover:border-amber-400/60 hover:bg-amber-500/10',
+                  )}
+                >
+                  {p.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.image}
+                      alt={p.name}
+                      className="h-6 w-6 shrink-0 rounded object-cover"
+                      onError={e => {
+                        ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <span className="text-base">{p.category?.icon ?? '📦'}</span>
+                  )}
+                  <span className="max-w-[96px] truncate text-xs font-medium text-[var(--text-1)]">
+                    {p.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Products */}
         <div className="flex-1 overflow-y-auto p-4">
           {filtered.length === 0 && filteredBundles.length === 0 ? (
@@ -746,13 +800,30 @@ export default function POSPageClient({
               {cart.map(item => (
                 <div key={item.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--text-1)]">
-                        {item.name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[var(--text-3)]">
-                        {fmt(item.price, currency)} / pcs
-                      </p>
+                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                      {item.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="mt-0.5 h-8 w-8 shrink-0 rounded-md object-cover"
+                          onError={e => {
+                            ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--bg-muted)] text-sm">
+                          📦
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[var(--text-1)]">
+                          {item.name}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--text-3)]">
+                          {fmt(item.price, currency)} / pcs
+                        </p>
+                      </div>
                     </div>
                     <button
                       onClick={() => removeItem(item.id)}
@@ -1426,14 +1497,13 @@ function CheckoutModal({
   const change = Math.max(0, totalPaid - total)
   const hasCash = payments.some(p => p.method === 'CASH')
 
-  const quickAmounts = (lineTotal: number) =>
-    [
-      Math.ceil(lineTotal / 10000) * 10000,
-      Math.ceil(lineTotal / 50000) * 50000,
-      Math.ceil(lineTotal / 100000) * 100000,
-    ]
-      .filter((v, i, a) => a.indexOf(v) === i && v >= lineTotal)
-      .slice(0, 3)
+  const quickAmounts = (lineTotal: number) => {
+    const exact = lineTotal
+    const r10 = Math.ceil(lineTotal / 10000) * 10000
+    const r50 = Math.ceil(lineTotal / 50000) * 50000
+    const r100 = Math.ceil(lineTotal / 100000) * 100000
+    return [exact, r10, r50, r100].filter((v, i, a) => a.indexOf(v) === i)
+  }
 
   const updateLine = (idx: number, field: keyof PaymentLine, value: string) => {
     setPayments(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)))
@@ -1616,14 +1686,18 @@ function CheckoutModal({
 
                 {/* Quick amounts for single-line cash */}
                 {line.method === 'CASH' && payments.length === 1 && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     {quickAmounts(total).map(a => (
                       <button
                         key={a}
                         onClick={() => updateLine(idx, 'amount', String(a))}
-                        className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-1 text-[10px] text-[var(--text-2)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)]"
+                        className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-1.5 text-[10px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)]"
                       >
-                        {fmt(a, currency)}
+                        {a === total ? (
+                          <span className="text-emerald-600">Pas</span>
+                        ) : (
+                          fmt(a, currency)
+                        )}
                       </button>
                     ))}
                   </div>
