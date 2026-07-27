@@ -258,6 +258,81 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
         />
       </div>
 
+      {/* ── Today's Performance summary bar ── */}
+      {!isLoading && (
+        <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-stone-100">
+            <p className="text-xs font-semibold text-stone-400 uppercase tracking-widest">Performa Hari Ini</p>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-stone-100">
+            {/* Revenue vs yesterday */}
+            {(() => {
+              const today = stats.totalRevenue ?? 0
+              const yest = yStats.totalRevenue ?? 0
+              const pct = yest > 0 ? ((today - yest) / yest) * 100 : undefined
+              const up = pct !== undefined && pct >= 0
+              return (
+                <div className="px-4 py-3 flex flex-col gap-1">
+                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest truncate">Omzet</p>
+                  <p className="text-sm sm:text-base font-bold text-stone-800 truncate">{formatCurrency(today, currency)}</p>
+                  {pct !== undefined ? (
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {Math.abs(pct).toFixed(1)}% vs kemarin
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-stone-300 flex items-center gap-0.5"><Minus className="h-3 w-3" /> belum ada data kemarin</span>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Orders vs yesterday */}
+            {(() => {
+              const today = stats.totalOrders ?? 0
+              const yest = yStats.totalOrders ?? 0
+              const pct = yest > 0 ? ((today - yest) / yest) * 100 : undefined
+              const up = pct !== undefined && pct >= 0
+              return (
+                <div className="px-4 py-3 flex flex-col gap-1">
+                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest truncate">Pesanan</p>
+                  <p className="text-sm sm:text-base font-bold text-stone-800">{today}</p>
+                  {pct !== undefined ? (
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {Math.abs(pct).toFixed(1)}% vs kemarin
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-stone-300 flex items-center gap-0.5"><Minus className="h-3 w-3" /> belum ada data kemarin</span>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Top selling product */}
+            {(() => {
+              const top = (topProducts as any[])[0]
+              return (
+                <div className="px-4 py-3 flex flex-col gap-1">
+                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest truncate">Produk Terlaris</p>
+                  {top ? (
+                    <>
+                      <p className="text-sm font-bold text-stone-800 truncate">{top.name}</p>
+                      <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        {top.qty ?? 0}x terjual
+                      </span>
+                    </>
+                  ) : (
+                    <p className="text-sm text-stone-300">—</p>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* ── 7-day revenue sparkline card ── */}
       {sparkRevenue.length > 1 && (
         <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">

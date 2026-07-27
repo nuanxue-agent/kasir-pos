@@ -114,7 +114,7 @@ export default function PembayaranModal({
         })),
         subtotal: subtotal(),
         taxAmt: taxAmt(taxRate),
-        discountAmt: discountAmt(),
+        discountAmt: discountAmt,
         total: orderTotal,
         paid: method === 'CASH' ? cashAmount : undefined,
         change: method === 'CASH' ? change : undefined,
