@@ -112,7 +112,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
           placeholder="Search by name, phone, or email..."
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
         />
       </div>
 

@@ -274,7 +274,7 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
         {error && <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors">
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors">
             Cancel
           </button>
           <button

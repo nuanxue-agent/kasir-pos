@@ -192,7 +192,7 @@ export default function ProductFormModal({
                 type="text"
                 {...register('name')}
                 className={cn(
-                  'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
+                  'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400',
                   errors.name ? 'border-red-300' : 'border-stone-200'
                 )}
                 placeholder="e.g. Blue T-Shirt"
@@ -209,7 +209,7 @@ export default function ProductFormModal({
                 id="description"
                 {...register('description')}
                 rows={3}
-                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                 placeholder="Optional product description"
               />
             </div>
@@ -224,7 +224,7 @@ export default function ProductFormModal({
                   id="sku"
                   type="text"
                   {...register('sku')}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                   placeholder="e.g. TSHIRT-BLU-M"
                 />
               </div>
@@ -236,7 +236,7 @@ export default function ProductFormModal({
                   id="barcode"
                   type="text"
                   {...register('barcode')}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                   placeholder="e.g. 1234567890123"
                 />
               </div>
@@ -254,7 +254,7 @@ export default function ProductFormModal({
                   step="0.01"
                   {...register('price', { valueAsNumber: true })}
                   className={cn(
-                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
+                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400',
                     errors.price ? 'border-red-300' : 'border-stone-200'
                   )}
                   placeholder="0"
@@ -271,7 +271,7 @@ export default function ProductFormModal({
                   step="0.01"
                   {...register('cost', { valueAsNumber: true })}
                   className={cn(
-                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
+                    'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400',
                     errors.cost ? 'border-red-300' : 'border-stone-200'
                   )}
                   placeholder="0"
@@ -288,7 +288,7 @@ export default function ProductFormModal({
               <select
                 id="categoryId"
                 {...register('categoryId')}
-                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent appearance-none bg-white"
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 appearance-none bg-white"
               >
                 <option value="">Tanpa Kategori</option>
                 {categories.map((cat) => (
@@ -324,7 +324,7 @@ export default function ProductFormModal({
                     type="number"
                     {...register('stock', { valueAsNumber: true })}
                     className={cn(
-                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
+                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400',
                       errors.stock ? 'border-red-300' : 'border-stone-200'
                     )}
                     placeholder="0"
@@ -340,7 +340,7 @@ export default function ProductFormModal({
                     type="number"
                     {...register('lowStock', { valueAsNumber: true })}
                     className={cn(
-                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent',
+                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400',
                       errors.lowStock ? 'border-red-300' : 'border-stone-200'
                     )}
                     placeholder="5"

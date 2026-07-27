@@ -103,7 +103,7 @@ export default function ProductsPageClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-stone-800">Produk</h1>
+          <h1 className="text-2xl font-bold text-stone-800">Produk</h1>
           <p className="text-sm text-stone-500 mt-0.5">
             Manage your product catalog
           </p>
@@ -121,7 +121,7 @@ export default function ProductsPageClient({
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="flex-1 relative">
@@ -131,7 +131,7 @@ export default function ProductsPageClient({
               placeholder="Search by name or SKU..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
             />
           </div>
 
@@ -141,7 +141,7 @@ export default function ProductsPageClient({
             <select
               value={selectedCategory ?? ''}
               onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent appearance-none bg-white"
+              className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 appearance-none bg-white"
             >
               <option value="">Semua Kategori</option>
               {categories.map((cat) => (
@@ -155,7 +155,7 @@ export default function ProductsPageClient({
       </div>
 
       {/* Products table */}
-      <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
         {filteredProducts.length === 0 ? (
           <div className="py-12 text-center">
             <Package className="h-12 w-12 text-stone-300 mx-auto mb-3" />

@@ -167,7 +167,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       </div>
 
       {/* Table */}
-      <div className="bg-stone-100 rounded-lg border border-stone-200 overflow-hidden">
+      <div className="bg-stone-100 rounded-xl border border-stone-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

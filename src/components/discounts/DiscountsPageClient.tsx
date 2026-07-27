@@ -217,7 +217,7 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-700 text-sm transition-colors">Cancel</button>
           <button onClick={submit} disabled={loading || !form.name}
             className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-500 disabled:bg-stone-200 text-white text-sm font-medium transition-colors">
             {loading ? 'Saving...' : 'Save'}

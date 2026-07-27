@@ -153,13 +153,13 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
       <div className="flex items-center gap-3">
         <Receipt className="h-6 w-6 text-indigo-500" />
         <div>
-          <h1 className="text-2xl font-semibold text-stone-800">Pesanan</h1>
+          <h1 className="text-2xl font-bold text-stone-800">Pesanan</h1>
           <p className="text-sm text-stone-500">Browse and manage all transactions</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 space-y-4">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 space-y-4">
         {/* Status tabs */}
         <div className="flex flex-wrap gap-2">
           {STATUS_TABS.map((tab) => (
@@ -187,7 +187,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
               placeholder="Search order number…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-lg border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
             />
           </div>
 
@@ -198,7 +198,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
               type="date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
-              className="pl-9 pr-3 py-2 rounded-lg border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              className="pl-9 pr-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
             />
           </div>
 
@@ -209,7 +209,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
               type="date"
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
-              className="pl-9 pr-3 py-2 rounded-lg border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+              className="pl-9 pr-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40"
             />
           </div>
 
@@ -223,7 +223,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
                 setStatusFilter('ALL')
                 setPage(1)
               }}
-              className="px-3 py-2 rounded-lg border border-stone-200 text-sm text-stone-500 hover:bg-stone-50"
+              className="px-3 py-2 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50"
             >
               Clear
             </button>
@@ -232,7 +232,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
         {isLoading ? (
           <TableSkeleton />
         ) : isError ? (
@@ -315,14 +315,14 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 disabled:opacity-40 hover:bg-stone-50"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-200 disabled:opacity-40 hover:bg-stone-50"
             >
               <ChevronLeft className="h-4 w-4" /> Prev
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 disabled:opacity-40 hover:bg-stone-50"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-200 disabled:opacity-40 hover:bg-stone-50"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>
