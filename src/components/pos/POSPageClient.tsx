@@ -291,7 +291,7 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
                         className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-white transition-colors">
                         <Minus className="h-3 w-3" />
                       </button>
-                      <span className="w-8 text-center text-sm font-medium text-white">{item.qty}</span>
+                      <span className="w-8 text-center text-sm font-medium text-stone-700">{item.qty}</span>
                       <button onClick={() => updateQty(item.id, item.qty + 1)}
                         className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-white transition-colors">
                         <Plus className="h-3 w-3" />

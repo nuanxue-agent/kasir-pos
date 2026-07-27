@@ -118,7 +118,7 @@ export default function ReceiptModal({
             </div>
             <button
               onClick={onClose}
-              className="text-white/30 hover:text-stone-700 transition-colors"
+              className="text-stone-400 hover:text-stone-700 transition-colors"
               aria-label="Close receipt"
             >
               <X className="h-5 w-5" />
