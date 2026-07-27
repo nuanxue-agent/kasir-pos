@@ -99,23 +99,23 @@ export function CustomerFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-2xl">
+      <div className="relative w-full max-w-md bg-white border border-stone-200 rounded-xl shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
           <div className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-indigo-400" />
+            <UserPlus className="h-5 w-5 text-amber-600" />
             <h2 className="text-lg font-semibold text-slate-100">
               {isEdit ? 'Edit Customer' : 'Add Customer'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-stone-500 hover:text-slate-100 hover:bg-stone-100 transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -133,7 +133,7 @@ export function CustomerFormModal({
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            <label className="block text-sm font-medium text-stone-600 mb-1.5">
               Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -141,7 +141,7 @@ export function CustomerFormModal({
               type="text"
               placeholder="Customer name"
               className={cn(
-                'w-full px-3 py-2 bg-slate-800 border rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
                 errors.name ? 'border-red-500' : 'border-slate-600'
               )}
             />
@@ -152,7 +152,7 @@ export function CustomerFormModal({
 
           {/* Phone */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            <label className="block text-sm font-medium text-stone-600 mb-1.5">
               Phone
             </label>
             <input
@@ -160,7 +160,7 @@ export function CustomerFormModal({
               type="tel"
               placeholder="+62 812 3456 7890"
               className={cn(
-                'w-full px-3 py-2 bg-slate-800 border rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
                 errors.phone ? 'border-red-500' : 'border-slate-600'
               )}
             />
@@ -171,7 +171,7 @@ export function CustomerFormModal({
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            <label className="block text-sm font-medium text-stone-600 mb-1.5">
               Email
             </label>
             <input
@@ -179,7 +179,7 @@ export function CustomerFormModal({
               type="email"
               placeholder="customer@example.com"
               className={cn(
-                'w-full px-3 py-2 bg-slate-800 border rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition',
                 errors.email ? 'border-red-500' : 'border-slate-600'
               )}
             />
@@ -190,7 +190,7 @@ export function CustomerFormModal({
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            <label className="block text-sm font-medium text-stone-600 mb-1.5">
               Address
             </label>
             <textarea
@@ -198,7 +198,7 @@ export function CustomerFormModal({
               rows={3}
               placeholder="Customer address"
               className={cn(
-                'w-full px-3 py-2 bg-slate-800 border rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none',
+                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none',
                 errors.address ? 'border-red-500' : 'border-slate-600'
               )}
             />
@@ -212,14 +212,14 @@ export function CustomerFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-stone-100 hover:bg-slate-700 text-stone-600 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-amber-500 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
             >
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Add Customer'}

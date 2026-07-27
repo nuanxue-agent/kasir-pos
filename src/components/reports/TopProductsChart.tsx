@@ -32,7 +32,7 @@ function truncate(name: string, maxLen = 20) {
 export function TopProductsChart({ data, currency }: TopProductsChartProps) {
   if (!data.length) {
     return (
-      <div className="h-64 flex items-center justify-center text-slate-500 text-sm">
+      <div className="h-64 flex items-center justify-center text-stone-500 text-sm">
         No product data for this period
       </div>
     )
@@ -50,9 +50,9 @@ export function TopProductsChart({ data, currency }: TopProductsChartProps) {
     const payload = props.payload as Array<{ value: number; payload: { qty: number } }> | undefined
     if (!active || !payload?.length) return null
     return (
-      <div className="bg-slate-900 border border-slate-600 rounded-lg p-3 shadow-xl">
+      <div className="bg-white border border-slate-600 rounded-lg p-3 shadow-xl">
         <p className="text-white font-semibold">{formatCurrency(payload[0].value, currency)}</p>
-        <p className="text-slate-400 text-xs mt-0.5">{payload[0].payload.qty} units sold</p>
+        <p className="text-stone-500 text-xs mt-0.5">{payload[0].payload.qty} units sold</p>
       </div>
     )
   }

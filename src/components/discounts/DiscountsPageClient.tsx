@@ -53,11 +53,11 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Discounts</h1>
-          <p className="text-slate-400 mt-1 text-sm">Manage coupon codes and promotions</p>
+          <p className="text-stone-500 mt-1 text-sm">Manage coupon codes and promotions</p>
         </div>
         <button
           onClick={() => { setEditing(null); setShowForm(true) }}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           <Plus size={16} /> Add Discount
         </button>
@@ -66,11 +66,11 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-slate-800 rounded-xl animate-pulse" />
+            <div key={i} className="h-16 bg-stone-100 rounded-xl animate-pulse" />
           ))}
         </div>
       ) : discounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-stone-500">
           <Tag size={48} strokeWidth={1} className="mb-4" />
           <p>No discounts yet. Create your first one.</p>
         </div>
@@ -78,13 +78,13 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
         <div className="space-y-3">
           {discounts.map((d: Discount) => (
             <div key={d.id} className={cn(
-              'bg-slate-800 rounded-xl p-4 flex items-center gap-4 border',
-              d.active ? 'border-slate-700' : 'border-slate-800 opacity-60'
+              'bg-stone-100 rounded-xl p-4 flex items-center gap-4 border',
+              d.active ? 'border-stone-200' : 'border-stone-200 opacity-60'
             )}>
               {/* Badge */}
               <div className={cn(
                 'shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold',
-                d.type === 'PERCENTAGE' ? 'bg-indigo-900/50 text-indigo-400' : 'bg-green-900/50 text-green-400'
+                d.type === 'PERCENTAGE' ? 'bg-indigo-900/50 text-amber-600' : 'bg-green-900/50 text-green-400'
               )}>
                 {d.type === 'PERCENTAGE' ? `${d.value}%` : `-`}
               </div>
@@ -92,9 +92,9 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-white">{d.name}</p>
-                  {!d.active && <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">Inactive</span>}
+                  {!d.active && <span className="text-xs bg-slate-700 text-stone-500 px-2 py-0.5 rounded-full">Inactive</span>}
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                <div className="flex items-center gap-3 mt-1 text-xs text-stone-500">
                   {d.code && (
                     <button
                       onClick={() => copyCode(d.code!, d.id)}
@@ -113,13 +113,13 @@ export default function DiscountsPageClient({ storeId, currency }: DiscountsPage
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => { setEditing(d); setShowForm(true) }}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                  className="p-2 text-stone-500 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   <Pencil size={15} />
                 </button>
                 <button
                   onClick={() => deleteMutation.mutate(d.id)}
-                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                  className="p-2 text-stone-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                 >
                   <Trash2 size={15} />
                 </button>
@@ -184,8 +184,8 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl w-full max-w-md border border-slate-700 p-6 space-y-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-md border border-stone-200 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-white">{discount ? 'Edit Discount' : 'New Discount'}</h2>
 
         <div className="space-y-3">
@@ -207,7 +207,7 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
             <input type="number" value={form.maxUses} onChange={e => setForm(f => ({ ...f, maxUses: e.target.value }))}
               placeholder="Max uses (blank = ∞)" className={ic} />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">
             <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))}
               className="rounded" />
             Active
@@ -217,9 +217,9 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white text-sm transition-colors">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-stone-200 text-stone-500 hover:text-white text-sm transition-colors">Cancel</button>
           <button onClick={submit} disabled={loading || !form.name}
-            className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white text-sm font-medium transition-colors">
+            className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-500 disabled:bg-slate-700 text-white text-sm font-medium transition-colors">
             {loading ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -228,4 +228,4 @@ function DiscountFormModal({ storeId, currency, discount, onClose, onSuccess }: 
   )
 }
 
-const ic = 'w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+const ic = 'w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'

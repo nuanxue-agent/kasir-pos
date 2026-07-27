@@ -88,15 +88,15 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-4 w-4 text-indigo-400" />
-            <span className="text-xs font-medium text-indigo-400 uppercase tracking-widest">
+            <Sparkles className="h-4 w-4 text-amber-600" />
+            <span className="text-xs font-medium text-amber-600 uppercase tracking-widest">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white">
             {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''} 👋
           </h1>
-          <p className="text-white/40 mt-1 text-sm">Here's what's happening at your store today.</p>
+          <p className="text-stone-400 mt-1 text-sm">Here's what's happening at your store today.</p>
         </div>
       </div>
 
@@ -136,21 +136,21 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
       <div className="flex flex-wrap gap-3">
         <Link
           href="/dashboard/pos"
-          className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-indigo-500/20 transition-all duration-150 active:scale-95"
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-indigo-500 hover:to-violet-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-amber-500/20 transition-all duration-150 active:scale-95"
         >
           <Plus size={16} />
           New Sale
         </Link>
         <Link
           href="/dashboard/products"
-          className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
+          className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
         >
           <Package size={16} />
           Add Product
         </Link>
         <Link
           href="/dashboard/reports"
-          className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
+          className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
         >
           <BarChart3 size={16} />
           View Reports
@@ -161,12 +161,12 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Recent orders */}
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="bg-stone-50 backdrop-blur border border-stone-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
             <h2 className="font-semibold text-white text-sm">Recent Orders</h2>
             <Link
               href="/dashboard/orders"
-              className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors"
+              className="text-amber-600 hover:text-amber-500 text-xs flex items-center gap-1 transition-colors"
             >
               View all <ArrowRight size={12} />
             </Link>
@@ -175,13 +175,13 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
           {ordersLoading ? (
             <div className="p-4 space-y-2">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-12 bg-white/5 animate-pulse rounded-xl" />
+                <div key={i} className="h-12 bg-stone-50 animate-pulse rounded-xl" />
               ))}
             </div>
           ) : (recentOrders as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <ShoppingCart className="h-8 w-8 text-white/10" />
-              <p className="text-sm text-white/30">No orders yet today</p>
+              <p className="text-sm text-stone-400">No orders yet today</p>
             </div>
           ) : (
             <div className="divide-y divide-white/5">
@@ -190,11 +190,11 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
                 return (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-colors"
+                    className="flex items-center justify-between px-5 py-3 hover:bg-stone-50 transition-colors"
                   >
                     <div>
                       <p className="text-sm font-medium text-white">#{order.number}</p>
-                      <p className="text-xs text-white/30 mt-0.5">{formatDate(order.createdAt)}</p>
+                      <p className="text-xs text-stone-400 mt-0.5">{formatDate(order.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <p className="text-sm font-semibold text-white">
@@ -213,15 +213,15 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
         </div>
 
         {/* Low stock alerts */}
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="bg-stone-50 backdrop-blur border border-stone-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
             <h2 className="font-semibold text-white text-sm flex items-center gap-2">
               <AlertTriangle size={15} className="text-amber-400" />
               Low Stock
             </h2>
             <Link
               href="/dashboard/inventory"
-              className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors"
+              className="text-amber-600 hover:text-amber-500 text-xs flex items-center gap-1 transition-colors"
             >
               View all <ArrowRight size={12} />
             </Link>
@@ -230,24 +230,24 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
           {stockLoading ? (
             <div className="p-4 space-y-2">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-12 bg-white/5 animate-pulse rounded-xl" />
+                <div key={i} className="h-12 bg-stone-50 animate-pulse rounded-xl" />
               ))}
             </div>
           ) : (lowStock as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <Boxes className="h-8 w-8 text-white/10" />
-              <p className="text-sm text-white/30">All products well stocked ✓</p>
+              <p className="text-sm text-stone-400">All products well stocked ✓</p>
             </div>
           ) : (
             <div className="divide-y divide-white/5">
               {(lowStock as any[]).slice(0, 8).map((p: any) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-colors"
+                  className="flex items-center justify-between px-5 py-3 hover:bg-stone-50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                      <Package className="h-3.5 w-3.5 text-white/30" />
+                    <div className="w-7 h-7 rounded-lg bg-stone-50 border border-stone-200 flex items-center justify-center shrink-0">
+                      <Package className="h-3.5 w-3.5 text-stone-400" />
                     </div>
                     <p className="text-sm text-white truncate">{p.name}</p>
                   </div>

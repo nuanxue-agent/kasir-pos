@@ -68,7 +68,7 @@ const STATUS_STYLES: Record<string, string> = {
   PAID: 'bg-emerald-500/20 text-emerald-300',
   PENDING: 'bg-yellow-500/20 text-yellow-300',
   VOIDED: 'bg-red-500/20 text-red-300',
-  REFUNDED: 'bg-slate-500/20 text-slate-300',
+  REFUNDED: 'bg-slate-500/20 text-stone-600',
 }
 
 export function CustomerDetailModal({
@@ -163,18 +163,18 @@ export function CustomerDetailModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-2xl bg-white border border-stone-200 rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 shrink-0">
           <h2 className="text-lg font-semibold text-slate-100">Customer Details</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-stone-500 hover:text-slate-100 hover:bg-stone-100 transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -184,22 +184,22 @@ export function CustomerDetailModal({
         <div className="overflow-y-auto flex-1">
           {loading || !customer ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 text-indigo-400 animate-spin" />
+              <Loader2 className="h-6 w-6 text-amber-600 animate-spin" />
             </div>
           ) : (
             <div className="p-6 space-y-6">
               {/* Info card */}
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+              <div className="bg-stone-100 border border-stone-200 rounded-lg p-5 space-y-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-xl font-bold text-slate-100">{customer.name}</h3>
-                    <p className="text-sm text-slate-400 mt-0.5">
+                    <p className="text-sm text-stone-500 mt-0.5">
                       Member since {formatDate(customer.createdAt)}
                     </p>
                   </div>
                   {/* Points badge */}
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 border border-indigo-500/30 rounded-lg shrink-0">
-                    <Star className="h-4 w-4 text-indigo-300 fill-indigo-300" />
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 border border-indigo-500/30 rounded-lg shrink-0">
+                    <Star className="h-4 w-4 text-amber-500 fill-indigo-300" />
                     <span className="text-sm font-semibold text-indigo-200">
                       {customer.points} pts
                     </span>
@@ -209,20 +209,20 @@ export function CustomerDetailModal({
                 {/* Contact info */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {customer.phone && (
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Phone className="h-4 w-4 text-slate-500 shrink-0" />
+                    <div className="flex items-center gap-2 text-sm text-stone-600">
+                      <Phone className="h-4 w-4 text-stone-500 shrink-0" />
                       {customer.phone}
                     </div>
                   )}
                   {customer.email && (
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Mail className="h-4 w-4 text-slate-500 shrink-0" />
+                    <div className="flex items-center gap-2 text-sm text-stone-600">
+                      <Mail className="h-4 w-4 text-stone-500 shrink-0" />
                       {customer.email}
                     </div>
                   )}
                   {customer.address && (
-                    <div className="flex items-start gap-2 text-sm text-slate-300 sm:col-span-2">
-                      <MapPin className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 text-sm text-stone-600 sm:col-span-2">
+                      <MapPin className="h-4 w-4 text-stone-500 shrink-0 mt-0.5" />
                       {customer.address}
                     </div>
                   )}
@@ -230,12 +230,12 @@ export function CustomerDetailModal({
 
                 {/* Stats row */}
                 <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div className="bg-slate-900/60 rounded-lg px-4 py-3">
-                    <p className="text-xs text-slate-500 mb-1">Total Orders</p>
+                  <div className="bg-white/60 rounded-lg px-4 py-3">
+                    <p className="text-xs text-stone-500 mb-1">Total Orders</p>
                     <p className="text-lg font-bold text-slate-100">{customer.totalOrders}</p>
                   </div>
-                  <div className="bg-slate-900/60 rounded-lg px-4 py-3">
-                    <p className="text-xs text-slate-500 mb-1">Total Spent</p>
+                  <div className="bg-white/60 rounded-lg px-4 py-3">
+                    <p className="text-xs text-stone-500 mb-1">Total Spent</p>
                     <p className="text-lg font-bold text-slate-100">
                       {formatCurrency(customer.totalSpent, currency)}
                     </p>
@@ -247,10 +247,10 @@ export function CustomerDetailModal({
               {showPointsForm && (
                 <form
                   onSubmit={handleSubmit(handleAddPoints)}
-                  className="bg-slate-800 border border-indigo-500/30 rounded-lg p-4 space-y-3"
+                  className="bg-stone-100 border border-indigo-500/30 rounded-lg p-4 space-y-3"
                 >
                   <p className="text-sm font-medium text-slate-200">Adjust Points</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-stone-500">
                     Use positive numbers to add, negative to deduct. Current: {customer.points} pts
                   </p>
                   {pointsError && (
@@ -262,21 +262,21 @@ export function CustomerDetailModal({
                       type="number"
                       placeholder="e.g. 50 or -20"
                       className={cn(
-                        'flex-1 px-3 py-2 bg-slate-900 border rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm',
+                        'flex-1 px-3 py-2 bg-white border rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm',
                         errors.delta ? 'border-red-500' : 'border-slate-600'
                       )}
                     />
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="px-4 py-2 bg-amber-500 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowPointsForm(false); reset() }}
-                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-stone-600 rounded-lg text-sm transition-colors"
                     >
                       Cancel
                     </button>
@@ -290,30 +290,30 @@ export function CustomerDetailModal({
               {/* Recent orders */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <ShoppingBag className="h-4 w-4 text-slate-400" />
-                  <h4 className="text-sm font-semibold text-slate-300">Recent Orders</h4>
+                  <ShoppingBag className="h-4 w-4 text-stone-500" />
+                  <h4 className="text-sm font-semibold text-stone-600">Recent Orders</h4>
                 </div>
 
                 {customer.orders.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-800 border border-slate-700 rounded-lg">
+                  <div className="text-center py-8 bg-stone-100 border border-stone-200 rounded-lg">
                     <ShoppingBag className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">No orders yet</p>
+                    <p className="text-sm text-stone-500">No orders yet</p>
                   </div>
                 ) : (
-                  <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                  <div className="bg-stone-100 border border-stone-200 rounded-lg overflow-hidden">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-slate-700 bg-slate-900/50">
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <tr className="border-b border-stone-200 bg-stone-500">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                             Order
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="px-4 py-2.5 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">
                             Total
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                             Date
                           </th>
                         </tr>
@@ -328,7 +328,7 @@ export function CustomerDetailModal({
                               <span
                                 className={cn(
                                   'inline-block px-2 py-0.5 rounded text-xs font-medium',
-                                  STATUS_STYLES[order.status] ?? 'bg-slate-500/20 text-slate-300'
+                                  STATUS_STYLES[order.status] ?? 'bg-slate-500/20 text-stone-600'
                                 )}
                               >
                                 {order.status}
@@ -337,7 +337,7 @@ export function CustomerDetailModal({
                             <td className="px-4 py-2.5 text-sm text-slate-100 font-medium text-right">
                               {formatCurrency(order.total, currency)}
                             </td>
-                            <td className="px-4 py-2.5 text-sm text-slate-400">
+                            <td className="px-4 py-2.5 text-sm text-stone-500">
                               {formatDate(order.createdAt)}
                             </td>
                           </tr>
@@ -358,7 +358,7 @@ export function CustomerDetailModal({
 
         {/* Footer actions */}
         {!loading && customer && (
-          <div className="px-6 py-4 border-t border-slate-700 flex items-center justify-between gap-3 shrink-0">
+          <div className="px-6 py-4 border-t border-stone-200 flex items-center justify-between gap-3 shrink-0">
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -370,14 +370,14 @@ export function CustomerDetailModal({
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowPointsForm((v) => !v) }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-slate-700 text-stone-600 rounded-lg text-sm font-medium transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 Adjust Points
               </button>
               <button
                 onClick={() => setShowEditModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 <Pencil className="h-4 w-4" />
                 Edit

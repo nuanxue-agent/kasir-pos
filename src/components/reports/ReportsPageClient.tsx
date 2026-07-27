@@ -112,11 +112,11 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white">Reports</h1>
-        <p className="text-slate-400 mt-1">Sales analytics and performance metrics</p>
+        <p className="text-stone-500 mt-1">Sales analytics and performance metrics</p>
       </div>
 
       {/* Date Range Selector */}
-      <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+      <div className="bg-stone-100 rounded-lg p-4 border border-stone-200">
         <div className="flex flex-wrap items-center gap-2">
           {rangeButtons.map((btn) => (
             <button
@@ -124,8 +124,8 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               onClick={() => setDateRange(btn.value)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 dateRange === btn.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-slate-700 text-stone-600 hover:bg-slate-600'
               }`}
             >
               {btn.label}
@@ -136,7 +136,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         {dateRange === 'custom' && (
           <div className="flex gap-4 mt-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">From</label>
+              <label className="block text-sm text-stone-500 mb-1">From</label>
               <input
                 type="date"
                 value={customFrom}
@@ -145,7 +145,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">To</label>
+              <label className="block text-sm text-stone-500 mb-1">To</label>
               <input
                 type="date"
                 value={customTo}
@@ -162,18 +162,18 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         {isLoading ? (
           <>
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-slate-800 rounded-lg h-32 animate-pulse border border-slate-700" />
+              <div key={i} className="bg-stone-100 rounded-lg h-32 animate-pulse border border-stone-200" />
             ))}
           </>
         ) : (
           <>
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-5">
+            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-lg p-2.5 bg-emerald-500/10 shrink-0">
                   <DollarSign className="h-5 w-5 text-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-400">Total Revenue</p>
+                  <p className="text-sm text-stone-500">Total Revenue</p>
                   <p className="text-2xl font-semibold text-white mt-0.5">
                     {formatCurrency(data?.summary.totalRevenue ?? 0, currency)}
                   </p>
@@ -181,13 +181,13 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               </div>
             </div>
 
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-5">
+            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-lg p-2.5 bg-blue-500/10 shrink-0">
                   <ShoppingCart className="h-5 w-5 text-blue-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-400">Total Orders</p>
+                  <p className="text-sm text-stone-500">Total Orders</p>
                   <p className="text-2xl font-semibold text-white mt-0.5">
                     {data?.summary.totalOrders ?? 0}
                   </p>
@@ -195,13 +195,13 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               </div>
             </div>
 
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-5">
+            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-lg p-2.5 bg-purple-500/10 shrink-0">
                   <TrendingUp className="h-5 w-5 text-purple-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-400">Avg Order Value</p>
+                  <p className="text-sm text-stone-500">Avg Order Value</p>
                   <p className="text-2xl font-semibold text-white mt-0.5">
                     {formatCurrency(data?.summary.avgOrderValue ?? 0, currency)}
                   </p>
@@ -209,13 +209,13 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               </div>
             </div>
 
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-5">
+            <div className="bg-stone-100 rounded-lg border border-stone-200 p-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-lg p-2.5 bg-orange-500/10 shrink-0">
                   <Users className="h-5 w-5 text-orange-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-400">New Customers</p>
+                  <p className="text-sm text-stone-500">New Customers</p>
                   <p className="text-2xl font-semibold text-white mt-0.5">
                     {data?.summary.newCustomers ?? 0}
                   </p>
@@ -229,7 +229,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Chart */}
-        <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Revenue Trend</h3>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
@@ -241,7 +241,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         </div>
 
         {/* Top Products Chart */}
-        <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Top 5 Products</h3>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
@@ -256,7 +256,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       {/* Bottom Row: Payment Breakdown & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Payment Breakdown */}
-        <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Payment Methods</h3>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
@@ -268,7 +268,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         </div>
 
         {/* Recent Orders Table */}
-        <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+        <div className="bg-stone-100 rounded-lg border border-stone-200 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Recent Orders</h3>
           {isLoading ? (
             <div className="space-y-3">
@@ -280,16 +280,16 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-slate-400 border-b border-slate-700">
+                  <tr className="text-stone-500 border-b border-stone-200">
                     <th className="text-left py-2 px-2">Order #</th>
                     <th className="text-left py-2 px-2">Time</th>
                     <th className="text-right py-2 px-2">Total</th>
                     <th className="text-left py-2 px-2">Method</th>
                   </tr>
                 </thead>
-                <tbody className="text-slate-300">
+                <tbody className="text-stone-600">
                   {data?.dailySales.slice(0, 5).map((sale, idx) => (
-                    <tr key={idx} className="border-b border-slate-700/50">
+                    <tr key={idx} className="border-b border-stone-200/50">
                       <td className="py-3 px-2">#{idx + 1}</td>
                       <td className="py-3 px-2">{new Date(sale.date).toLocaleDateString()}</td>
                       <td className="py-3 px-2 text-right font-medium">
@@ -299,7 +299,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
                     </tr>
                   )) ?? (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-500">
+                      <td colSpan={4} className="py-8 text-center text-stone-500">
                         No orders found
                       </td>
                     </tr>

@@ -72,7 +72,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -100,7 +100,7 @@ export default function StockAdjustModal({ product, onClose, onSuccess }: StockA
               Current stock: <span className="text-white font-semibold">{product.stock}</span>
             </div>
             <div className="text-sm text-gray-400">
-              Low stock alert: <span className="text-white">{product.lowStock}</span>
+              Low stock alert: <span className="text-stone-800">{product.lowStock}</span>
             </div>
           </div>
         </div>

@@ -113,7 +113,7 @@ export default function ProductsPageClient({
             setEditingProduct(null)
             setShowModal(true)
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-500 transition-colors"
         >
           <Plus className="h-4 w-4" />
           Add Product

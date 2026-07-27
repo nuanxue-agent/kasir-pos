@@ -38,10 +38,10 @@ const variantStyles: Record<ColorVariant, {
     border: 'hover:border-blue-500/20',
   },
   purple: {
-    iconBg: 'bg-indigo-500/15',
-    iconText: 'text-indigo-400',
+    iconBg: 'bg-amber-500/15',
+    iconText: 'text-amber-600',
     glow: 'shadow-indigo-500/5',
-    border: 'hover:border-indigo-500/20',
+    border: 'hover:border-amber-400/30',
   },
   orange: {
     iconBg: 'bg-orange-500/15',
@@ -70,13 +70,13 @@ export function StatsCard({
 
   if (loading) {
     return (
-      <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5 animate-pulse">
+      <div className="bg-stone-50 backdrop-blur border border-stone-200 rounded-2xl p-5 animate-pulse">
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl bg-white/10 shrink-0" />
+          <div className="w-10 h-10 rounded-xl bg-stone-100 shrink-0" />
           <div className="flex-1 space-y-2 pt-1">
-            <div className="h-3 bg-white/10 rounded w-2/3" />
-            <div className="h-7 bg-white/10 rounded w-1/2" />
-            <div className="h-3 bg-white/10 rounded w-1/3" />
+            <div className="h-3 bg-stone-100 rounded w-2/3" />
+            <div className="h-7 bg-stone-100 rounded w-1/2" />
+            <div className="h-3 bg-stone-100 rounded w-1/3" />
           </div>
         </div>
       </div>
@@ -86,7 +86,7 @@ export function StatsCard({
   return (
     <div
       className={cn(
-        'relative bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5',
+        'relative bg-stone-50 backdrop-blur border border-stone-200 rounded-2xl p-5',
         'shadow-lg transition-all duration-200',
         `hover:bg-white/[0.07] ${border}`,
         glow
@@ -100,7 +100,7 @@ export function StatsCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-white/50 truncate">{label}</p>
+          <p className="text-xs font-medium text-stone-500 truncate">{label}</p>
           <p className="text-2xl font-bold text-white mt-1 truncate leading-none">{value}</p>
 
           {/* Trend indicator */}
@@ -110,7 +110,7 @@ export function StatsCard({
                 'flex items-center gap-1 mt-2 text-xs font-medium',
                 isUp   && 'text-emerald-400',
                 isDown && 'text-red-400',
-                !isUp && !isDown && 'text-white/30'
+                !isUp && !isDown && 'text-stone-400'
               )}
             >
               {isUp   && <TrendingUp  className="h-3 w-3" />}

@@ -18,12 +18,12 @@ const METHOD_STYLES: Record<string, { label: string; color: string; bg: string; 
   TRANSFER: { label: 'Transfer', color: 'bg-orange-500',  bg: 'bg-orange-500/10',  text: 'text-orange-400'  },
 }
 
-const DEFAULT_STYLE = { label: 'Other', color: 'bg-slate-500', bg: 'bg-slate-500/10', text: 'text-slate-400' }
+const DEFAULT_STYLE = { label: 'Other', color: 'bg-slate-500', bg: 'bg-slate-500/10', text: 'text-stone-500' }
 
 export function PaymentBreakdown({ data, currency }: PaymentBreakdownProps) {
   if (!data.length) {
     return (
-      <div className="h-48 flex items-center justify-center text-slate-500 text-sm">
+      <div className="h-48 flex items-center justify-center text-stone-500 text-sm">
         No payment data for this period
       </div>
     )
@@ -47,11 +47,11 @@ export function PaymentBreakdown({ data, currency }: PaymentBreakdownProps) {
                 <span className={`inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
                   {style.label}
                 </span>
-                <span className="text-slate-400 text-sm">{item._count.id} txn{item._count.id !== 1 ? 's' : ''}</span>
+                <span className="text-stone-500 text-sm">{item._count.id} txn{item._count.id !== 1 ? 's' : ''}</span>
               </div>
               <div className="text-right">
                 <span className="text-white font-medium text-sm">{formatCurrency(amount, currency)}</span>
-                <span className="text-slate-500 text-xs ml-2">{pct}%</span>
+                <span className="text-stone-500 text-xs ml-2">{pct}%</span>
               </div>
             </div>
 
@@ -67,8 +67,8 @@ export function PaymentBreakdown({ data, currency }: PaymentBreakdownProps) {
       })}
 
       {/* Total */}
-      <div className="pt-3 mt-3 border-t border-slate-700 flex items-center justify-between">
-        <span className="text-slate-400 text-sm">Total</span>
+      <div className="pt-3 mt-3 border-t border-stone-200 flex items-center justify-between">
+        <span className="text-stone-500 text-sm">Total</span>
         <span className="text-white font-semibold">{formatCurrency(total, currency)}</span>
       </div>
     </div>

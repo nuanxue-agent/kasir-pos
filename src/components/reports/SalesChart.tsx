@@ -25,7 +25,7 @@ interface SalesChartProps {
 export function SalesChart({ data, currency }: SalesChartProps) {
   if (!data.length) {
     return (
-      <div className="h-64 flex items-center justify-center text-slate-500 text-sm">
+      <div className="h-64 flex items-center justify-center text-stone-500 text-sm">
         No sales data for this period
       </div>
     )
@@ -45,10 +45,10 @@ export function SalesChart({ data, currency }: SalesChartProps) {
     const label = props.label as string | undefined
     if (!active || !payload?.length) return null
     return (
-      <div className="bg-slate-900 border border-slate-600 rounded-lg p-3 shadow-xl">
-        <p className="text-slate-400 text-xs mb-1.5">{label}</p>
+      <div className="bg-white border border-slate-600 rounded-lg p-3 shadow-xl">
+        <p className="text-stone-500 text-xs mb-1.5">{label}</p>
         <p className="text-white font-semibold">{formatCurrency(payload[0].value, currency)}</p>
-        <p className="text-slate-400 text-xs mt-0.5">{payload[0].payload.orders} orders</p>
+        <p className="text-stone-500 text-xs mt-0.5">{payload[0].payload.orders} orders</p>
       </div>
     )
   }

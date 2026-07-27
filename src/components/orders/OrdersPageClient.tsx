@@ -63,14 +63,14 @@ const STATUS_STYLES: Record<string, string> = {
   PAID:     'bg-emerald-100 text-emerald-700',
   PENDING:  'bg-yellow-100 text-yellow-700',
   VOIDED:   'bg-red-100 text-red-600',
-  REFUNDED: 'bg-slate-100 text-slate-500',
+  REFUNDED: 'bg-slate-100 text-stone-500',
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-        STATUS_STYLES[status] ?? 'bg-slate-100 text-slate-500'
+        STATUS_STYLES[status] ?? 'bg-slate-100 text-stone-500'
       }`}
     >
       {status.charAt(0) + status.slice(1).toLowerCase()}
@@ -168,7 +168,7 @@ export function OrdersPageClient({ storeId, currency, taxRate }: Props) {
               onClick={() => handleStatusChange(tab.value)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 statusFilter === tab.value
-                  ? 'bg-indigo-500 text-white'
+                  ? 'bg-amber-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >

@@ -77,13 +77,13 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
     <div className="p-6 max-w-2xl space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white">Store Settings</h1>
-        <p className="text-slate-400 mt-1 text-sm">Configure your store information and preferences</p>
+        <p className="text-stone-500 mt-1 text-sm">Configure your store information and preferences</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Store Info */}
-        <section className="bg-slate-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-slate-300 font-medium mb-2">
+        <section className="bg-stone-100 rounded-xl p-6 space-y-4">
+          <div className="flex items-center gap-2 text-stone-600 font-medium mb-2">
             <Store size={16} />
             <span>Store Information</span>
           </div>
@@ -105,8 +105,8 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* Tax & Currency */}
-        <section className="bg-slate-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-slate-300 font-medium mb-2">
+        <section className="bg-stone-100 rounded-xl p-6 space-y-4">
+          <div className="flex items-center gap-2 text-stone-600 font-medium mb-2">
             <Globe size={16} />
             <span>Tax & Currency</span>
           </div>
@@ -135,8 +135,8 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* Receipt */}
-        <section className="bg-slate-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-slate-300 font-medium mb-2">
+        <section className="bg-stone-100 rounded-xl p-6 space-y-4">
+          <div className="flex items-center gap-2 text-stone-600 font-medium mb-2">
             <Receipt size={16} />
             <span>Receipt</span>
           </div>
@@ -156,7 +156,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-500 disabled:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             <Save size={16} />
             {saving ? 'Saving...' : 'Save Settings'}
@@ -173,7 +173,7 @@ const inputCls = 'w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-400 mb-1.5">{label}</label>
+      <label className="block text-xs font-medium text-stone-500 mb-1.5">{label}</label>
       {children}
       {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
     </div>

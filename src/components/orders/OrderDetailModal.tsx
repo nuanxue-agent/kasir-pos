@@ -21,14 +21,14 @@ const STATUS_STYLES: Record<string, string> = {
   PAID:     'bg-emerald-100 text-emerald-700',
   PENDING:  'bg-yellow-100 text-yellow-700',
   VOIDED:   'bg-red-100 text-red-600',
-  REFUNDED: 'bg-slate-100 text-slate-500',
+  REFUNDED: 'bg-slate-100 text-stone-500',
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-        STATUS_STYLES[status] ?? 'bg-slate-100 text-slate-500'
+        STATUS_STYLES[status] ?? 'bg-slate-100 text-stone-500'
       }`}
     >
       {status.charAt(0) + status.slice(1).toLowerCase()}

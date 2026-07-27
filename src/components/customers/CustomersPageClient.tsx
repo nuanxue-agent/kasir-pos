@@ -85,19 +85,19 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-500/10 rounded-lg">
-            <Users className="h-6 w-6 text-indigo-400" />
+          <div className="p-2 bg-amber-500/10 rounded-lg">
+            <Users className="h-6 w-6 text-amber-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-100">Customers</h1>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-stone-500">
               {total} {total === 1 ? 'customer' : 'customers'}
             </p>
           </div>
         </div>
         <button
           onClick={() => setShowFormModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-indigo-700 text-white rounded-lg transition-colors"
         >
           <UserPlus className="h-4 w-4" />
           Add Customer
@@ -106,26 +106,26 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
 
       {/* Search */}
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500 pointer-events-none" />
         <input
           type="search"
           placeholder="Search by name, phone, or email..."
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-slate-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+      <div className="bg-stone-100 border border-stone-200 rounded-lg overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 text-indigo-400 animate-spin" />
+            <Loader2 className="h-6 w-6 text-amber-600 animate-spin" />
           </div>
         ) : customers.length === 0 ? (
           <div className="text-center py-12">
             <Users className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400">
+            <p className="text-stone-500">
               {searchQuery ? 'No customers found' : 'No customers yet'}
             </p>
           </div>
@@ -134,26 +134,26 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-700 bg-slate-900/50">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-stone-200 bg-stone-500">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Phone
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Points
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Orders
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Total Spent
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Joined
                     </th>
                   </tr>
@@ -168,10 +168,10 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                       <td className="px-4 py-3 text-sm font-medium text-slate-100">
                         {customer.name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-300">
+                      <td className="px-4 py-3 text-sm text-stone-600">
                         {customer.phone || '—'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-300">
+                      <td className="px-4 py-3 text-sm text-stone-600">
                         {customer.email || '—'}
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
@@ -180,13 +180,13 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                           {customer.points}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-300 text-center">
+                      <td className="px-4 py-3 text-sm text-stone-600 text-center">
                         {customer.totalOrders}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-100 font-medium text-right">
                         {formatCurrency(customer.totalSpent, currency)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-400">
+                      <td className="px-4 py-3 text-sm text-stone-500">
                         {formatDate(customer.createdAt)}
                       </td>
                     </tr>
@@ -197,8 +197,8 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
 
             {/* Pagination */}
             {pages > 1 && (
-              <div className="px-4 py-3 border-t border-slate-700 flex items-center justify-between">
-                <p className="text-sm text-slate-400">
+              <div className="px-4 py-3 border-t border-stone-200 flex items-center justify-between">
+                <p className="text-sm text-stone-500">
                   Page {page} of {pages}
                 </p>
                 <div className="flex gap-2">
@@ -208,7 +208,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                     className={cn(
                       'px-3 py-1 rounded text-sm font-medium transition-colors',
                       page === 1
-                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        ? 'bg-stone-100 text-slate-600 cursor-not-allowed'
                         : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
                     )}
                   >
@@ -220,7 +220,7 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                     className={cn(
                       'px-3 py-1 rounded text-sm font-medium transition-colors',
                       page === pages
-                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        ? 'bg-stone-100 text-slate-600 cursor-not-allowed'
                         : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
                     )}
                   >

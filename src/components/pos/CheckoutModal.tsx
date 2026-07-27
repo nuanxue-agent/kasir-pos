@@ -98,20 +98,20 @@ export default function CheckoutModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl w-full max-w-md shadow-2xl border border-slate-700">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-stone-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
           <h2 className="text-lg font-semibold text-white">Checkout</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-stone-500 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-5 space-y-5">
           {/* Order summary */}
-          <div className="bg-slate-800 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between text-sm text-slate-400">
+          <div className="bg-stone-100 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm text-stone-500">
               <span>Subtotal</span><span>{fmt(subtotal())}</span>
             </div>
             {discountAmt > 0 && (
@@ -120,18 +120,18 @@ export default function CheckoutModal({
               </div>
             )}
             {taxRate > 0 && (
-              <div className="flex justify-between text-sm text-slate-400">
+              <div className="flex justify-between text-sm text-stone-500">
                 <span>Tax ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt(taxRate))}</span>
               </div>
             )}
-            <div className="flex justify-between text-lg font-bold text-white pt-2 border-t border-slate-700">
+            <div className="flex justify-between text-lg font-bold text-white pt-2 border-t border-stone-200">
               <span>Total</span><span>{fmt(orderTotal)}</span>
             </div>
           </div>
 
           {/* Payment method */}
           <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Payment Method</p>
+            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Payment Method</p>
             <div className="grid grid-cols-4 gap-2">
               {PAYMENT_METHODS.map(({ id, label, icon: Icon, color }) => (
                 <button
@@ -140,11 +140,11 @@ export default function CheckoutModal({
                   className={cn(
                     'flex flex-col items-center gap-1.5 py-3 rounded-lg border transition-all text-sm',
                     method === id
-                      ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
-                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'
+                      ? 'border-indigo-500 bg-amber-500/10 text-amber-600'
+                      : 'border-stone-200 bg-stone-100 text-stone-500 hover:border-slate-600'
                   )}
                 >
-                  <Icon size={18} className={method === id ? 'text-indigo-400' : color} />
+                  <Icon size={18} className={method === id ? 'text-amber-600' : color} />
                   <span className="text-xs">{label}</span>
                 </button>
               ))}
@@ -154,13 +154,13 @@ export default function CheckoutModal({
           {/* Cash input */}
           {method === 'CASH' && (
             <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Cash Given</p>
+              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Cash Given</p>
               <input
                 type="number"
                 value={cashGiven}
                 onChange={e => setCashGiven(e.target.value)}
                 placeholder={fmt(orderTotal)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               {/* Quick amounts */}
               <div className="flex gap-2 mt-2">
@@ -168,7 +168,7 @@ export default function CheckoutModal({
                   <button
                     key={amount}
                     onClick={() => setCashGiven(String(amount))}
-                    className="flex-1 text-xs py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500 transition-colors"
+                    className="flex-1 text-xs py-1.5 rounded bg-stone-100 border border-stone-200 text-stone-600 hover:border-slate-500 transition-colors"
                   >
                     {fmt(amount)}
                   </button>
@@ -176,7 +176,7 @@ export default function CheckoutModal({
               </div>
               {cashAmount >= orderTotal && (
                 <div className="mt-3 flex justify-between text-sm font-medium">
-                  <span className="text-slate-400">Change</span>
+                  <span className="text-stone-500">Change</span>
                   <span className="text-green-400">{fmt(change)}</span>
                 </div>
               )}
@@ -186,7 +186,7 @@ export default function CheckoutModal({
           {/* Reference for card/transfer */}
           {(method === 'CARD' || method === 'TRANSFER') && (
             <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
+              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">
                 {method === 'CARD' ? 'Card Reference' : 'Transfer Reference'} (optional)
               </p>
               <input
@@ -194,7 +194,7 @@ export default function CheckoutModal({
                 value={reference}
                 onChange={e => setReference(e.target.value)}
                 placeholder="e.g. last 4 digits, ref number"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           )}
@@ -207,7 +207,7 @@ export default function CheckoutModal({
           <button
             onClick={handleCheckout}
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-stone-500 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
               <span>Processing...</span>
