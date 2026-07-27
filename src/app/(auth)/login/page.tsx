@@ -15,6 +15,9 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
+const inputClass =
+  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-amber-400 focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-amber-400/20'
+
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -46,59 +49,72 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-stone-800">Selamat datang kembali</h1>
-        <p className="mt-1.5 text-sm text-stone-500">Masuk ke akun Lakoo kamu.</p>
+      {/* Logo — visible on desktop too for a self-contained feel */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[var(--shadow-md)]">
+          <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.5} />
+        </div>
+        <span className="text-lg font-bold tracking-tight text-[var(--text-1)]">Lakoo</span>
       </div>
 
-      <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-sm">
+      {/* Card */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-8 shadow-[var(--shadow-lg)]">
+        <div className="mb-6 text-center">
+          <h1 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Masuk ke akun Anda</h1>
+          <p className="mt-1.5 text-sm text-[var(--text-3)]">Sistem kasir modern untuk bisnis Anda</p>
+        </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {error && (
-            <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              <div className="h-2 w-2 flex-shrink-0 rounded-full bg-red-400" />
+            <div className="flex items-center gap-3 rounded-lg border border-[var(--danger-subtle)] bg-[var(--danger-subtle)] px-4 py-3 text-sm text-[var(--danger)]">
+              <div className="h-2 w-2 flex-shrink-0 rounded-full bg-[var(--danger)]" />
               {error}
             </div>
           )}
 
+          {/* Email */}
           <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium text-stone-700">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium text-[var(--text-2)]">Email</label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
               <input
                 {...register('email')}
                 type="email"
                 id="email"
                 autoComplete="email"
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 py-3 pl-10 pr-4 text-sm text-stone-800 placeholder-stone-400 transition-all focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+                className={inputClass}
                 placeholder="kamu@email.com"
               />
             </div>
-            {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+            {errors.email && <p className="text-xs text-[var(--danger)]">{errors.email.message}</p>}
           </div>
 
+          {/* Password */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor="password" className="block text-sm font-medium text-stone-700">Password</label>
-              <Link href="#" className="text-xs text-stone-400 hover:text-amber-600 transition-colors">Lupa password?</Link>
+              <label htmlFor="password" className="block text-sm font-medium text-[var(--text-2)]">Password</label>
+              <Link href="#" className="text-xs text-[var(--text-3)] hover:text-amber-600 transition-colors">
+                Lupa password?
+              </Link>
             </div>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
               <input
                 {...register('password')}
                 type="password"
                 id="password"
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 py-3 pl-10 pr-4 text-sm text-stone-800 placeholder-stone-400 transition-all focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+                className={inputClass}
                 placeholder="••••••••"
               />
             </div>
-            {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+            {errors.password && <p className="text-xs text-[var(--danger)]">{errors.password.message}</p>}
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="group mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold text-white shadow-md shadow-amber-200 transition-all hover:shadow-amber-300 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+            className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
               <><Loader2 className="h-4 w-4 animate-spin" />Memproses…</>
@@ -109,10 +125,10 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <p className="text-center text-sm text-stone-500">
+      <p className="text-center text-sm text-[var(--text-3)]">
         Belum punya akun?{' '}
         <Link href="/signup" className="font-medium text-amber-600 hover:text-amber-700 transition-colors">
-          Daftar gratis
+          Daftar
         </Link>
       </p>
     </div>

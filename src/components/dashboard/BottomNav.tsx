@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, ShoppingCart, Package, Receipt, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, Receipt, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ALL_NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard',          icon: LayoutDashboard, module: null },
-  { label: 'Kasir',     href: '/dashboard/pos',       icon: ShoppingCart,    module: 'pos' },
-  { label: 'Produk',    href: '/dashboard/products',  icon: Package,         module: null },
-  { label: 'Pesanan',   href: '/dashboard/orders',    icon: Receipt,         module: null },
-  { label: 'Laporan',   href: '/dashboard/reports',   icon: BarChart3,       module: 'reports' },
+  { label: 'Dashboard', href: '/dashboard',       icon: LayoutDashboard, module: null },
+  { label: 'Kasir',     href: '/dashboard/pos',   icon: ShoppingCart,    module: 'pos' },
+  { label: 'Produk',    href: '/dashboard/products', icon: Package,      module: null },
+  { label: 'Pesanan',   href: '/dashboard/orders', icon: Receipt,        module: null },
+  { label: 'Lainnya',   href: '/dashboard/more',  icon: MoreHorizontal,  module: null },
 ]
 
 interface BottomNavProps {

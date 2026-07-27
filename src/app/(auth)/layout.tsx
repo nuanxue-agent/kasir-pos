@@ -11,11 +11,11 @@ const features = [
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#fffdf7] text-stone-800">
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-1)]">
       <div className="flex min-h-screen">
         {/* ── Left panel ── */}
         <div className="relative hidden lg:flex lg:w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-amber-500 to-orange-500 p-12">
-          {/* Subtle pattern */}
+          {/* Subtle dot pattern */}
           <div
             className="absolute inset-0 opacity-[0.07]"
             style={{
@@ -98,11 +98,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500">
                 <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
               </div>
-              <span className="text-lg font-bold text-stone-800">Lakoo</span>
+              <span className="text-lg font-bold text-[var(--text-1)]">Lakoo</span>
             </a>
           </div>
 
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-sm">
             {children}
           </div>
         </div>
