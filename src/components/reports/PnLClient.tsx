@@ -124,11 +124,11 @@ function LineRow({
       ? amount >= 0 ? 'text-emerald-600' : 'text-red-500'
       : highlight === 'negative'
       ? 'text-red-500'
-      : 'text-stone-800'
+      : 'text-[var(--text-1)]'
 
   return (
-    <div className={`flex items-center justify-between px-5 py-2.5 ${bold ? 'bg-stone-50/80' : 'hover:bg-stone-50/40'} transition-colors`}>
-      <span className={`text-sm ${indent ? 'pl-4' : ''} ${bold ? 'font-bold text-stone-700' : 'text-stone-600'}`}>
+    <div className={`flex items-center justify-between px-5 py-2.5 ${bold ? 'bg-[var(--bg-subtle)]/80' : 'hover:bg-[var(--bg-subtle)]/40'} transition-colors`}>
+      <span className={`text-sm ${indent ? 'pl-4' : ''} ${bold ? 'font-bold text-[var(--text-1)]' : 'text-[var(--text-2)]'}`}>
         {label}
       </span>
       <div className="flex items-center gap-4">
@@ -203,7 +203,7 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
   const skeleton = () => (
     <div className="space-y-2 animate-pulse">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-10 bg-stone-50 rounded-xl" />
+        <div key={i} className="h-10 bg-[var(--bg-subtle)] rounded-xl" />
       ))}
     </div>
   )
@@ -212,12 +212,12 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5 pb-24 lg:pb-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Laba Rugi</h1>
-        <p className="text-stone-400 text-sm mt-0.5">Profit &amp; Loss — performa keuangan dalam periode tertentu</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Laba Rugi</h1>
+        <p className="text-[var(--text-3)] text-sm mt-0.5">Profit &amp; Loss — performa keuangan dalam periode tertentu</p>
       </div>
 
       {/* Controls */}
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap gap-2">
           {PERIOD_BTNS.map(btn => (
             <button
@@ -226,7 +226,7 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
               className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 period === btn.value
                   ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
-                  : 'bg-stone-50 text-stone-500 hover:bg-stone-100 border border-stone-200'
+                  : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:bg-[var(--bg-muted)] border border-[var(--border)]'
               }`}
             >
               {btn.label}
@@ -236,22 +236,22 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
 
         {period === 'custom' && (
           <div className="flex gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-stone-400">Dari</span>
+            <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+              <span className="text-xs text-[var(--text-3)]">Dari</span>
               <input
                 type="date"
                 value={customFrom}
                 onChange={e => setCustomFrom(e.target.value)}
-                className="text-sm text-stone-700 bg-transparent focus:outline-none"
+                className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none"
               />
             </div>
-            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-stone-400">Sampai</span>
+            <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+              <span className="text-xs text-[var(--text-3)]">Sampai</span>
               <input
                 type="date"
                 value={customTo}
                 onChange={e => setCustomTo(e.target.value)}
-                className="text-sm text-stone-700 bg-transparent focus:outline-none"
+                className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none"
               />
             </div>
           </div>
@@ -282,45 +282,45 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
       {/* KPI row */}
       {!isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-semibold text-stone-400 mb-1">Pendapatan</p>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(t.revenue, currency)}</p>
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+            <p className="text-xs font-semibold text-[var(--text-3)] mb-1">Pendapatan</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(t.revenue, currency)}</p>
             <PctBadge value={pctChange(t.revenue, pt.revenue)} />
           </div>
-          <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-semibold text-stone-400 mb-1">Laba Kotor</p>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(t.grossProfit, currency)}</p>
-            <span className="text-xs text-stone-400">Margin {grossMargin.toFixed(1)}%</span>
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+            <p className="text-xs font-semibold text-[var(--text-3)] mb-1">Laba Kotor</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(t.grossProfit, currency)}</p>
+            <span className="text-xs text-[var(--text-3)]">Margin {grossMargin.toFixed(1)}%</span>
           </div>
-          <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-semibold text-stone-400 mb-1">Biaya Operasional</p>
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+            <p className="text-xs font-semibold text-[var(--text-3)] mb-1">Biaya Operasional</p>
             <p className="text-lg font-bold text-red-500">-{formatCurrency(t.operatingExpenses, currency)}</p>
             <PctBadge value={pctChange(t.operatingExpenses, pt.operatingExpenses)} />
           </div>
-          <div className={`rounded-2xl p-4 shadow-sm border ${t.netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-            <p className="text-xs font-semibold text-stone-400 mb-1">Laba Bersih</p>
+          <div className={`rounded-xl p-4 shadow-sm border ${t.netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+            <p className="text-xs font-semibold text-[var(--text-3)] mb-1">Laba Bersih</p>
             <p className={`text-lg font-bold ${t.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
               {formatCurrency(t.netProfit, currency)}
             </p>
-            <span className="text-xs text-stone-400">Margin {netMargin.toFixed(1)}%</span>
+            <span className="text-xs text-[var(--text-3)]">Margin {netMargin.toFixed(1)}%</span>
           </div>
         </div>
       )}
 
       {/* P&L Statement */}
       {isLoading ? skeleton() : (
-        <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
           {/* Column headers */}
-          <div className="flex items-center justify-between px-5 py-3 bg-stone-50 border-b border-stone-100">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wide">Akun</span>
+          <div className="flex items-center justify-between px-5 py-3 bg-[var(--bg-subtle)] border-b border-[var(--border)]">
+            <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wide">Akun</span>
             <div className="flex items-center gap-4">
               <span className="text-xs text-stone-300 hidden sm:block w-28 text-right">Periode Lalu</span>
-              <span className="text-xs font-bold text-stone-500 w-32 text-right">Periode Ini</span>
+              <span className="text-xs font-bold text-[var(--text-2)] w-32 text-right">Periode Ini</span>
             </div>
           </div>
 
           {/* Revenue */}
-          <div className="border-b border-stone-100">
+          <div className="border-b border-[var(--border)]">
             <div className="px-5 py-2 bg-amber-50/60">
               <span className="text-xs font-bold uppercase tracking-wide text-amber-600">Pendapatan</span>
             </div>
@@ -331,9 +331,9 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
           </div>
 
           {/* COGS */}
-          <div className="border-b border-stone-100">
-            <div className="px-5 py-2 bg-stone-50/60">
-              <span className="text-xs font-bold uppercase tracking-wide text-stone-500">Harga Pokok Penjualan (HPP)</span>
+          <div className="border-b border-[var(--border)]">
+            <div className="px-5 py-2 bg-[var(--bg-subtle)]/60">
+              <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-2)]">Harga Pokok Penjualan (HPP)</span>
             </div>
             {(data?.cogs ?? []).map((acc, i) => (
               <LineRow key={i} label={acc.name} amount={acc.amount} currency={currency} indent />
@@ -342,7 +342,7 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
           </div>
 
           {/* Gross Profit */}
-          <div className="border-b-2 border-stone-200">
+          <div className="border-b-2 border-[var(--border)]">
             <LineRow
               label="Laba Kotor"
               amount={t.grossProfit}
@@ -354,9 +354,9 @@ export function PnLClient({ storeId, currency }: PnLClientProps) {
           </div>
 
           {/* OpEx */}
-          <div className="border-b border-stone-100">
-            <div className="px-5 py-2 bg-stone-50/60">
-              <span className="text-xs font-bold uppercase tracking-wide text-stone-500">Biaya Operasional</span>
+          <div className="border-b border-[var(--border)]">
+            <div className="px-5 py-2 bg-[var(--bg-subtle)]/60">
+              <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-2)]">Biaya Operasional</span>
             </div>
             {(data?.operatingExpenses ?? []).map((acc, i) => (
               <LineRow key={i} label={acc.name} amount={acc.amount} currency={currency} indent />

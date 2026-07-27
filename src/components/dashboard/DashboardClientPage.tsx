@@ -143,10 +143,10 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               {dateLabel}
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">
             {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''} 👋
           </h1>
-          <p className="text-stone-400 mt-0.5 text-sm">Ini ringkasan tokomu hari ini.</p>
+          <p className="text-[var(--text-3)] mt-0.5 text-sm">Ini ringkasan tokomu hari ini.</p>
         </div>
         <Link
           href="/dashboard/pos"
@@ -159,7 +159,7 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
       </div>
 
       {/* ── Shift status widget ── */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
         {shiftLoading ? (
           <div className="h-10 bg-amber-100 animate-pulse rounded-xl" />
         ) : activeShift ? (
@@ -170,24 +170,24 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               </div>
               <div>
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">Shift Aktif</p>
-                <p className="text-sm font-bold text-stone-800 mt-0.5">{activeShift.userName ?? 'Kasir'}</p>
+                <p className="text-sm font-bold text-[var(--text-1)] mt-0.5">{activeShift.userName ?? 'Kasir'}</p>
               </div>
             </div>
             <div className="hidden sm:flex items-center gap-6 text-center">
               <div>
-                <p className="text-[10px] text-stone-400 uppercase tracking-widest">Dibuka</p>
-                <p className="text-xs font-semibold text-stone-700 mt-0.5">
+                <p className="text-[10px] text-[var(--text-3)] uppercase tracking-widest">Dibuka</p>
+                <p className="text-xs font-semibold text-[var(--text-1)] mt-0.5">
                   {new Date(activeShift.openedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-stone-400 uppercase tracking-widest">Kas Awal</p>
-                <p className="text-xs font-semibold text-stone-700 mt-0.5">
+                <p className="text-[10px] text-[var(--text-3)] uppercase tracking-widest">Kas Awal</p>
+                <p className="text-xs font-semibold text-[var(--text-1)] mt-0.5">
                   {formatCurrency(activeShift.openingCash ?? 0, currency)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-stone-400 uppercase tracking-widest">Omzet Shift</p>
+                <p className="text-[10px] text-[var(--text-3)] uppercase tracking-widest">Omzet Shift</p>
                 <p className="text-xs font-semibold text-amber-700 mt-0.5">
                   {formatCurrency(stats.totalRevenue ?? 0, currency)}
                 </p>
@@ -204,11 +204,11 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-stone-200 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4 text-stone-400" />
+                <Clock className="h-4 w-4 text-[var(--text-3)]" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest">Tidak ada shift aktif</p>
-                <p className="text-sm text-stone-400 mt-0.5">Buka shift untuk mulai mencatat penjualan</p>
+                <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-widest">Tidak ada shift aktif</p>
+                <p className="text-sm text-[var(--text-3)] mt-0.5">Buka shift untuk mulai mencatat penjualan</p>
               </div>
             </div>
             <a
@@ -260,11 +260,11 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
 
       {/* ── Today's Performance summary bar ── */}
       {!isLoading && (
-        <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-stone-100">
-            <p className="text-xs font-semibold text-stone-400 uppercase tracking-widest">Performa Hari Ini</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-[var(--border)]">
+            <p className="text-xs font-semibold text-[var(--text-3)] uppercase tracking-widest">Performa Hari Ini</p>
           </div>
-          <div className="grid grid-cols-3 divide-x divide-stone-100">
+          <div className="grid grid-cols-3 divide-x divide-[var(--border)]">
             {/* Revenue vs yesterday */}
             {(() => {
               const today = stats.totalRevenue ?? 0
@@ -273,8 +273,8 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               const up = pct !== undefined && pct >= 0
               return (
                 <div className="px-4 py-3 flex flex-col gap-1">
-                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest truncate">Omzet</p>
-                  <p className="text-sm sm:text-base font-bold text-stone-800 truncate">{formatCurrency(today, currency)}</p>
+                  <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest truncate">Omzet</p>
+                  <p className="text-sm sm:text-base font-bold text-[var(--text-1)] truncate">{formatCurrency(today, currency)}</p>
                   {pct !== undefined ? (
                     <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
                       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -295,8 +295,8 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               const up = pct !== undefined && pct >= 0
               return (
                 <div className="px-4 py-3 flex flex-col gap-1">
-                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest truncate">Pesanan</p>
-                  <p className="text-sm sm:text-base font-bold text-stone-800">{today}</p>
+                  <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest truncate">Pesanan</p>
+                  <p className="text-sm sm:text-base font-bold text-[var(--text-1)]">{today}</p>
                   {pct !== undefined ? (
                     <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
                       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -314,10 +314,10 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               const top = (topProducts as any[])[0]
               return (
                 <div className="px-4 py-3 flex flex-col gap-1">
-                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest truncate">Produk Terlaris</p>
+                  <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest truncate">Produk Terlaris</p>
                   {top ? (
                     <>
-                      <p className="text-sm font-bold text-stone-800 truncate">{top.name}</p>
+                      <p className="text-sm font-bold text-[var(--text-1)] truncate">{top.name}</p>
                       <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5">
                         <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                         {top.qty ?? 0}x terjual
@@ -335,11 +335,11 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
 
       {/* ── 7-day revenue sparkline card ── */}
       {sparkRevenue.length > 1 && (
-        <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-widest">Tren 7 Hari</p>
-              <p className="text-sm font-semibold text-stone-700 mt-0.5">Omzet minggu ini</p>
+              <p className="text-xs font-semibold text-[var(--text-3)] uppercase tracking-widest">Tren 7 Hari</p>
+              <p className="text-sm font-semibold text-[var(--text-1)] mt-0.5">Omzet minggu ini</p>
             </div>
             <Link href="/dashboard/reports" className="text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1 transition-colors">
               Detail <ChevronRight className="h-3 w-3" />
@@ -361,7 +361,7 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
                       title={formatCurrency(v, currency)}
                     />
                   </div>
-                  <span className={`text-[9px] font-medium ${isToday ? 'text-amber-600' : 'text-stone-400'}`}>
+                  <span className={`text-[9px] font-medium ${isToday ? 'text-amber-600' : 'text-[var(--text-3)]'}`}>
                     {dayNames[d.getDay()]}
                   </span>
                 </div>
@@ -377,23 +377,23 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
           <ShoppingBag className="h-4 w-4 shrink-0" />
           <span>Kasir</span>
         </Link>
-        <Link href="/dashboard/products" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-stone-50 border border-stone-200 text-stone-600 px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-stone-100 active:scale-95 text-center">
+        <Link href="/dashboard/products" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] text-[var(--text-2)] px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-[var(--bg-muted)] active:scale-95 text-center">
           <Package className="h-4 w-4 shrink-0" />
           <span>Produk</span>
         </Link>
-        <Link href="/dashboard/orders" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-stone-50 border border-stone-200 text-stone-600 px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-stone-100 active:scale-95 text-center">
+        <Link href="/dashboard/orders" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] text-[var(--text-2)] px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-[var(--bg-muted)] active:scale-95 text-center">
           <ShoppingCart className="h-4 w-4 shrink-0" />
           <span>Pesanan</span>
         </Link>
-        <Link href="/dashboard/customers" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-stone-50 border border-stone-200 text-stone-600 px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-stone-100 active:scale-95 text-center">
+        <Link href="/dashboard/customers" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] text-[var(--text-2)] px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-[var(--bg-muted)] active:scale-95 text-center">
           <Users className="h-4 w-4 shrink-0" />
           <span>Pelanggan</span>
         </Link>
-        <Link href="/dashboard/inventory" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-stone-50 border border-stone-200 text-stone-600 px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-stone-100 active:scale-95 text-center">
+        <Link href="/dashboard/inventory" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] text-[var(--text-2)] px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-[var(--bg-muted)] active:scale-95 text-center">
           <Boxes className="h-4 w-4 shrink-0" />
           <span>Stok</span>
         </Link>
-        <Link href="/dashboard/reports" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-stone-50 border border-stone-200 text-stone-600 px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-stone-100 active:scale-95 text-center">
+        <Link href="/dashboard/reports" className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] text-[var(--text-2)] px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all hover:bg-[var(--bg-muted)] active:scale-95 text-center">
           <BarChart3 className="h-4 w-4 shrink-0" />
           <span>Laporan</span>
         </Link>
@@ -403,9 +403,9 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Recent orders */}
-        <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100">
-            <h2 className="font-semibold text-stone-800 text-sm">Pesanan Terbaru</h2>
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border)]">
+            <h2 className="font-semibold text-[var(--text-1)] text-sm">Pesanan Terbaru</h2>
             <Link href="/dashboard/orders" className="text-amber-600 hover:text-amber-700 text-xs flex items-center gap-1 transition-colors font-medium">
               Lihat semua <ArrowRight className="h-3 w-3" />
             </Link>
@@ -413,12 +413,12 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
 
           {ordersLoading ? (
             <div className="p-4 space-y-2">
-              {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-stone-50 animate-pulse rounded-xl" />)}
+              {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}
             </div>
           ) : (recentOrders as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-center px-4">
               <ShoppingCart className="h-8 w-8 text-stone-200" />
-              <p className="text-sm text-stone-400">Belum ada pesanan hari ini</p>
+              <p className="text-sm text-[var(--text-3)]">Belum ada pesanan hari ini</p>
               <Link href="/dashboard/pos" className="text-xs text-amber-600 font-medium hover:underline">Mulai catat penjualan →</Link>
             </div>
           ) : (
@@ -426,13 +426,13 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               {(recentOrders as any[]).slice(0, 7).map((order: any) => {
                 const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.PENDING
                 return (
-                  <div key={order.id} className="flex items-center justify-between px-4 py-3 hover:bg-stone-50 transition-colors">
+                  <div key={order.id} className="flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-subtle)] transition-colors">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-stone-700">#{order.number}</p>
-                      <p className="text-xs text-stone-400 mt-0.5">{formatDate(order.createdAt)}</p>
+                      <p className="text-sm font-semibold text-[var(--text-1)]">#{order.number}</p>
+                      <p className="text-xs text-[var(--text-3)] mt-0.5">{formatDate(order.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <p className="text-sm font-bold text-stone-800">{formatCurrency(order.total, currency)}</p>
+                      <p className="text-sm font-bold text-[var(--text-1)]">{formatCurrency(order.total, currency)}</p>
                       <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${style.pill}`}>
                         {style.icon}{style.label}
                       </span>
@@ -448,9 +448,9 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
         <div className="space-y-4">
 
           {/* Low stock alerts */}
-          <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100">
-              <h2 className="font-semibold text-stone-800 text-sm flex items-center gap-2">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border)]">
+              <h2 className="font-semibold text-[var(--text-1)] text-sm flex items-center gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                 Stok Menipis
                 {(lowStock as any[]).length > 0 && (
@@ -466,24 +466,24 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
 
             {stockLoading ? (
               <div className="p-4 space-y-2">
-                {[...Array(3)].map((_, i) => <div key={i} className="h-10 bg-stone-50 animate-pulse rounded-xl" />)}
+                {[...Array(3)].map((_, i) => <div key={i} className="h-10 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}
               </div>
             ) : (lowStock as any[]).length === 0 ? (
               <div className="flex items-center gap-3 px-4 py-4">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 </div>
-                <p className="text-sm text-stone-500">Semua stok aman ✓</p>
+                <p className="text-sm text-[var(--text-2)]">Semua stok aman ✓</p>
               </div>
             ) : (
               <div className="divide-y divide-stone-50">
                 {(lowStock as any[]).slice(0, 5).map((p: any) => (
-                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-stone-50 transition-colors">
+                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--bg-subtle)] transition-colors">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
                         <Package className="h-3.5 w-3.5 text-amber-500" />
                       </div>
-                      <p className="text-sm text-stone-700 truncate">{p.name}</p>
+                      <p className="text-sm text-[var(--text-1)] truncate">{p.name}</p>
                     </div>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ${
                       p.stock === 0 ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-amber-50 text-amber-600 border border-amber-100'
@@ -498,9 +498,9 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
 
           {/* Top products today */}
           {(topProducts as any[]).length > 0 && (
-            <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
-              <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100">
-                <h2 className="font-semibold text-stone-800 text-sm flex items-center gap-2">
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border)]">
+                <h2 className="font-semibold text-[var(--text-1)] text-sm flex items-center gap-2">
                   <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" />
                   Produk Terlaris Hari Ini
                 </h2>
@@ -510,13 +510,13 @@ export default function DashboardClientPage({ storeId, session, modules }: Dashb
               </div>
               <div className="divide-y divide-stone-50">
                 {(topProducts as any[]).slice(0, 5).map((p: any, i: number) => (
-                  <div key={p.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-50 transition-colors">
+                  <div key={p.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-subtle)] transition-colors">
                     <span className="text-xs font-bold text-stone-300 w-4 shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-stone-700 truncate">{p.name}</p>
-                      <p className="text-xs text-stone-400">{p.qty ?? 0}x terjual</p>
+                      <p className="text-sm text-[var(--text-1)] truncate">{p.name}</p>
+                      <p className="text-xs text-[var(--text-3)]">{p.qty ?? 0}x terjual</p>
                     </div>
-                    <p className="text-sm font-bold text-stone-800 shrink-0">{formatCurrency(p.revenue ?? 0, currency)}</p>
+                    <p className="text-sm font-bold text-[var(--text-1)] shrink-0">{formatCurrency(p.revenue ?? 0, currency)}</p>
                   </div>
                 ))}
               </div>

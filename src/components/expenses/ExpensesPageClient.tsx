@@ -27,7 +27,7 @@ interface Expense {
 
 interface Props { storeId: string; currency: string }
 
-const inputCls = 'w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
+const inputCls = 'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
@@ -36,7 +36,7 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   const over = pct >= 100
   return (
-    <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
+    <div className="w-full h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden">
       <div
         className="h-full rounded-full transition-all"
         style={{ width: `${pct}%`, background: over ? '#ef4444' : color }}
@@ -191,13 +191,13 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Pengeluaran</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Catat biaya operasional tokomu</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Pengeluaran</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Catat biaya operasional tokomu</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowCatMgr(v => !v)}
-            className="flex items-center gap-1.5 border border-stone-200 text-stone-600 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-stone-50 transition-all"
+            className="flex items-center gap-1.5 border border-[var(--border)] text-[var(--text-2)] px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-[var(--bg-subtle)] transition-all"
             title="Kelola Kategori"
           >
             <Settings className="h-4 w-4" />
@@ -205,7 +205,7 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
           </button>
           <button
             onClick={exportCSV}
-            className="flex items-center gap-1.5 border border-stone-200 text-stone-600 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-stone-50 transition-all"
+            className="flex items-center gap-1.5 border border-[var(--border)] text-[var(--text-2)] px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-[var(--bg-subtle)] transition-all"
             title="Export CSV"
           >
             <Download className="h-4 w-4" />
@@ -222,10 +222,10 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
 
       {/* Category manager */}
       {showCatMgr && (
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-stone-800 text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Kelola Kategori</h2>
-            <button onClick={() => setShowCatMgr(false)} className="text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition-colors"><X className="h-4 w-4" /></button>
+            <h2 className="font-semibold text-[var(--text-1)] text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Kelola Kategori</h2>
+            <button onClick={() => setShowCatMgr(false)} className="text-[var(--text-3)] hover:text-[var(--text-1)] p-1 rounded-lg hover:bg-[var(--bg-muted)] transition-colors"><X className="h-4 w-4" /></button>
           </div>
 
           {/* Existing categories with budgets */}
@@ -234,13 +234,13 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
               {apiCategories.map((cat: ExpenseCategory) => {
                 const spent = byCategory[cat.name] ?? 0
                 return (
-                  <div key={cat.id} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl border border-stone-100">
+                  <div key={cat.id} className="flex items-center gap-3 p-3 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border)]">
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.color }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-medium text-stone-700">{cat.name}</span>
+                        <span className="font-medium text-[var(--text-1)]">{cat.name}</span>
                         {cat.budget > 0 && (
-                          <span className={`font-medium ${spent > cat.budget ? 'text-red-500' : 'text-stone-500'}`}>
+                          <span className={`font-medium ${spent > cat.budget ? 'text-red-500' : 'text-[var(--text-2)]'}`}>
                             {formatCurrency(spent, currency)} / {formatCurrency(cat.budget, currency)}
                           </span>
                         )}
@@ -254,20 +254,20 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
           )}
 
           {/* New category form */}
-          <div className="border-t border-stone-100 pt-4 space-y-3">
-            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Tambah Kategori Baru</p>
+          <div className="border-t border-[var(--border)] pt-4 space-y-3">
+            <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide">Tambah Kategori Baru</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-stone-500 mb-1.5 block">Nama</label>
+                <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Nama</label>
                 <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Misal: Transportasi" className={inputCls} />
               </div>
               <div>
-                <label className="text-xs font-medium text-stone-500 mb-1.5 block">Anggaran/Bulan (Rp)</label>
+                <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Anggaran/Bulan (Rp)</label>
                 <input type="number" min="0" value={newCatBudget} onChange={e => setNewCatBudget(e.target.value)} placeholder="0" className={inputCls} />
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-stone-500 mb-1.5 block">Warna</label>
+              <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Warna</label>
               <div className="flex gap-2 flex-wrap">
                 {CATEGORY_COLORS.map(c => (
                   <button
@@ -292,13 +292,13 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
 
       {/* Date filter */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-xl px-3 py-2">
-          <span className="text-xs text-stone-400">Dari</span>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="text-sm text-stone-700 bg-transparent focus:outline-none" />
+        <div className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2">
+          <span className="text-xs text-[var(--text-3)]">Dari</span>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none" />
         </div>
-        <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-xl px-3 py-2">
-          <span className="text-xs text-stone-400">Sampai</span>
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm text-stone-700 bg-transparent focus:outline-none" />
+        <div className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2">
+          <span className="text-xs text-[var(--text-3)]">Sampai</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none" />
         </div>
       </div>
 
@@ -310,15 +310,15 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
             const pct = Math.min(100, (spent / cat.budget) * 100)
             const over = spent > cat.budget
             return (
-              <div key={cat.id} className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+              <div key={cat.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ background: cat.color }} />
-                  <p className="text-xs text-stone-500 font-medium truncate">{cat.name}</p>
+                  <p className="text-xs text-[var(--text-2)] font-medium truncate">{cat.name}</p>
                 </div>
-                <p className={`text-base font-bold ${over ? 'text-red-500' : 'text-stone-800'}`}>{formatCurrency(spent, currency)}</p>
-                <p className="text-xs text-stone-400 mb-2">dari {formatCurrency(cat.budget, currency)}</p>
+                <p className={`text-base font-bold ${over ? 'text-red-500' : 'text-[var(--text-1)]'}`}>{formatCurrency(spent, currency)}</p>
+                <p className="text-xs text-[var(--text-3)] mb-2">dari {formatCurrency(cat.budget, currency)}</p>
                 <ProgressBar value={spent} max={cat.budget} color={cat.color} />
-                <p className={`text-xs mt-1 ${over ? 'text-red-500 font-medium' : 'text-stone-400'}`}>
+                <p className={`text-xs mt-1 ${over ? 'text-red-500 font-medium' : 'text-[var(--text-3)]'}`}>
                   {over ? `Melebihi ${formatCurrency(spent - cat.budget, currency)}` : `Sisa ${formatCurrency(cat.budget - spent, currency)}`}
                 </p>
               </div>
@@ -329,74 +329,74 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="col-span-2 sm:col-span-1 bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+        <div className="col-span-2 sm:col-span-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
               <TrendingDown className="h-4 w-4 text-red-500" />
             </div>
-            <span className="text-xs text-stone-400 font-medium">Total Pengeluaran</span>
+            <span className="text-xs text-[var(--text-3)] font-medium">Total Pengeluaran</span>
           </div>
-          <p className="text-2xl font-bold text-stone-800">{formatCurrency(total, currency)}</p>
-          <p className="text-xs text-stone-400 mt-0.5">{(expenses as Expense[]).length} transaksi</p>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(total, currency)}</p>
+          <p className="text-xs text-[var(--text-3)] mt-0.5">{(expenses as Expense[]).length} transaksi</p>
         </div>
         {Object.entries(byCategory).slice(0, 4).map(([cat, amt]) => (
-          <div key={cat} className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+          <div key={cat} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               {categoryMap[cat] && (
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: categoryMap[cat].color }} />
               )}
-              <p className="text-xs text-stone-400 truncate">{cat}</p>
+              <p className="text-xs text-[var(--text-3)] truncate">{cat}</p>
             </div>
-            <p className="text-lg font-bold text-stone-800 mt-1">{formatCurrency(amt, currency)}</p>
+            <p className="text-lg font-bold text-[var(--text-1)] mt-1">{formatCurrency(amt, currency)}</p>
           </div>
         ))}
       </div>
 
       {/* Add/Edit form */}
       {showForm && (
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-stone-800 text-sm">{editItem ? 'Edit Pengeluaran' : 'Pengeluaran Baru'}</h2>
-            <button onClick={resetForm} className="text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition-colors"><X className="h-4 w-4" /></button>
+            <h2 className="font-semibold text-[var(--text-1)] text-sm">{editItem ? 'Edit Pengeluaran' : 'Pengeluaran Baru'}</h2>
+            <button onClick={resetForm} className="text-[var(--text-3)] hover:text-[var(--text-1)] p-1 rounded-lg hover:bg-[var(--bg-muted)] transition-colors"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-stone-500 mb-1.5 block">Kategori</label>
+              <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Kategori</label>
               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inputCls}>
                 {categoryNames.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-stone-500 mb-1.5 block">Tanggal</label>
+              <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Tanggal</label>
               <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className={inputCls} />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-stone-500 mb-1.5 block">Keterangan</label>
+            <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Keterangan</label>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Contoh: Beli tepung 5kg" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-stone-500 mb-1.5 block">Jumlah (Rp)</label>
+            <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Jumlah (Rp)</label>
             <input type="number" min="0" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="50000" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-stone-500 mb-1.5 block">Catatan / URL Struk</label>
+            <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block">Catatan / URL Struk</label>
             <input value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="Tambahkan catatan atau URL struk..." className={inputCls} />
           </div>
 
           {/* Receipt photo upload */}
           <div>
-            <label className="text-xs font-medium text-stone-500 mb-1.5 block flex items-center gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-2)] mb-1.5 block flex items-center gap-1.5">
               <Camera className="h-3.5 w-3.5" /> Foto Struk (opsional)
             </label>
-            <label className="flex items-center gap-2 cursor-pointer bg-stone-50 border border-dashed border-stone-300 rounded-xl px-3 py-2.5 hover:bg-stone-100 transition-colors">
-              <Camera className="h-4 w-4 text-stone-400" />
-              <span className="text-sm text-stone-400">Pilih foto struk...</span>
+            <label className="flex items-center gap-2 cursor-pointer bg-[var(--bg-subtle)] border border-dashed border-stone-300 rounded-xl px-3 py-2.5 hover:bg-[var(--bg-muted)] transition-colors">
+              <Camera className="h-4 w-4 text-[var(--text-3)]" />
+              <span className="text-sm text-[var(--text-3)]">Pilih foto struk...</span>
               <input type="file" accept="image/*" className="hidden" onChange={handleReceiptUpload} />
             </label>
             {form.note?.startsWith('blob:') && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={form.note} alt="Struk" className="mt-2 h-24 w-auto rounded-xl object-cover border border-stone-200" />
+              <img src={form.note} alt="Struk" className="mt-2 h-24 w-auto rounded-xl object-cover border border-[var(--border)]" />
             )}
           </div>
 
@@ -406,15 +406,15 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
               onClick={() => setForm(f => ({ ...f, recurring: !f.recurring }))}
               className={`w-9 h-5 rounded-full transition-colors relative ${form.recurring ? 'bg-amber-500' : 'bg-stone-200'}`}
             >
-              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${form.recurring ? 'left-4' : 'left-0.5'}`} />
+              <div className={`absolute top-0.5 w-4 h-4 bg-[var(--bg-card)] rounded-full shadow transition-all ${form.recurring ? 'left-4' : 'left-0.5'}`} />
             </div>
-            <span className="text-sm text-stone-600 flex items-center gap-1.5">
-              <RefreshCw className="h-3.5 w-3.5 text-stone-400" /> Pengeluaran berulang (otomatis tiap bulan)
+            <span className="text-sm text-[var(--text-2)] flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5 text-[var(--text-3)]" /> Pengeluaran berulang (otomatis tiap bulan)
             </span>
           </label>
 
           <div className="flex gap-3">
-            <button onClick={resetForm} className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 transition-colors">Batal</button>
+            <button onClick={resetForm} className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-2)] text-sm font-medium hover:bg-[var(--bg-subtle)] transition-colors">Batal</button>
             <button onClick={handleSave} disabled={saving || !form.description || !form.amount} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2">
               {saving ? 'Menyimpan…' : <><Check className="h-4 w-4" />{editItem ? 'Simpan' : 'Tambah'}</>}
             </button>
@@ -423,23 +423,23 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
       )}
 
       {/* Expense list */}
-      <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
-        <div className="px-4 py-3.5 border-b border-stone-100">
-          <h2 className="text-sm font-semibold text-stone-800">Daftar Pengeluaran</h2>
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+        <div className="px-4 py-3.5 border-b border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-[var(--text-1)]">Daftar Pengeluaran</h2>
         </div>
         {isLoading ? (
-          <div className="p-4 space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-14 bg-stone-50 animate-pulse rounded-xl" />)}</div>
+          <div className="p-4 space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-14 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}</div>
         ) : (expenses as Expense[]).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
             <TrendingDown className="h-8 w-8 text-stone-200" />
-            <p className="text-sm text-stone-400">Belum ada pengeluaran di periode ini</p>
+            <p className="text-sm text-[var(--text-3)]">Belum ada pengeluaran di periode ini</p>
           </div>
         ) : (
-          <div className="divide-y divide-stone-50">
+          <div className="divide-y divide-[var(--border)]">
             {(expenses as Expense[]).map(e => {
               const catInfo = categoryMap[e.category]
               return (
-                <div key={e.id} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition-colors">
+                <div key={e.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-subtle)] transition-colors">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
@@ -451,22 +451,22 @@ export default function ExpensesPageClient({ storeId, currency }: Props) {
                       >
                         {e.category}
                       </span>
-                      <span className="text-xs text-stone-400">{e.date}</span>
+                      <span className="text-xs text-[var(--text-3)]">{e.date}</span>
                       {e.recurring && (
                         <span className="text-xs flex items-center gap-0.5 text-blue-500">
                           <RefreshCw className="h-3 w-3" /> berulang
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-stone-700 font-medium mt-0.5 truncate">{e.description}</p>
-                    {e.note && !e.note.startsWith('blob:') && <p className="text-xs text-stone-400 truncate">{e.note}</p>}
+                    <p className="text-sm text-[var(--text-1)] font-medium mt-0.5 truncate">{e.description}</p>
+                    {e.note && !e.note.startsWith('blob:') && <p className="text-xs text-[var(--text-3)] truncate">{e.note}</p>}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-red-500">-{formatCurrency(e.amount, currency)}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => openEdit(e)} className="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => deleteMut.mutate(e.id)} className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => openEdit(e)} className="p-1.5 rounded-lg text-[var(--text-3)] hover:text-amber-600 hover:bg-amber-50 transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => deleteMut.mutate(e.id)} className="p-1.5 rounded-lg text-[var(--text-3)] hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 </div>
               )

@@ -100,15 +100,15 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Pengaturan Toko</h1>
-        <p className="text-stone-500 mt-1 text-sm">Konfigurasi informasi dan preferensi toko kamu</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Pengaturan Toko</h1>
+        <p className="text-[var(--text-2)] mt-1 text-sm">Konfigurasi informasi dan preferensi toko kamu</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
         {/* ── Store Info ── */}
-        <section className="bg-white border border-stone-100 rounded-2xl p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-stone-700 font-semibold text-sm">
+        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm">
             <Store className="h-4 w-4 text-amber-500" />
             Informasi Toko
           </div>
@@ -129,8 +129,8 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* ── Tax & Currency ── */}
-        <section className="bg-white border border-stone-100 rounded-2xl p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-stone-700 font-semibold text-sm">
+        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm">
             <Globe className="h-4 w-4 text-amber-500" />
             Pajak & Mata Uang
           </div>
@@ -159,8 +159,8 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* ── Receipt ── */}
-        <section className="bg-white border border-stone-100 rounded-2xl p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-stone-700 font-semibold text-sm">
+        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm">
             <Receipt className="h-4 w-4 text-amber-500" />
             Struk
           </div>
@@ -175,12 +175,12 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
         </section>
 
         {/* ── Modules ── */}
-        <section className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-stone-700 font-semibold text-sm mb-1">
+        <section className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--text-1)] font-semibold text-sm mb-1">
             <LayoutGrid className="h-4 w-4 text-amber-500" />
             Fitur yang Diaktifkan
           </div>
-          <p className="text-xs text-stone-400 mb-4">
+          <p className="text-xs text-[var(--text-3)] mb-4">
             Pilih fitur yang sesuai dengan kebutuhan bisnis kamu. Fitur yang dinonaktifkan akan disembunyikan dari tampilan.
           </p>
           <div className="space-y-2">
@@ -195,21 +195,21 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
                     enabled
                       ? 'bg-amber-50 border-amber-200'
-                      : 'bg-stone-50 border-stone-100 opacity-60'
+                      : 'bg-[var(--bg-subtle)] border-[var(--border)] opacity-60'
                   } ${required ? 'cursor-default' : 'cursor-pointer hover:border-amber-300'}`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${enabled ? 'bg-amber-100' : 'bg-stone-100'}`}>
-                    <Icon className={`h-4 w-4 ${enabled ? 'text-amber-600' : 'text-stone-400'}`} />
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${enabled ? 'bg-amber-100' : 'bg-[var(--bg-muted)]'}`}>
+                    <Icon className={`h-4 w-4 ${enabled ? 'text-amber-600' : 'text-[var(--text-3)]'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm font-semibold ${enabled ? 'text-stone-800' : 'text-stone-500'}`}>{label}</p>
-                      {required && <span className="text-[10px] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">Wajib</span>}
+                      <p className={`text-sm font-semibold ${enabled ? 'text-[var(--text-1)]' : 'text-[var(--text-2)]'}`}>{label}</p>
+                      {required && <span className="text-[10px] text-[var(--text-3)] bg-[var(--bg-muted)] px-1.5 py-0.5 rounded-full">Wajib</span>}
                     </div>
-                    <p className="text-xs text-stone-400 mt-0.5 truncate">{desc}</p>
+                    <p className="text-xs text-[var(--text-3)] mt-0.5 truncate">{desc}</p>
                   </div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                    enabled ? 'bg-amber-500 border-amber-500' : 'border-stone-300 bg-white'
+                    enabled ? 'bg-amber-500 border-amber-500' : 'border-stone-300 bg-[var(--bg-card)]'
                   }`}>
                     {enabled && <CheckCircle2 className="h-3 w-3 text-white" />}
                   </div>
@@ -225,7 +225,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 disabled:from-stone-200 disabled:to-stone-200 disabled:text-stone-400 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all"
+            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 disabled:from-stone-200 disabled:to-stone-200 disabled:text-[var(--text-3)] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all"
           >
             <Save className="h-4 w-4" />
             {saving ? 'Menyimpan…' : 'Simpan Pengaturan'}
@@ -236,12 +236,12 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
   )
 }
 
-const inputCls = 'w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
+const inputCls = 'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 placeholder-stone-400 transition-all'
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-stone-500 mb-1.5">{label}</label>
+      <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">{label}</label>
       {children}
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>

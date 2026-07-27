@@ -107,18 +107,18 @@ export function CustomerFormModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white border border-stone-200 rounded-xl shadow-2xl">
+      <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-amber-600" />
-            <h2 className="text-lg font-semibold text-stone-800">
+            <h2 className="text-lg font-semibold text-[var(--text-1)]">
               {isEdit ? 'Edit Customer' : 'Add Customer'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+            className="p-1.5 rounded-lg text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-muted)] transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -136,7 +136,7 @@ export function CustomerFormModal({
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-stone-600 mb-1.5">
+            <label className="block text-sm font-medium text-[var(--text-2)] mb-1.5">
               Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -144,8 +144,8 @@ export function CustomerFormModal({
               type="text"
               placeholder="Customer name"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition',
-                errors.name ? 'border-red-500' : 'border-stone-200'
+                'w-full px-3 py-2 bg-[var(--bg-muted)] border rounded-lg text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition',
+                errors.name ? 'border-red-500' : 'border-[var(--border)]'
               )}
             />
             {errors.name && (
@@ -155,7 +155,7 @@ export function CustomerFormModal({
 
           {/* Phone */}
           <div>
-            <label className="block text-sm font-medium text-stone-600 mb-1.5">
+            <label className="block text-sm font-medium text-[var(--text-2)] mb-1.5">
               Phone
             </label>
             <input
@@ -163,8 +163,8 @@ export function CustomerFormModal({
               type="tel"
               placeholder="+62 812 3456 7890"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition',
-                errors.phone ? 'border-red-500' : 'border-stone-200'
+                'w-full px-3 py-2 bg-[var(--bg-muted)] border rounded-lg text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition',
+                errors.phone ? 'border-red-500' : 'border-[var(--border)]'
               )}
             />
             {errors.phone && (
@@ -174,7 +174,7 @@ export function CustomerFormModal({
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-stone-600 mb-1.5">
+            <label className="block text-sm font-medium text-[var(--text-2)] mb-1.5">
               Email
             </label>
             <input
@@ -182,8 +182,8 @@ export function CustomerFormModal({
               type="email"
               placeholder="customer@example.com"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition',
-                errors.email ? 'border-red-500' : 'border-stone-200'
+                'w-full px-3 py-2 bg-[var(--bg-muted)] border rounded-lg text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition',
+                errors.email ? 'border-red-500' : 'border-[var(--border)]'
               )}
             />
             {errors.email && (
@@ -193,7 +193,7 @@ export function CustomerFormModal({
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-medium text-stone-600 mb-1.5">
+            <label className="block text-sm font-medium text-[var(--text-2)] mb-1.5">
               Address
             </label>
             <textarea
@@ -201,8 +201,8 @@ export function CustomerFormModal({
               rows={3}
               placeholder="Customer address"
               className={cn(
-                'w-full px-3 py-2 bg-stone-100 border rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition resize-none',
-                errors.address ? 'border-red-500' : 'border-stone-200'
+                'w-full px-3 py-2 bg-[var(--bg-muted)] border rounded-lg text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition resize-none',
+                errors.address ? 'border-red-500' : 'border-[var(--border)]'
               )}
             />
             {errors.address && (
@@ -215,7 +215,7 @@ export function CustomerFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-2)] rounded-lg transition-colors"
             >
               Cancel
             </button>

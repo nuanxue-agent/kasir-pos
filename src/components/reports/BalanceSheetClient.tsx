@@ -54,52 +54,52 @@ function SectionTable({
 }) {
   const [open, setOpen] = useState(true)
   return (
-    <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-stone-50/60 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-[var(--bg-subtle)]/60 transition-colors"
         aria-expanded={open}
       >
         <span className={`text-sm font-bold uppercase tracking-wide ${accentClass}`}>{title}</span>
         <div className="flex items-center gap-4">
-          <span className="text-sm font-bold text-stone-800">{formatCurrency(total, currency)}</span>
+          <span className="text-sm font-bold text-[var(--text-1)]">{formatCurrency(total, currency)}</span>
           {open ? (
-            <ChevronDown className="h-4 w-4 text-stone-400" />
+            <ChevronDown className="h-4 w-4 text-[var(--text-3)]" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-stone-400" />
+            <ChevronRight className="h-4 w-4 text-[var(--text-3)]" />
           )}
         </div>
       </button>
       {open && (
-        <div className="border-t border-stone-100">
+        <div className="border-t border-[var(--border)]">
           {accounts.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-stone-400 italic">Tidak ada akun</p>
+            <p className="px-5 py-4 text-sm text-[var(--text-3)] italic">Tidak ada akun</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-stone-50">
+              <thead className="bg-[var(--bg-subtle)]">
                 <tr>
-                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-stone-400">Kode</th>
-                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-stone-400">Nama Akun</th>
-                  <th className="text-right px-5 py-2.5 text-xs font-semibold text-stone-400">Saldo</th>
+                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-[var(--text-3)]">Kode</th>
+                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-[var(--text-3)]">Nama Akun</th>
+                  <th className="text-right px-5 py-2.5 text-xs font-semibold text-[var(--text-3)]">Saldo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-50">
+              <tbody className="divide-y divide-[var(--border)]">
                 {accounts.map((acc, i) => (
-                  <tr key={acc.code ?? i} className="hover:bg-stone-50/50">
-                    <td className="px-5 py-2.5 font-mono text-xs text-stone-400">{acc.code}</td>
-                    <td className="px-5 py-2.5 text-stone-700">{acc.name}</td>
-                    <td className="px-5 py-2.5 text-right font-mono text-stone-800">
+                  <tr key={acc.code ?? i} className="hover:bg-[var(--bg-subtle)]/50">
+                    <td className="px-5 py-2.5 font-mono text-xs text-[var(--text-3)]">{acc.code}</td>
+                    <td className="px-5 py-2.5 text-[var(--text-1)]">{acc.name}</td>
+                    <td className="px-5 py-2.5 text-right font-mono text-[var(--text-1)]">
                       {formatCurrency(acc.balance, currency)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t border-stone-200 bg-stone-50/70">
+              <tfoot className="border-t border-[var(--border)] bg-[var(--bg-subtle)]/70">
                 <tr>
-                  <td colSpan={2} className="px-5 py-2.5 text-xs font-bold text-stone-600">
+                  <td colSpan={2} className="px-5 py-2.5 text-xs font-bold text-[var(--text-2)]">
                     Total {title}
                   </td>
-                  <td className="px-5 py-2.5 text-right font-bold font-mono text-stone-800">
+                  <td className="px-5 py-2.5 text-right font-bold font-mono text-[var(--text-1)]">
                     {formatCurrency(total, currency)}
                   </td>
                 </tr>
@@ -143,11 +143,11 @@ export function BalanceSheetClient({ storeId, currency }: BalanceSheetClientProp
   ]
 
   const skeleton = () => (
-    <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm space-y-3 animate-pulse">
-      <div className="h-4 bg-stone-100 rounded w-1/4" />
-      <div className="h-3 bg-stone-50 rounded w-full" />
-      <div className="h-3 bg-stone-50 rounded w-5/6" />
-      <div className="h-3 bg-stone-50 rounded w-4/6" />
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-3 animate-pulse">
+      <div className="h-4 bg-[var(--bg-muted)] rounded w-1/4" />
+      <div className="h-3 bg-[var(--bg-subtle)] rounded w-full" />
+      <div className="h-3 bg-[var(--bg-subtle)] rounded w-5/6" />
+      <div className="h-3 bg-[var(--bg-subtle)] rounded w-4/6" />
     </div>
   )
 
@@ -155,19 +155,19 @@ export function BalanceSheetClient({ storeId, currency }: BalanceSheetClientProp
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5 pb-24 lg:pb-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Neraca</h1>
-        <p className="text-stone-400 text-sm mt-0.5">Balance sheet — posisi keuangan per tanggal tertentu</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Neraca</h1>
+        <p className="text-[var(--text-3)] text-sm mt-0.5">Balance sheet — posisi keuangan per tanggal tertentu</p>
       </div>
 
       {/* Controls */}
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-          <span className="text-xs font-semibold text-stone-400 shrink-0">Per tanggal</span>
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+          <span className="text-xs font-semibold text-[var(--text-3)] shrink-0">Per tanggal</span>
           <input
             type="date"
             value={asOf}
             onChange={e => setAsOf(e.target.value)}
-            className="text-sm text-stone-700 bg-transparent focus:outline-none"
+            className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none"
             aria-label="Tanggal neraca"
           />
         </div>
@@ -207,17 +207,17 @@ export function BalanceSheetClient({ storeId, currency }: BalanceSheetClientProp
       {/* Equation summary */}
       {!isLoading && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center">
+          <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
             <p className="text-xs font-semibold text-amber-600 mb-1">Total Aset</p>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(totalAssets, currency)}</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(totalAssets, currency)}</p>
           </div>
-          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 text-center">
-            <p className="text-xs font-semibold text-stone-500 mb-1">Total Kewajiban</p>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(totalLiabilities, currency)}</p>
+          <div className="bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl p-4 text-center">
+            <p className="text-xs font-semibold text-[var(--text-2)] mb-1">Total Kewajiban</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(totalLiabilities, currency)}</p>
           </div>
-          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 text-center">
-            <p className="text-xs font-semibold text-stone-500 mb-1">Total Ekuitas</p>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(totalEquity, currency)}</p>
+          <div className="bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl p-4 text-center">
+            <p className="text-xs font-semibold text-[var(--text-2)] mb-1">Total Ekuitas</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(totalEquity, currency)}</p>
           </div>
         </div>
       )}
@@ -239,18 +239,18 @@ export function BalanceSheetClient({ storeId, currency }: BalanceSheetClientProp
             accounts={liabilities}
             total={totalLiabilities}
             currency={currency}
-            accentClass="text-stone-600"
+            accentClass="text-[var(--text-2)]"
           />
           <SectionTable
             title="Ekuitas"
             accounts={equity}
             total={totalEquity}
             currency={currency}
-            accentClass="text-stone-600"
+            accentClass="text-[var(--text-2)]"
           />
 
           {/* Equation check footer */}
-          <div className={`rounded-2xl border p-4 flex items-center justify-between text-sm font-semibold ${
+          <div className={`rounded-xl border p-4 flex items-center justify-between text-sm font-semibold ${
             isBalanced
               ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
               : 'bg-red-50 border-red-200 text-red-600'

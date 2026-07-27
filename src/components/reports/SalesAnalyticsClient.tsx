@@ -97,20 +97,20 @@ function SummaryCard({
   iconColor: string
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 shadow-sm">
       <div className="flex items-center gap-2 mb-2">
         <div className={`w-8 h-8 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
           <Icon className={`h-4 w-4 ${iconColor}`} />
         </div>
-        <p className="text-xs font-medium text-stone-400">{label}</p>
+        <p className="text-xs font-medium text-[var(--text-3)]">{label}</p>
       </div>
-      <p className="text-xl font-bold text-stone-800">{value}</p>
+      <p className="text-xl font-bold text-[var(--text-1)]">{value}</p>
     </div>
   )
 }
 
 function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`bg-stone-50 animate-pulse rounded-2xl border border-stone-100 ${className}`} />
+  return <div className={`bg-[var(--bg-subtle)] animate-pulse rounded-xl border border-[var(--border)] ${className}`} />
 }
 
 export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClientProps) {
@@ -159,8 +159,8 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Sales Analytics</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Deep-dive into your store performance</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Sales Analytics</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Deep-dive into your store performance</p>
         </div>
         <div className="flex gap-2">
           <ExportButton
@@ -185,7 +185,7 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
       </div>
 
       {/* Date range selector */}
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap gap-2">
           {RANGE_BTNS.map((btn) => (
             <button
@@ -194,7 +194,7 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
               className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 dateRange === btn.value
                   ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
-                  : 'bg-stone-50 text-stone-500 hover:bg-stone-100 border border-stone-200'
+                  : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:bg-[var(--bg-muted)] border border-[var(--border)]'
               }`}
             >
               {btn.label}
@@ -203,22 +203,22 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
         </div>
         {dateRange === 'custom' && (
           <div className="flex gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-stone-400">From</span>
+            <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+              <span className="text-xs text-[var(--text-3)]">From</span>
               <input
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="text-sm text-stone-700 bg-transparent focus:outline-none"
+                className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none"
               />
             </div>
-            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-stone-400">To</span>
+            <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+              <span className="text-xs text-[var(--text-3)]">To</span>
               <input
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="text-sm text-stone-700 bg-transparent focus:outline-none"
+                className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none"
               />
             </div>
           </div>
@@ -267,10 +267,10 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
       </div>
 
       {/* Hourly sales chart */}
-      <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <Clock className="h-4 w-4 text-amber-500" />
-          <h3 className="text-sm font-semibold text-stone-800">Sales by Hour of Day</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">Sales by Hour of Day</h3>
         </div>
         {isLoading ? (
           <Skeleton className="h-48" />
@@ -322,17 +322,17 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
       {/* Day-of-week heatmap + Category breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Day-of-week heatmap */}
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="h-4 w-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-stone-800">Day-of-Week Performance</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Day-of-Week Performance</h3>
           </div>
           {isLoading ? (
             <div className="space-y-2">
               {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-10" />)}
             </div>
           ) : (analytics?.dayOfWeekData ?? []).length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-stone-400 text-sm">
+            <div className="flex items-center justify-center h-32 text-[var(--text-3)] text-sm">
               No data for this period
             </div>
           ) : (
@@ -341,8 +341,8 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
                 const pct = (d.revenue / maxDayRevenue) * 100
                 return (
                   <div key={d.day} className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-stone-500 w-8 shrink-0">{d.day}</span>
-                    <div className="flex-1 bg-stone-100 rounded-full h-6 overflow-hidden">
+                    <span className="text-xs font-medium text-[var(--text-2)] w-8 shrink-0">{d.day}</span>
+                    <div className="flex-1 bg-[var(--bg-muted)] rounded-full h-6 overflow-hidden">
                       <div
                         className="h-full bg-amber-400 rounded-full flex items-center justify-end pr-2 transition-all duration-500"
                         style={{ width: `${Math.max(pct, 2)}%` }}
@@ -354,7 +354,7 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
                         )}
                       </div>
                     </div>
-                    <span className="text-xs text-stone-400 w-8 text-right shrink-0">{d.orders}×</span>
+                    <span className="text-xs text-[var(--text-3)] w-8 text-right shrink-0">{d.orders}×</span>
                   </div>
                 )
               })}
@@ -363,15 +363,15 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
         </div>
 
         {/* Category breakdown pie chart */}
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <BarChart2 className="h-4 w-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-stone-800">Category Breakdown</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Category Breakdown</h3>
           </div>
           {isLoading ? (
             <Skeleton className="h-48" />
           ) : (analytics?.categoryBreakdown ?? []).length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-stone-400 text-sm">
+            <div className="flex items-center justify-center h-48 text-[var(--text-3)] text-sm">
               No data for this period
             </div>
           ) : (
@@ -405,7 +405,7 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
                 />
                 <Legend
                   formatter={(value) => (
-                    <span className="text-xs text-stone-600">{value}</span>
+                    <span className="text-xs text-[var(--text-2)]">{value}</span>
                   )}
                   iconSize={10}
                   iconType="circle"
@@ -419,10 +419,10 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
       {/* Customer retention + Payment methods */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Customer retention */}
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Repeat className="h-4 w-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-stone-800">Customer Retention</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Customer Retention</h3>
           </div>
           {isLoading ? (
             <Skeleton className="h-32" />
@@ -444,13 +444,13 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-bold text-stone-800">
+                    <span className="text-sm font-bold text-[var(--text-1)]">
                       {(analytics?.customerStats?.retentionRate ?? 0).toFixed(0)}%
                     </span>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-400 mb-1">Retention Rate</p>
+                  <p className="text-xs text-[var(--text-3)] mb-1">Retention Rate</p>
                   <p className="text-2xl font-bold text-amber-500">
                     {(analytics?.customerStats?.retentionRate ?? 0).toFixed(1)}%
                   </p>
@@ -458,14 +458,14 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-stone-50 rounded-xl p-3">
-                  <p className="text-xs text-stone-400 mb-1">New Customers</p>
-                  <p className="text-lg font-bold text-stone-800">
+                <div className="bg-[var(--bg-subtle)] rounded-xl p-3">
+                  <p className="text-xs text-[var(--text-3)] mb-1">New Customers</p>
+                  <p className="text-lg font-bold text-[var(--text-1)]">
                     {analytics?.customerStats?.newCustomers ?? 0}
                   </p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-3">
-                  <p className="text-xs text-stone-400 mb-1">Returning</p>
+                  <p className="text-xs text-[var(--text-3)] mb-1">Returning</p>
                   <p className="text-lg font-bold text-amber-600">
                     {analytics?.customerStats?.returningCustomers ?? 0}
                   </p>
@@ -476,17 +476,17 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
         </div>
 
         {/* Payment methods */}
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <DollarSign className="h-4 w-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-stone-800">Payment Methods</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Payment Methods</h3>
           </div>
           {isLoading ? (
             <div className="space-y-2">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12" />)}
             </div>
           ) : (analytics?.paymentMethods ?? []).length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-stone-400 text-sm">
+            <div className="flex items-center justify-center h-32 text-[var(--text-3)] text-sm">
               No data for this period
             </div>
           ) : (
@@ -494,27 +494,27 @@ export function SalesAnalyticsClient({ storeId, currency }: SalesAnalyticsClient
               {(analytics?.paymentMethods ?? []).map((p) => {
                 const pct = totalPayments > 0 ? (p.total / totalPayments) * 100 : 0
                 return (
-                  <div key={p.method} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-50 transition-colors">
+                  <div key={p.method} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-subtle)] transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-stone-700">
+                        <span className="text-sm font-medium text-[var(--text-1)]">
                           {PAYMENT_METHOD_LABELS[p.method] ?? p.method}
                         </span>
-                        <span className="text-xs text-stone-400">{p.count} txn</span>
+                        <span className="text-xs text-[var(--text-3)]">{p.count} txn</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                        <div className="flex-1 bg-[var(--bg-muted)] rounded-full h-1.5">
                           <div
                             className="h-1.5 bg-amber-400 rounded-full transition-all duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <span className="text-xs font-semibold text-stone-600 w-10 text-right shrink-0">
+                        <span className="text-xs font-semibold text-[var(--text-2)] w-10 text-right shrink-0">
                           {pct.toFixed(0)}%
                         </span>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-stone-800 shrink-0 ml-2">
+                    <span className="text-sm font-bold text-[var(--text-1)] shrink-0 ml-2">
                       {formatCurrency(p.total, currency)}
                     </span>
                   </div>

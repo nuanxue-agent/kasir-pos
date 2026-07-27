@@ -19,7 +19,7 @@ interface PurchaseOrdersPageClientProps {
 type POStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED'
 
 const STATUS_CONFIG: Record<POStatus, { label: string; icon: React.ElementType; pill: string }> = {
-  DRAFT:     { label: 'Draft',     icon: Clock,         pill: 'bg-stone-100 text-stone-500 border border-stone-200' },
+  DRAFT:     { label: 'Draft',     icon: Clock,         pill: 'bg-[var(--bg-muted)] text-[var(--text-2)] border border-[var(--border)]' },
   SENT:      { label: 'Terkirim',  icon: Send,          pill: 'bg-blue-50 text-blue-600 border border-blue-200' },
   CONFIRMED: { label: 'Dikonfirmasi', icon: CheckCircle2, pill: 'bg-amber-50 text-amber-600 border border-amber-200' },
   RECEIVED:  { label: 'Diterima',  icon: CheckCircle2,  pill: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
@@ -73,8 +73,8 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Purchase Orders</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Kelola pembelian dari supplier</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Purchase Orders</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Kelola pembelian dari supplier</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportButton
@@ -108,7 +108,7 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Draft', status: 'DRAFT', color: 'text-stone-500' },
+          { label: 'Draft', status: 'DRAFT', color: 'text-[var(--text-2)]' },
           { label: 'Terkirim', status: 'SENT', color: 'text-blue-600' },
           { label: 'Dikonfirmasi', status: 'CONFIRMED', color: 'text-amber-600' },
           { label: 'Diterima', status: 'RECEIVED', color: 'text-emerald-600' },
@@ -116,44 +116,44 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
           const count = (data?.orders ?? []).filter((o: any) => o.status === s.status).length
           return (
             <button key={s.status} onClick={() => setStatusFilter(s.status === statusFilter ? '' : s.status)}
-              className={cn('bg-white border rounded-2xl p-4 text-left shadow-sm transition-all', statusFilter === s.status ? 'border-amber-300 bg-amber-50' : 'border-stone-100 hover:border-stone-200')}>
+              className={cn('bg-[var(--bg-card)] border rounded-xl p-4 text-left shadow-sm transition-all', statusFilter === s.status ? 'border-amber-300 bg-amber-50' : 'border-[var(--border)] hover:border-[var(--border)]')}>
               <p className={`text-2xl font-bold ${s.color}`}>{count}</p>
-              <p className="text-xs text-stone-400 mt-0.5">{s.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-0.5">{s.label}</p>
             </button>
           )
         })}
       </div>
 
       {/* Filter + Search */}
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap gap-2">
           {STATUS_TABS.map(t => (
             <button key={t.value} onClick={() => setStatusFilter(t.value)}
               className={cn('px-3 py-1.5 rounded-xl text-xs font-semibold transition-all',
-                statusFilter === t.value ? 'bg-amber-500 text-white shadow-sm' : 'bg-stone-50 text-stone-500 hover:bg-stone-100 border border-stone-200'
+                statusFilter === t.value ? 'bg-amber-500 text-white shadow-sm' : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:bg-[var(--bg-muted)] border border-[var(--border)]'
               )}>
               {t.label}
             </button>
           ))}
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+            className="w-full pl-9 pr-4 py-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
             placeholder="Cari nomor PO atau supplier…" />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="space-y-1 p-4">
-            {[...Array(5)].map((_, i) => <div key={i} className="h-14 bg-stone-50 animate-pulse rounded-xl" />)}
+            {[...Array(5)].map((_, i) => <div key={i} className="h-14 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}
           </div>
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Package className="h-12 w-12 text-stone-200 mb-3" />
-            <p className="text-stone-400 text-sm">Belum ada purchase order</p>
+            <p className="text-[var(--text-3)] text-sm">Belum ada purchase order</p>
             <button onClick={() => setShowForm(true)} className="mt-3 text-amber-500 text-sm font-medium hover:text-amber-600">
               + Buat PO pertama
             </button>
@@ -164,28 +164,28 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/50">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-stone-400">NO. PO</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-stone-400">SUPPLIER</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-stone-400">STATUS</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-stone-400">TGL EKSPEKTASI</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-stone-400">TOTAL</th>
+                  <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)]/50">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[var(--text-3)]">NO. PO</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[var(--text-3)]">SUPPLIER</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[var(--text-3)]">STATUS</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[var(--text-3)]">TGL EKSPEKTASI</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-[var(--text-3)]">TOTAL</th>
                     <th className="py-3 px-4" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-50">
+                <tbody className="divide-y divide-[var(--border)]">
                   {orders.map((po: any) => {
                     const cfg = STATUS_CONFIG[po.status as POStatus]
                     const Icon = cfg.icon
                     return (
-                      <tr key={po.id} className="hover:bg-stone-50/50 transition-colors cursor-pointer" onClick={() => setSelectedPO(po)}>
-                        <td className="py-3 px-4 font-mono text-xs font-semibold text-stone-700">{po.number}</td>
+                      <tr key={po.id} className="hover:bg-[var(--bg-subtle)]/50 transition-colors cursor-pointer" onClick={() => setSelectedPO(po)}>
+                        <td className="py-3 px-4 font-mono text-xs font-semibold text-[var(--text-1)]">{po.number}</td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-stone-100 flex items-center justify-center shrink-0">
-                              <Truck className="h-3.5 w-3.5 text-stone-400" />
+                            <div className="w-7 h-7 rounded-lg bg-[var(--bg-muted)] flex items-center justify-center shrink-0">
+                              <Truck className="h-3.5 w-3.5 text-[var(--text-3)]" />
                             </div>
-                            <span className="text-stone-700 font-medium">{po.supplierName}</span>
+                            <span className="text-[var(--text-1)] font-medium">{po.supplierName}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
@@ -194,10 +194,10 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
                             {cfg.label}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-stone-500 text-xs">
+                        <td className="py-3 px-4 text-[var(--text-2)] text-xs">
                           {po.expectedDate ? formatDate(po.expectedDate) : '—'}
                         </td>
-                        <td className="py-3 px-4 text-right font-semibold text-stone-800">
+                        <td className="py-3 px-4 text-right font-semibold text-[var(--text-1)]">
                           {formatCurrency(po.total, currency)}
                         </td>
                         <td className="py-3 px-4">
@@ -211,25 +211,25 @@ export default function PurchaseOrdersPageClient({ storeId, currency, taxRate }:
             </div>
 
             {/* Mobile list */}
-            <div className="sm:hidden divide-y divide-stone-50">
+            <div className="sm:hidden divide-y divide-[var(--border)]">
               {orders.map((po: any) => {
                 const cfg = STATUS_CONFIG[po.status as POStatus]
                 const Icon = cfg.icon
                 return (
-                  <button key={po.id} onClick={() => setSelectedPO(po)} className="w-full flex items-center gap-3 p-4 hover:bg-stone-50 transition-colors text-left">
-                    <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
-                      <Truck className="h-5 w-5 text-stone-400" />
+                  <button key={po.id} onClick={() => setSelectedPO(po)} className="w-full flex items-center gap-3 p-4 hover:bg-[var(--bg-subtle)] transition-colors text-left">
+                    <div className="w-10 h-10 rounded-xl bg-[var(--bg-muted)] flex items-center justify-center shrink-0">
+                      <Truck className="h-5 w-5 text-[var(--text-3)]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-semibold text-stone-600">{po.number}</span>
+                        <span className="font-mono text-xs font-semibold text-[var(--text-2)]">{po.number}</span>
                         <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold', cfg.pill)}>
                           <Icon className="h-3 w-3" />
                           {cfg.label}
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-stone-700 truncate mt-0.5">{po.supplierName}</p>
-                      <p className="text-xs text-stone-400">{formatCurrency(po.total, currency)}</p>
+                      <p className="text-sm font-medium text-[var(--text-1)] truncate mt-0.5">{po.supplierName}</p>
+                      <p className="text-xs text-[var(--text-3)]">{formatCurrency(po.total, currency)}</p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-stone-300 shrink-0" />
                   </button>

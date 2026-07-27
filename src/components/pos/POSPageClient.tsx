@@ -382,18 +382,18 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
     <div className="flex h-[calc(100dvh-3.5rem)] bg-[#fffdf7] overflow-hidden">
 
       {/* ── Mobile tab switcher (top) ── */}
-      <div className="lg:hidden absolute top-14 left-0 right-0 z-20 flex bg-white border-b border-stone-100 shadow-sm">
+      <div className="lg:hidden absolute top-14 left-0 right-0 z-20 flex bg-[var(--bg-card)] border-b border-[var(--border)] shadow-sm">
         <button
           onClick={() => setMobileTab('products')}
           className={cn('flex-1 py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
-            mobileTab === 'products' ? 'text-amber-600 border-b-2 border-amber-500' : 'text-stone-400')}
+            mobileTab === 'products' ? 'text-amber-600 border-b-2 border-amber-500' : 'text-[var(--text-3)]')}
         >
           <Grid3x3 className="h-4 w-4" /> Produk
         </button>
         <button
           onClick={() => setMobileTab('cart')}
           className={cn('flex-1 py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2 relative',
-            mobileTab === 'cart' ? 'text-amber-600 border-b-2 border-amber-500' : 'text-stone-400')}
+            mobileTab === 'cart' ? 'text-amber-600 border-b-2 border-amber-500' : 'text-[var(--text-3)]')}
         >
           <ShoppingCart className="h-4 w-4" />
           Keranjang
@@ -415,53 +415,53 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
         'lg:relative lg:flex'
       )}>
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-stone-100 bg-white">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-card)]">
           <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
             <input
               ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Cari produk…"
-              className="w-full pl-9 pr-12 py-2 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
+              className="w-full pl-9 pr-12 py-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)] text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
             />
-            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-stone-100 text-[10px] font-mono text-stone-400 border border-stone-200 pointer-events-none">F1</kbd>
+            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-[var(--bg-muted)] text-[10px] font-mono text-[var(--text-3)] border border-[var(--border)] pointer-events-none">F1</kbd>
           </div>
-          <div className="flex rounded-lg border border-stone-200 overflow-hidden">
-            <button onClick={() => setViewMode('grid')} className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-700')}>
+          <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+            <button onClick={() => setViewMode('grid')} className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-amber-500 text-white' : 'bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-1)]')}>
               <Grid3x3 className="h-4 w-4" />
             </button>
-            <button onClick={() => setViewMode('list')} className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-700')}>
+            <button onClick={() => setViewMode('list')} className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-amber-500 text-white' : 'bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-1)]')}>
               <List className="h-4 w-4" />
             </button>
           </div>
           {/* Camera barcode scanner button */}
           <button
             onClick={() => setShowBarcodeScanner(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200 hover:border-amber-400/60 hover:bg-amber-500/10 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)] hover:border-amber-400/60 hover:bg-amber-500/10 transition-colors"
             title="Buka kamera scanner"
           >
             <Scan className="h-3.5 w-3.5 text-amber-600" />
             <span className="text-[10px] font-medium text-amber-600 hidden sm:block">Scan</span>
           </button>
           {/* HID scanner indicator */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200" title="USB/Bluetooth barcode scanner ready">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)]" title="USB/Bluetooth barcode scanner ready">
             <ScanBarcode className="h-3.5 w-3.5 text-emerald-600" />
             <span className="text-[10px] font-medium text-emerald-600 hidden sm:block">HID</span>
           </div>
         </div>
 
         {/* Category filter */}
-        <div className="flex gap-2 px-4 py-2.5 border-b border-stone-100 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 px-4 py-2.5 border-b border-[var(--border)] overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', !selectedCategory ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-stone-700 hover:bg-stone-100')}
+            className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', !selectedCategory ? 'bg-amber-500 text-white' : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-muted)]')}
           >Semua</button>
           {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
-              className={cn('flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', selectedCategory === cat.id ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-500 hover:text-stone-700 hover:bg-stone-100')}
+              className={cn('flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors', selectedCategory === cat.id ? 'bg-amber-500 text-white' : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-muted)]')}
             >
               {cat.icon && <span>{cat.icon}</span>}
               {cat.name}
@@ -472,7 +472,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
         {/* Products */}
         <div className="flex-1 overflow-y-auto p-4">
           {filtered.length === 0 && filteredBundles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-stone-400">
+            <div className="flex flex-col items-center justify-center h-48 text-[var(--text-3)]">
               <Search className="h-10 w-10 mb-3" />
               <p className="text-sm">Produk tidak ditemukan</p>
             </div>
@@ -482,7 +482,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
               {filtered.map(p => <ProductCard key={p.id} product={p} currency={currency} onAdd={addToCart} />)}
             </div>
           ) : (
-            <div className="rounded-xl border border-stone-200 overflow-hidden divide-y divide-white/5">
+            <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-white/5">
               {filteredBundles.map(b => <BundleRow key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />)}
               {filtered.map(p => <ProductRow key={p.id} product={p} currency={currency} onAdd={addToCart} />)}
             </div>
@@ -492,7 +492,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
 
       {/* ── Right: Cart ── */}
       <div className={cn(
-        'flex flex-col border-l border-stone-100 bg-white',
+        'flex flex-col border-l border-[var(--border)] bg-[var(--bg-card)]',
         // Desktop: fixed width sidebar
         'lg:w-80 xl:w-96 lg:shrink-0',
         // Mobile: full screen tab panel
@@ -500,8 +500,8 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
         mobileTab === 'cart' ? 'max-lg:flex' : 'max-lg:hidden',
       )}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100">
-          <h2 className="text-sm font-semibold text-stone-800">Pesanan</h2>
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-[var(--text-1)]">Pesanan</h2>
           <div className="flex items-center gap-2">
             {/* Recall button */}
             <button
@@ -510,7 +510,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                 'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors relative',
                 heldOrders.length > 0
                   ? 'bg-amber-500/15 text-amber-600 hover:bg-amber-500/25'
-                  : 'bg-stone-100 text-stone-400 hover:text-stone-600'
+                  : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:text-[var(--text-2)]'
               )}
               title="Recall held order"
             >
@@ -526,7 +526,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
             {cart.length > 0 && (
               <button
                 onClick={holdOrder}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700 transition-colors"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--bg-muted)] text-[var(--text-2)] hover:bg-stone-200 hover:text-[var(--text-1)] transition-colors"
                 title="Hold current order"
               >
                 <PauseCircle className="h-3.5 w-3.5" />
@@ -541,23 +541,23 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
 
         {/* Held orders panel */}
         {showHeldOrders && (
-          <div className="border-b border-stone-100 bg-amber-500/5">
+          <div className="border-b border-[var(--border)] bg-amber-500/5">
             <div className="px-4 py-2 flex items-center justify-between">
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Held Orders ({heldOrders.length}/{MAX_HELD_ORDERS})</p>
-              <button onClick={() => setShowHeldOrders(false)} className="text-stone-400 hover:text-stone-600"><X className="h-3.5 w-3.5" /></button>
+              <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Held Orders ({heldOrders.length}/{MAX_HELD_ORDERS})</p>
+              <button onClick={() => setShowHeldOrders(false)} className="text-[var(--text-3)] hover:text-[var(--text-2)]"><X className="h-3.5 w-3.5" /></button>
             </div>
             {heldOrders.length === 0 ? (
-              <p className="text-xs text-stone-400 text-center py-3">No held orders</p>
+              <p className="text-xs text-[var(--text-3)] text-center py-3">No held orders</p>
             ) : (
-              <div className="divide-y divide-stone-100 max-h-48 overflow-y-auto">
+              <div className="divide-y divide-[var(--border)] max-h-48 overflow-y-auto">
                 {heldOrders.map(h => (
                   <div key={h.id} className="flex items-center gap-2 px-4 py-2.5">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-stone-700 truncate">
+                      <p className="text-xs font-medium text-[var(--text-1)] truncate">
                         {h.items.length} item{h.items.length !== 1 ? 's' : ''}
                         {h.customerName ? ` · ${h.customerName}` : ''}
                       </p>
-                      <p className="text-[10px] text-stone-400">
+                      <p className="text-[10px] text-[var(--text-3)]">
                         {new Date(h.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                         {' · '}
                         {fmt(h.items.reduce((s, i) => s + i.subtotal, 0), currency)}
@@ -595,8 +595,8 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                 <div key={item.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-stone-700 truncate">{item.name}</p>
-                      <p className="text-xs text-stone-400 mt-0.5">{fmt(item.price, currency)} / pcs</p>
+                      <p className="text-sm font-medium text-[var(--text-1)] truncate">{item.name}</p>
+                      <p className="text-xs text-[var(--text-3)] mt-0.5">{fmt(item.price, currency)} / pcs</p>
                     </div>
                     <button onClick={() => removeItem(item.id)} className="text-stone-300 hover:text-red-400 transition-colors mt-0.5">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -605,16 +605,16 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => updateQty(item.id, item.qty - 1)}
-                        className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition-colors">
+                        className="w-6 h-6 rounded-md bg-[var(--bg-muted)] hover:bg-stone-200 flex items-center justify-center text-[var(--text-2)] transition-colors">
                         <Minus className="h-3 w-3" />
                       </button>
-                      <span className="w-8 text-center text-sm font-medium text-stone-700">{item.qty}</span>
+                      <span className="w-8 text-center text-sm font-medium text-[var(--text-1)]">{item.qty}</span>
                       <button onClick={() => updateQty(item.id, item.qty + 1)}
-                        className="w-6 h-6 rounded-md bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition-colors">
+                        className="w-6 h-6 rounded-md bg-[var(--bg-muted)] hover:bg-stone-200 flex items-center justify-center text-[var(--text-2)] transition-colors">
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
-                    <span className="text-sm font-semibold text-stone-800">{fmt(item.subtotal, currency)}</span>
+                    <span className="text-sm font-semibold text-[var(--text-1)]">{fmt(item.subtotal, currency)}</span>
                   </div>
                 </div>
               ))}
@@ -630,21 +630,21 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
               onChange={e => setOrderNote(e.target.value)}
               placeholder="Catatan pesanan…"
               rows={2}
-              className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 resize-none"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-xs text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 resize-none"
             />
           </div>
           )}
 
         {/* Customer selector + Summary + Checkout */}
           {cart.length > 0 && (
-          <div className="border-t border-stone-100 p-4 space-y-3">
+          <div className="border-t border-[var(--border)] p-4 space-y-3">
             {/* Customer section */}
             {!selectedCustomer ? (
               <div>
                 {!showCustomerSearch ? (
                   <button
                     onClick={() => setShowCustomerSearch(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-stone-300 text-xs text-stone-400 hover:text-stone-600 hover:border-white/40 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-stone-300 text-xs text-[var(--text-3)] hover:text-[var(--text-2)] hover:border-white/40 transition-colors"
                   >
                     <UserPlus className="h-3.5 w-3.5" />
                     Add Customer
@@ -658,12 +658,12 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                 )}
               </div>
             ) : (
-              <div className="flex items-center justify-between bg-stone-50 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-between bg-[var(--bg-subtle)] rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <User className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                   <div>
-                    <p className="text-xs font-medium text-stone-700">{selectedCustomer.name}</p>
-                    <p className="text-[10px] text-stone-400 flex items-center gap-0.5">
+                    <p className="text-xs font-medium text-[var(--text-1)]">{selectedCustomer.name}</p>
+                    <p className="text-[10px] text-[var(--text-3)] flex items-center gap-0.5">
                       <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
                       {selectedCustomer.points} poin
                     </p>
@@ -671,7 +671,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                 </div>
                 <button
                   onClick={() => { setSelectedCustomer(null); setRedeemPoints(false) }}
-                  className="text-stone-400 hover:text-stone-600 transition-colors"
+                  className="text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -686,14 +686,14 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                   'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-colors',
                   redeemPoints
                     ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
-                    : 'border-stone-200 bg-stone-50 text-stone-500 hover:text-stone-700 hover:border-stone-300'
+                    : 'border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:border-stone-300'
                 )}
               >
                 <span className="flex items-center gap-1.5">
                   <Star className={cn('h-3 w-3', redeemPoints ? 'fill-amber-400 text-amber-400' : '')} />
                   Tukar {maxRedeemablePoints} poin = {fmt(maxRedeemablePoints * 100, currency)} diskon
                 </span>
-                <span className={cn('font-medium', redeemPoints ? 'text-amber-400' : 'text-stone-400')}>
+                <span className={cn('font-medium', redeemPoints ? 'text-amber-400' : 'text-[var(--text-3)]')}>
                   {redeemPoints ? 'ON' : 'OFF'}
                 </span>
               </button>
@@ -701,11 +701,11 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
 
             {/* Totals */}
             <div className="space-y-1.5">
-              <div className="flex justify-between text-sm text-stone-500">
+              <div className="flex justify-between text-sm text-[var(--text-2)]">
                 <span>Subtotal</span><span>{fmt(subtotal, currency)}</span>
               </div>
               {taxRate > 0 && (
-                <div className="flex justify-between text-sm text-stone-500">
+                <div className="flex justify-between text-sm text-[var(--text-2)]">
                   <span>Pajak ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt, currency)}</span>
                 </div>
               )}
@@ -721,23 +721,23 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                   <span>-{fmt(manualDiscountAmt(), currency)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-base font-bold text-stone-800 pt-1 border-t border-stone-200">
+              <div className="flex justify-between text-base font-bold text-[var(--text-1)] pt-1 border-t border-[var(--border)]">
                 <span>Total</span><span>{fmt(total, currency)}</span>
               </div>
             </div>
 
             {/* Manual discount */}
             <div className="flex items-center gap-2">
-              <div className="flex rounded-lg border border-stone-200 overflow-hidden shrink-0">
+              <div className="flex rounded-lg border border-[var(--border)] overflow-hidden shrink-0">
                 <button
                   onClick={() => setDiscountType('PERCENT')}
-                  className={cn('px-2 py-1.5 text-xs font-medium transition-colors', discountType === 'PERCENT' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600')}
+                  className={cn('px-2 py-1.5 text-xs font-medium transition-colors', discountType === 'PERCENT' ? 'bg-amber-500 text-white' : 'bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-2)]')}
                 >
                   <Percent className="h-3 w-3" />
                 </button>
                 <button
                   onClick={() => setDiscountType('FLAT')}
-                  className={cn('px-2 py-1.5 text-xs font-medium transition-colors', discountType === 'FLAT' ? 'bg-amber-500 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600')}
+                  className={cn('px-2 py-1.5 text-xs font-medium transition-colors', discountType === 'FLAT' ? 'bg-amber-500 text-white' : 'bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-2)]')}
                 >
                   <Tag className="h-3 w-3" />
                 </button>
@@ -749,7 +749,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                   value={discountValue}
                   onChange={e => setDiscountValue(e.target.value)}
                   placeholder={discountType === 'PERCENT' ? 'Diskon %' : 'Diskon flat'}
-                  className="w-full pl-3 pr-3 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
+                  className="w-full pl-3 pr-3 py-1.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)] text-xs text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20"
                 />
               </div>
               {discountValue && (
@@ -765,7 +765,7 @@ export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp
                 className="flex-1 mt-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
               >
                 <span>Bayar — {fmt(total, currency)}</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono border border-white/30">F2</kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)]/20 text-[10px] font-mono border border-white/30">F2</kbd>
               </button>
             </div>
           </div>
@@ -857,37 +857,37 @@ function CustomerSearch({ storeId, onSelect, onClose }: {
   }, [q, storeId])
 
   return (
-    <div className="bg-stone-50 rounded-lg border border-stone-200 overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-stone-200">
-        <Search className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+    <div className="bg-[var(--bg-subtle)] rounded-lg border border-[var(--border)] overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)]">
+        <Search className="h-3.5 w-3.5 text-[var(--text-3)] shrink-0" />
         <input
           ref={inputRef}
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder="Search customer name or phone…"
-          className="flex-1 bg-transparent text-xs text-stone-800 placeholder-stone-400 focus:outline-none"
+          className="flex-1 bg-transparent text-xs text-[var(--text-1)] placeholder-stone-400 focus:outline-none"
         />
-        <button onClick={onClose} className="text-stone-400 hover:text-stone-600 transition-colors">
+        <button onClick={onClose} className="text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
       {loading && (
         <div className="flex justify-center py-3">
-          <Loader2 className="h-4 w-4 text-stone-400 animate-spin" />
+          <Loader2 className="h-4 w-4 text-[var(--text-3)] animate-spin" />
         </div>
       )}
       {!loading && q.trim() && results.length === 0 && (
-        <p className="text-xs text-stone-400 text-center py-3">No customers found</p>
+        <p className="text-xs text-[var(--text-3)] text-center py-3">No customers found</p>
       )}
       {results.map(c => (
         <button
           key={c.id}
           onClick={() => onSelect(c)}
-          className="w-full flex items-center justify-between px-3 py-2 hover:bg-stone-100 transition-colors text-left border-t border-stone-100 first:border-t-0"
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-muted)] transition-colors text-left border-t border-[var(--border)] first:border-t-0"
         >
           <div>
-            <p className="text-xs font-medium text-stone-700">{c.name}</p>
-            {c.phone && <p className="text-[10px] text-stone-400">{c.phone}</p>}
+            <p className="text-xs font-medium text-[var(--text-1)]">{c.name}</p>
+            {c.phone && <p className="text-[10px] text-[var(--text-3)]">{c.phone}</p>}
           </div>
           <span className="flex items-center gap-1 text-[10px] text-amber-400 shrink-0">
             <Star className="h-2.5 w-2.5 fill-amber-400" />
@@ -910,7 +910,7 @@ function BundleCard({ bundle, currency, onAdd }: { bundle: Bundle; currency: str
       className={cn(
         'flex flex-col p-3.5 rounded-xl border text-left transition-all duration-150 active:scale-[0.97]',
         !available
-          ? 'border-stone-100 bg-white/[0.02] opacity-40 cursor-not-allowed'
+          ? 'border-[var(--border)] bg-[var(--bg-card)]/[0.02] opacity-40 cursor-not-allowed'
           : 'border-amber-200 bg-amber-50/60 hover:border-amber-400 hover:bg-amber-500/10 cursor-pointer'
       )}
     >
@@ -921,9 +921,9 @@ function BundleCard({ bundle, currency, onAdd }: { bundle: Bundle; currency: str
         <span className="shrink-0 text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500 text-white uppercase tracking-wide leading-none mt-0.5">
           Bundle
         </span>
-        <p className="text-sm font-medium text-stone-800 leading-tight line-clamp-2">{bundle.name}</p>
+        <p className="text-sm font-medium text-[var(--text-1)] leading-tight line-clamp-2">{bundle.name}</p>
       </div>
-      <p className="text-[10px] text-stone-400 mt-0.5">{bundle.items.length} produk</p>
+      <p className="text-[10px] text-[var(--text-3)] mt-0.5">{bundle.items.length} produk</p>
       <div className="flex items-center justify-between mt-2">
         <span className="text-sm font-bold text-amber-600">
           {new Intl.NumberFormat('id-ID', { style: 'currency', currency, minimumFractionDigits: 0 }).format(bundle.price)}
@@ -952,9 +952,9 @@ function BundleRow({ bundle, currency, onAdd }: { bundle: Bundle; currency: stri
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500 text-white uppercase tracking-wide">Bundle</span>
-          <p className="text-sm font-medium text-stone-700 truncate">{bundle.name}</p>
+          <p className="text-sm font-medium text-[var(--text-1)] truncate">{bundle.name}</p>
         </div>
-        <p className="text-xs text-stone-400">{bundle.items.length} produk</p>
+        <p className="text-xs text-[var(--text-3)]">{bundle.items.length} produk</p>
       </div>
       <div className="text-right shrink-0">
         <p className="text-sm font-bold text-amber-600">
@@ -978,19 +978,19 @@ function ProductCard({ product, currency, onAdd }: { product: Product; currency:
       className={cn(
         'flex flex-col p-3.5 rounded-xl border text-left transition-all duration-150 active:scale-[0.97]',
         outOfStock
-          ? 'border-stone-100 bg-white/[0.02] opacity-40 cursor-not-allowed'
-          : 'border-stone-200 bg-stone-50 hover:border-amber-400/60 hover:bg-amber-500/10 cursor-pointer'
+          ? 'border-[var(--border)] bg-[var(--bg-card)]/[0.02] opacity-40 cursor-not-allowed'
+          : 'border-[var(--border)] bg-[var(--bg-subtle)] hover:border-amber-400/60 hover:bg-amber-500/10 cursor-pointer'
       )}
     >
       {product.category?.color && (
         <div className="w-1.5 h-1.5 rounded-full mb-2" style={{ background: product.category.color }} />
       )}
-      <div className="w-full aspect-square rounded-lg bg-stone-50 flex items-center justify-center mb-3 text-2xl">
+      <div className="w-full aspect-square rounded-lg bg-[var(--bg-subtle)] flex items-center justify-center mb-3 text-2xl">
         {product.category?.icon || '📦'}
       </div>
-      <p className="text-sm font-medium text-stone-800 leading-tight line-clamp-2">{product.name}</p>
+      <p className="text-sm font-medium text-[var(--text-1)] leading-tight line-clamp-2">{product.name}</p>
       {product.category && (
-        <p className="text-[10px] text-stone-400 mt-0.5">{product.category.icon} {product.category.name}</p>
+        <p className="text-[10px] text-[var(--text-3)] mt-0.5">{product.category.icon} {product.category.name}</p>
       )}
       <div className="flex items-center justify-between mt-2">
         <span className="text-sm font-bold text-amber-600">
@@ -1000,7 +1000,7 @@ function ProductCard({ product, currency, onAdd }: { product: Product; currency:
           <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded',
             outOfStock ? 'bg-red-500/20 text-red-400' :
             lowStock ? 'bg-amber-500/20 text-amber-400' :
-            'bg-stone-100 text-stone-400'
+            'bg-[var(--bg-muted)] text-[var(--text-3)]'
           )}>
             {outOfStock ? 'Out' : `${product.stock}`}
           </span>
@@ -1021,22 +1021,22 @@ function ProductRow({ product, currency, onAdd }: { product: Product; currency: 
       disabled={outOfStock}
       className={cn(
         'w-full flex items-center gap-4 px-4 py-3 text-left transition-colors',
-        outOfStock ? 'opacity-40 cursor-not-allowed' : 'hover:bg-stone-50 cursor-pointer'
+        outOfStock ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[var(--bg-subtle)] cursor-pointer'
       )}
     >
-      <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center text-xl shrink-0">
+      <div className="w-10 h-10 rounded-lg bg-[var(--bg-subtle)] flex items-center justify-center text-xl shrink-0">
         {product.category?.icon || '📦'}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-stone-700">{product.name}</p>
-        <p className="text-xs text-stone-400">{product.category?.name}</p>
+        <p className="text-sm font-medium text-[var(--text-1)]">{product.name}</p>
+        <p className="text-xs text-[var(--text-3)]">{product.category?.name}</p>
       </div>
       <div className="text-right shrink-0">
         <p className="text-sm font-bold text-amber-600">
           {new Intl.NumberFormat('id-ID', { style: 'currency', currency, minimumFractionDigits: 0 }).format(product.price)}
         </p>
         {product.trackStock && (
-          <p className={cn('text-[10px]', product.stock <= 5 ? 'text-amber-400' : 'text-stone-400')}>
+          <p className={cn('text-[10px]', product.stock <= 5 ? 'text-amber-400' : 'text-[var(--text-3)]')}>
             {product.stock} left
           </p>
         )}
@@ -1136,17 +1136,17 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
-          <h2 className="text-base font-semibold text-stone-800">Payment</h2>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-800 transition-colors"><X className="h-5 w-5" /></button>
+      <div className="w-full max-w-md bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <h2 className="text-base font-semibold text-[var(--text-1)]">Payment</h2>
+          <button onClick={onClose} className="text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {/* Order summary */}
-          <div className="bg-stone-50 rounded-xl p-4 space-y-1.5">
-            <div className="flex justify-between text-sm text-stone-500"><span>Subtotal</span><span>{fmt(subtotal, currency)}</span></div>
-            {taxAmt > 0 && <div className="flex justify-between text-sm text-stone-500"><span>Pajak</span><span>{fmt(taxAmt, currency)}</span></div>}
+          <div className="bg-[var(--bg-subtle)] rounded-xl p-4 space-y-1.5">
+            <div className="flex justify-between text-sm text-[var(--text-2)]"><span>Subtotal</span><span>{fmt(subtotal, currency)}</span></div>
+            {taxAmt > 0 && <div className="flex justify-between text-sm text-[var(--text-2)]"><span>Pajak</span><span>{fmt(taxAmt, currency)}</span></div>}
             {!!pointsRedeemed && (
               <div className="flex justify-between text-sm text-amber-400">
                 <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400" />Points ({pointsRedeemed} pts)</span>
@@ -1159,13 +1159,13 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                 <span>-{fmt(manualDiscountAmt, currency)}</span>
               </div>
             )}
-            <div className="flex justify-between text-base font-bold text-stone-800 pt-1.5 border-t border-stone-200"><span>Total</span><span>{fmt(total, currency)}</span></div>
+            <div className="flex justify-between text-base font-bold text-[var(--text-1)] pt-1.5 border-t border-[var(--border)]"><span>Total</span><span>{fmt(total, currency)}</span></div>
           </div>
 
           {/* Split payment lines */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider">Metode Pembayaran</p>
+              <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider">Metode Pembayaran</p>
               {payments.length < 4 && (
                 <button
                   onClick={addLine}
@@ -1178,7 +1178,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
             </div>
 
             {payments.map((line, idx) => (
-              <div key={idx} className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-2">
+              <div key={idx} className="rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-2">
                 {/* Method selector row */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="grid grid-cols-4 gap-1.5 flex-1">
@@ -1187,7 +1187,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                         key={m.id}
                         onClick={() => updateLine(idx, 'method', m.id)}
                         className={cn('flex flex-col items-center gap-1 py-2 rounded-lg border text-[10px] font-medium transition-all',
-                          line.method === m.id ? 'border-amber-500/60 bg-amber-500/15 text-amber-700' : 'border-stone-200 bg-white text-stone-400 hover:text-stone-700 hover:border-stone-300'
+                          line.method === m.id ? 'border-amber-500/60 bg-amber-500/15 text-amber-700' : 'border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-stone-300'
                         )}
                       >
                         <m.icon className={cn('h-4 w-4', line.method === m.id ? m.color : '')} />
@@ -1208,7 +1208,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                   value={line.amount}
                   onChange={e => updateLine(idx, 'amount', e.target.value)}
                   placeholder={fmt(payments.length === 1 ? total : 0, currency)}
-                  className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:border-amber-400/60"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:border-amber-400/60"
                 />
 
                 {/* Quick amounts for single-line cash */}
@@ -1216,7 +1216,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
                   <div className="flex gap-2">
                     {quickAmounts(total).map(a => (
                       <button key={a} onClick={() => updateLine(idx, 'amount', String(a))}
-                        className="flex-1 py-1 rounded-lg bg-white border border-stone-200 text-[10px] text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors">
+                        className="flex-1 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[10px] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-subtle)] transition-colors">
                         {fmt(a, currency)}
                       </button>
                     ))}
@@ -1227,7 +1227,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
 
             {/* Running total */}
             <div className="flex justify-between text-sm px-1">
-              <span className="text-stone-500">Dibayar</span>
+              <span className="text-[var(--text-2)]">Dibayar</span>
               <span className={cn('font-semibold', totalPaid >= total ? 'text-emerald-600' : 'text-red-400')}>
                 {fmt(totalPaid, currency)} / {fmt(total, currency)}
               </span>
@@ -1236,7 +1236,7 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
             {/* Change (cash portion) */}
             {totalPaid >= total && hasCash && change > 0 && (
               <div className="flex justify-between text-sm font-medium px-1">
-                <span className="text-stone-500">Kembalian</span>
+                <span className="text-[var(--text-2)]">Kembalian</span>
                 <span className="text-emerald-600">{fmt(change, currency)}</span>
               </div>
             )}

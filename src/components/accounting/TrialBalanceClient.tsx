@@ -50,18 +50,18 @@ export default function TrialBalanceClient({ storeId, currency }: TrialBalanceCl
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5 pb-24 lg:pb-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Neraca Saldo</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Trial balance</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Neraca Saldo</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Trial balance</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-stone-200 text-stone-600 text-sm font-semibold rounded-xl shadow-sm hover:bg-stone-50">
+        <button className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-2)] text-sm font-semibold rounded-xl shadow-sm hover:bg-[var(--bg-subtle)]">
           <Download className="h-4 w-4" /> Ekspor
         </button>
       </div>
 
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-        <label className="text-xs font-semibold text-stone-500 shrink-0">Per tanggal</label>
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm flex items-center gap-4">
+        <label className="text-xs font-semibold text-[var(--text-2)] shrink-0">Per tanggal</label>
         <input type="date" value={asOf} onChange={e => setAsOf(e.target.value)}
-          className="bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
+          className="bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
         {!isBalanced && totalDebit > 0 && (
           <span className="text-xs font-semibold text-red-500 ml-auto">⚠ Tidak balance</span>
         )}
@@ -70,41 +70,41 @@ export default function TrialBalanceClient({ storeId, currency }: TrialBalanceCl
         )}
       </div>
 
-      <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 border-b border-stone-100">
+          <thead className="bg-[var(--bg-subtle)] border-b border-[var(--border)]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-bold text-stone-500">Kode</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-stone-500">Nama Akun</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-stone-500">Tipe</th>
-              <th className="text-right px-4 py-3 text-xs font-bold text-stone-500">Debit</th>
-              <th className="text-right px-4 py-3 text-xs font-bold text-stone-500">Kredit</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-[var(--text-2)]">Kode</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-[var(--text-2)]">Nama Akun</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-[var(--text-2)]">Tipe</th>
+              <th className="text-right px-4 py-3 text-xs font-bold text-[var(--text-2)]">Debit</th>
+              <th className="text-right px-4 py-3 text-xs font-bold text-[var(--text-2)]">Kredit</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-50">
+          <tbody className="divide-y divide-[var(--border)]">
             {isLoading ? (
               [...Array(6)].map((_, i) => (
-                <tr key={i}><td colSpan={5} className="px-4 py-3"><div className="h-4 bg-stone-50 animate-pulse rounded" /></td></tr>
+                <tr key={i}><td colSpan={5} className="px-4 py-3"><div className="h-4 bg-[var(--bg-subtle)] animate-pulse rounded" /></td></tr>
               ))
             ) : sorted.map((row: any) => (
-              <tr key={row.id} className="hover:bg-stone-50/50">
-                <td className="px-4 py-2.5 font-mono text-xs text-stone-500">{row.code}</td>
-                <td className="px-4 py-2.5 text-stone-800">{row.name}</td>
-                <td className="px-4 py-2.5 text-xs text-stone-400">{row.type}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-stone-700">
+              <tr key={row.id} className="hover:bg-[var(--bg-subtle)]/50">
+                <td className="px-4 py-2.5 font-mono text-xs text-[var(--text-2)]">{row.code}</td>
+                <td className="px-4 py-2.5 text-[var(--text-1)]">{row.name}</td>
+                <td className="px-4 py-2.5 text-xs text-[var(--text-3)]">{row.type}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-[var(--text-1)]">
                   {row.debit > 0 ? formatCurrency(row.debit, currency) : '—'}
                 </td>
-                <td className="px-4 py-2.5 text-right font-mono text-stone-700">
+                <td className="px-4 py-2.5 text-right font-mono text-[var(--text-1)]">
                   {row.credit > 0 ? formatCurrency(row.credit, currency) : '—'}
                 </td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="border-t-2 border-stone-200 bg-stone-50">
+          <tfoot className="border-t-2 border-[var(--border)] bg-[var(--bg-subtle)]">
             <tr>
-              <td colSpan={3} className="px-4 py-3 text-xs font-bold text-stone-700">TOTAL</td>
-              <td className="px-4 py-3 text-right font-bold font-mono text-stone-800">{formatCurrency(totalDebit, currency)}</td>
-              <td className="px-4 py-3 text-right font-bold font-mono text-stone-800">{formatCurrency(totalCredit, currency)}</td>
+              <td colSpan={3} className="px-4 py-3 text-xs font-bold text-[var(--text-1)]">TOTAL</td>
+              <td className="px-4 py-3 text-right font-bold font-mono text-[var(--text-1)]">{formatCurrency(totalDebit, currency)}</td>
+              <td className="px-4 py-3 text-right font-bold font-mono text-[var(--text-1)]">{formatCurrency(totalCredit, currency)}</td>
             </tr>
           </tfoot>
         </table>

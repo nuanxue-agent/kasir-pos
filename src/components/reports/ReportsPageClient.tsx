@@ -98,19 +98,19 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
   }))
 
   const skeleton = (h = 'h-28') => (
-    <div className={`${h} bg-stone-50 animate-pulse rounded-2xl border border-stone-100`} />
+    <div className={`${h} bg-[var(--bg-subtle)] animate-pulse rounded-xl border border-[var(--border)]`} />
   )
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5 pb-24 lg:pb-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-stone-800">Laporan</h1>
-        <p className="text-stone-400 text-sm mt-0.5">Analitik penjualan dan performa toko</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">Laporan</h1>
+        <p className="text-[var(--text-3)] text-sm mt-0.5">Analitik penjualan dan performa toko</p>
       </div>
 
       {/* Date range selector */}
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap gap-2">
           {RANGE_BTNS.map(btn => (
             <button
@@ -119,7 +119,7 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 dateRange === btn.value
                   ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
-                  : 'bg-stone-50 text-stone-500 hover:bg-stone-100 border border-stone-200'
+                  : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:bg-[var(--bg-muted)] border border-[var(--border)]'
               }`}
             >
               {btn.label}
@@ -128,15 +128,15 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         </div>
         {dateRange === 'custom' && (
           <div className="flex gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-stone-400">Dari</span>
+            <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+              <span className="text-xs text-[var(--text-3)]">Dari</span>
               <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                className="text-sm text-stone-700 bg-transparent focus:outline-none" />
+                className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none" />
             </div>
-            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-stone-400">Sampai</span>
+            <div className="flex items-center gap-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2">
+              <span className="text-xs text-[var(--text-3)]">Sampai</span>
               <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                className="text-sm text-stone-700 bg-transparent focus:outline-none" />
+                className="text-sm text-[var(--text-1)] bg-transparent focus:outline-none" />
             </div>
           </div>
         )}
@@ -166,40 +166,40 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Link
           href="/dashboard/reports/balance-sheet"
-          className="group bg-white border border-stone-100 rounded-2xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4"
+          className="group bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4"
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
             <Scale className="h-5 w-5 text-amber-500" />
           </div>
           <div>
-            <p className="text-sm font-bold text-stone-800">Neraca</p>
-            <p className="text-xs text-stone-400 mt-0.5">Balance sheet — posisi keuangan</p>
+            <p className="text-sm font-bold text-[var(--text-1)]">Neraca</p>
+            <p className="text-xs text-[var(--text-3)] mt-0.5">Balance sheet — posisi keuangan</p>
           </div>
           <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
         </Link>
         <Link
           href="/dashboard/reports/pnl"
-          className="group bg-white border border-stone-100 rounded-2xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4"
+          className="group bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4"
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
             <BarChart2 className="h-5 w-5 text-amber-500" />
           </div>
           <div>
-            <p className="text-sm font-bold text-stone-800">Laba Rugi</p>
-            <p className="text-xs text-stone-400 mt-0.5">P&amp;L — pendapatan &amp; beban</p>
+            <p className="text-sm font-bold text-[var(--text-1)]">Laba Rugi</p>
+            <p className="text-xs text-[var(--text-3)] mt-0.5">P&amp;L — pendapatan &amp; beban</p>
           </div>
           <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
         </Link>
         <Link
           href="/dashboard/reports/analytics"
-          className="group bg-white border border-stone-100 rounded-2xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4 sm:col-span-2"
+          className="group bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4 sm:col-span-2"
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
             <LineChart className="h-5 w-5 text-amber-500" />
           </div>
           <div>
-            <p className="text-sm font-bold text-stone-800">Analytics</p>
-            <p className="text-xs text-stone-400 mt-0.5">Hourly trends, category breakdown &amp; customer retention</p>
+            <p className="text-sm font-bold text-[var(--text-1)]">Analytics</p>
+            <p className="text-xs text-[var(--text-3)] mt-0.5">Hourly trends, category breakdown &amp; customer retention</p>
           </div>
           <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
         </Link>
@@ -212,56 +212,56 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
         ) : (
           <>
             {/* Omzet */}
-            <div className="col-span-2 sm:col-span-1 lg:col-span-2 bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+            <div className="col-span-2 sm:col-span-1 lg:col-span-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
                   <DollarSign className="h-4 w-4 text-emerald-600" />
                 </div>
-                <p className="text-xs font-medium text-stone-400">Omzet</p>
+                <p className="text-xs font-medium text-[var(--text-3)]">Omzet</p>
               </div>
-              <p className="text-2xl font-bold text-stone-800">{formatCurrency(data?.totalRevenue ?? 0, currency)}</p>
+              <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(data?.totalRevenue ?? 0, currency)}</p>
             </div>
             {/* Pengeluaran */}
-            <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
                   <TrendingDown className="h-4 w-4 text-red-500" />
                 </div>
-                <p className="text-xs font-medium text-stone-400">Pengeluaran</p>
+                <p className="text-xs font-medium text-[var(--text-3)]">Pengeluaran</p>
               </div>
               <p className="text-xl font-bold text-red-500">-{formatCurrency(data?.totalExpenses ?? 0, currency)}</p>
             </div>
             {/* Laba Bersih */}
-            <div className={`bg-white rounded-2xl p-4 shadow-sm border ${(data?.netProfit ?? 0) >= 0 ? 'border-emerald-200' : 'border-red-200'}`}>
+            <div className={`bg-[var(--bg-card)] rounded-xl p-4 shadow-sm border ${(data?.netProfit ?? 0) >= 0 ? 'border-emerald-200' : 'border-red-200'}`}>
               <div className="flex items-center gap-2 mb-2">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${(data?.netProfit ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
                   <TrendingUp className={`h-4 w-4 ${(data?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`} />
                 </div>
-                <p className="text-xs font-medium text-stone-400">Laba Bersih</p>
+                <p className="text-xs font-medium text-[var(--text-3)]">Laba Bersih</p>
               </div>
               <p className={`text-xl font-bold ${(data?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                 {formatCurrency(data?.netProfit ?? 0, currency)}
               </p>
             </div>
             {/* Pesanan */}
-            <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                   <ShoppingCart className="h-4 w-4 text-amber-500" />
                 </div>
-                <p className="text-xs font-medium text-stone-400">Pesanan</p>
+                <p className="text-xs font-medium text-[var(--text-3)]">Pesanan</p>
               </div>
-              <p className="text-xl font-bold text-stone-800">{data?.totalOrders ?? 0}</p>
+              <p className="text-xl font-bold text-[var(--text-1)]">{data?.totalOrders ?? 0}</p>
             </div>
             {/* Pelanggan Baru */}
-            <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm">
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
                   <Users className="h-4 w-4 text-orange-400" />
                 </div>
-                <p className="text-xs font-medium text-stone-400">Pelanggan</p>
+                <p className="text-xs font-medium text-[var(--text-3)]">Pelanggan</p>
               </div>
-              <p className="text-xl font-bold text-stone-800">{data?.newCustomers ?? 0}</p>
+              <p className="text-xl font-bold text-[var(--text-1)]">{data?.newCustomers ?? 0}</p>
             </div>
           </>
         )}
@@ -269,22 +269,22 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-800 mb-4">Tren Penjualan</h3>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">Tren Penjualan</h3>
           {isLoading ? (
             <div className="h-48 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-stone-100 border-t-amber-500" />
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-[var(--border)] border-t-amber-500" />
             </div>
           ) : (
             <SalesChart data={data?.dailySales ?? []} currency={currency} />
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-800 mb-4">5 Produk Terlaris</h3>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">5 Produk Terlaris</h3>
           {isLoading ? (
             <div className="h-48 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-stone-100 border-t-amber-500" />
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-[var(--border)] border-t-amber-500" />
             </div>
           ) : (
             <TopProductsChart
@@ -301,10 +301,10 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-800 mb-4">Metode Pembayaran</h3>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">Metode Pembayaran</h3>
           {isLoading ? (
-            <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-stone-50 animate-pulse rounded-xl" />)}</div>
+            <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}</div>
           ) : (
             <PaymentBreakdown
               data={(data?.paymentBreakdown ?? []).map((p: any) => ({
@@ -317,26 +317,26 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-800 mb-4">Penjualan Harian</h3>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">Penjualan Harian</h3>
           {isLoading ? (
-            <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-stone-50 animate-pulse rounded-xl" />)}</div>
+            <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}</div>
           ) : (data?.dailySales ?? []).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10">
               <ShoppingCart className="h-8 w-8 text-stone-200 mb-2" />
-              <p className="text-sm text-stone-400">Belum ada penjualan di periode ini</p>
+              <p className="text-sm text-[var(--text-3)]">Belum ada penjualan di periode ini</p>
             </div>
           ) : (
             <div className="space-y-1">
               {(data?.dailySales ?? []).map((s, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-stone-50 transition-colors">
+                <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[var(--bg-subtle)] transition-colors">
                   <div>
-                    <p className="text-sm font-medium text-stone-700">
+                    <p className="text-sm font-medium text-[var(--text-1)]">
                       {new Date(s.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </p>
-                    <p className="text-xs text-stone-400">{s.orders} pesanan</p>
+                    <p className="text-xs text-[var(--text-3)]">{s.orders} pesanan</p>
                   </div>
-                  <p className="text-sm font-bold text-stone-800">{formatCurrency(s.total, currency)}</p>
+                  <p className="text-sm font-bold text-[var(--text-1)]">{formatCurrency(s.total, currency)}</p>
                 </div>
               ))}
             </div>

@@ -133,19 +133,19 @@ export default function PembayaranModal({
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-stone-200">
+      <div className="bg-[var(--bg-card)] rounded-xl w-full max-w-md shadow-2xl border border-[var(--border)]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
-          <h2 className="text-lg font-semibold text-stone-800">Pembayaran</h2>
-          <button onClick={onClose} className="text-stone-500 hover:text-stone-800 transition-colors">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2 className="text-lg font-semibold text-[var(--text-1)]">Pembayaran</h2>
+          <button onClick={onClose} className="text-[var(--text-2)] hover:text-[var(--text-1)] transition-colors">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-5 space-y-5">
           {/* Order summary */}
-          <div className="bg-stone-100 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between text-sm text-stone-500">
+          <div className="bg-[var(--bg-muted)] rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm text-[var(--text-2)]">
               <span>Subtotal</span><span>{fmt(subtotal())}</span>
             </div>
             {discountAmt > 0 && (
@@ -154,18 +154,18 @@ export default function PembayaranModal({
               </div>
             )}
             {taxRate > 0 && (
-              <div className="flex justify-between text-sm text-stone-500">
+              <div className="flex justify-between text-sm text-[var(--text-2)]">
                 <span>Pajak ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt(taxRate))}</span>
               </div>
             )}
-            <div className="flex justify-between text-lg font-bold text-stone-800 pt-2 border-t border-stone-200">
+            <div className="flex justify-between text-lg font-bold text-[var(--text-1)] pt-2 border-t border-[var(--border)]">
               <span>Total</span><span>{fmt(orderTotal)}</span>
             </div>
           </div>
 
           {/* Payment method */}
           <div>
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Metode Pembayaran</p>
+            <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-2">Metode Pembayaran</p>
             <div className="grid grid-cols-4 gap-2">
               {PAYMENT_METHODS.map(({ id, label, icon: Icon, color }) => (
                 <button
@@ -175,7 +175,7 @@ export default function PembayaranModal({
                     'flex flex-col items-center gap-1.5 py-3 rounded-lg border transition-all text-sm',
                     method === id
                       ? 'border-indigo-500 bg-amber-500/10 text-amber-600'
-                      : 'border-stone-200 bg-stone-100 text-stone-500 hover:border-stone-200'
+                      : 'border-[var(--border)] bg-[var(--bg-muted)] text-[var(--text-2)] hover:border-[var(--border)]'
                   )}
                 >
                   <Icon size={18} className={method === id ? 'text-amber-600' : color} />
@@ -188,13 +188,13 @@ export default function PembayaranModal({
           {/* Tunai input */}
           {method === 'CASH' && (
             <div>
-              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Tunai Given</p>
+              <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-2">Tunai Given</p>
               <input
                 type="number"
                 value={cashGiven}
                 onChange={(e: any) => setTunaiGiven(e.target.value)}
                 placeholder={fmt(orderTotal)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
               {/* Quick amounts */}
               <div className="flex gap-2 mt-2">
@@ -202,7 +202,7 @@ export default function PembayaranModal({
                   <button
                     key={amount}
                     onClick={() => setTunaiGiven(String(amount))}
-                    className="flex-1 text-xs py-1.5 rounded bg-stone-100 border border-stone-200 text-stone-600 hover:border-stone-400 transition-colors"
+                    className="flex-1 text-xs py-1.5 rounded bg-[var(--bg-muted)] border border-[var(--border)] text-[var(--text-2)] hover:border-stone-400 transition-colors"
                   >
                     {fmt(amount)}
                   </button>
@@ -210,7 +210,7 @@ export default function PembayaranModal({
               </div>
               {cashAmount >= orderTotal && (
                 <div className="mt-3 flex justify-between text-sm font-medium">
-                  <span className="text-stone-500">Kembalian</span>
+                  <span className="text-[var(--text-2)]">Kembalian</span>
                   <span className="text-green-400">{fmt(change)}</span>
                 </div>
               )}
@@ -220,7 +220,7 @@ export default function PembayaranModal({
           {/* Reference for card/transfer */}
           {(method === 'CARD' || method === 'TRANSFER') && (
             <div>
-              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">
+              <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-2">
                 {method === 'CARD' ? 'Card Reference' : 'Transfer Reference'} (optional)
               </p>
               <input
@@ -228,7 +228,7 @@ export default function PembayaranModal({
                 value={reference}
                 onChange={(e: any) => setReference(e.target.value)}
                 placeholder="Contoh: 4 digit terakhir, nomor ref"
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           )}
@@ -241,7 +241,7 @@ export default function PembayaranModal({
           <button
             onClick={handlePembayaran}
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-stone-200 disabled:text-stone-500 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-stone-200 disabled:text-[var(--text-2)] text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
               <span>Processing...</span>

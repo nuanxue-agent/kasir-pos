@@ -11,7 +11,7 @@ interface CRMPageClientProps { storeId: string; currency: string }
 type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST'
 
 const PIPELINE_STAGES: { value: LeadStatus; label: string; color: string; headerBg: string }[] = [
-  { value: 'NEW',         label: 'Lead',        color: 'bg-stone-100 text-stone-600',    headerBg: 'bg-stone-100' },
+  { value: 'NEW',         label: 'Lead',        color: 'bg-[var(--bg-muted)] text-[var(--text-2)]',    headerBg: 'bg-[var(--bg-muted)]' },
   { value: 'CONTACTED',   label: 'Contacted',   color: 'bg-blue-50 text-blue-600',       headerBg: 'bg-blue-50' },
   { value: 'QUALIFIED',   label: 'Qualified',   color: 'bg-purple-50 text-purple-600',   headerBg: 'bg-purple-50' },
   { value: 'PROPOSAL',    label: 'Proposal',    color: 'bg-amber-50 text-amber-600',     headerBg: 'bg-amber-50' },
@@ -77,8 +77,8 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-800">CRM Pipeline</h1>
-          <p className="text-stone-400 text-sm mt-0.5">Sales funnel & lead tracking</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-1)]">CRM Pipeline</h1>
+          <p className="text-[var(--text-3)] text-sm mt-0.5">Sales funnel & lead tracking</p>
         </div>
         <button
           className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-200 hover:opacity-90 transition-all">
@@ -87,54 +87,54 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
       </div>
 
       {/* ── Conversion Rate Summary ──────────────────────────────────────────── */}
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
-        <h2 className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Conversion Summary</h2>
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+        <h2 className="text-xs font-semibold text-[var(--text-3)] uppercase tracking-wide mb-3">Conversion Summary</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {/* Win rate meter */}
           <div className="col-span-2 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-stone-400">Win Rate</span>
+              <span className="text-xs text-[var(--text-3)]">Win Rate</span>
               <span className="text-xl font-bold text-emerald-600">{conversionRate}%</span>
             </div>
-            <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+            <div className="h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all"
                 style={{ width: `${conversionRate}%` }}
               />
             </div>
-            <p className="text-xs text-stone-400 mt-1">{wonCount} won / {closedCount} closed</p>
+            <p className="text-xs text-[var(--text-3)] mt-1">{wonCount} won / {closedCount} closed</p>
           </div>
 
-          <div className="bg-stone-50 rounded-xl p-3">
+          <div className="bg-[var(--bg-subtle)] rounded-xl p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Users className="h-3.5 w-3.5 text-blue-400" />
-              <span className="text-xs text-stone-400">Total Leads</span>
+              <span className="text-xs text-[var(--text-3)]">Total Leads</span>
             </div>
-            <p className="text-lg font-bold text-stone-800">{totalLeads}</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{totalLeads}</p>
           </div>
 
-          <div className="bg-stone-50 rounded-xl p-3">
+          <div className="bg-[var(--bg-subtle)] rounded-xl p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <TrendingUp className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-xs text-stone-400">Active</span>
+              <span className="text-xs text-[var(--text-3)]">Active</span>
             </div>
-            <p className="text-lg font-bold text-stone-800">{activeLeads}</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{activeLeads}</p>
           </div>
 
-          <div className="bg-stone-50 rounded-xl p-3">
+          <div className="bg-[var(--bg-subtle)] rounded-xl p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Target className="h-3.5 w-3.5 text-blue-500" />
-              <span className="text-xs text-stone-400">Pipeline</span>
+              <span className="text-xs text-[var(--text-3)]">Pipeline</span>
             </div>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(totalValue, currency)}</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(totalValue, currency)}</p>
           </div>
 
-          <div className="bg-stone-50 rounded-xl p-3">
+          <div className="bg-[var(--bg-subtle)] rounded-xl p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Award className="h-3.5 w-3.5 text-purple-500" />
-              <span className="text-xs text-stone-400">Weighted</span>
+              <span className="text-xs text-[var(--text-3)]">Weighted</span>
             </div>
-            <p className="text-lg font-bold text-stone-800">{formatCurrency(weightedValue, currency)}</p>
+            <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(weightedValue, currency)}</p>
           </div>
         </div>
 
@@ -167,16 +167,16 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-3)]" />
         <input value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 bg-white border border-stone-100 rounded-2xl text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 shadow-sm"
+          className="w-full pl-9 pr-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 shadow-sm"
           placeholder="Search leads…" />
       </div>
 
       {/* ── Kanban Board ─────────────────────────────────────────────────────── */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-          {[...Array(7)].map((_, i) => <div key={i} className="h-96 bg-stone-50 animate-pulse rounded-2xl" />)}
+          {[...Array(7)].map((_, i) => <div key={i} className="h-96 bg-[var(--bg-subtle)] animate-pulse rounded-xl" />)}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 overflow-x-auto">
@@ -196,16 +196,16 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
                   if (leadId) handleDrop(leadId, stage.value)
                 }}
                 className={cn(
-                  'border rounded-2xl p-3 min-h-[500px] transition-all',
+                  'border rounded-xl p-3 min-h-[500px] transition-all',
                   isOver
                     ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-300/40'
-                    : 'bg-stone-50/50 border-stone-100'
+                    : 'bg-[var(--bg-subtle)]/50 border-[var(--border)]'
                 )}
               >
                 {/* Column header */}
                 <div className={cn('flex items-center justify-between mb-3 px-3 py-2 rounded-xl', stage.color)}>
                   <span className="text-xs font-bold">{stage.label}</span>
-                  <span className="text-xs font-semibold bg-white/60 rounded-full px-1.5 py-0.5">{stageLeads.length}</span>
+                  <span className="text-xs font-semibold bg-[var(--bg-card)]/60 rounded-full px-1.5 py-0.5">{stageLeads.length}</span>
                 </div>
 
                 {/* Cards */}
@@ -221,14 +221,14 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
                           e.dataTransfer.effectAllowed = 'move'
                         }}
                         onDragEnd={() => setDragOverStage(null)}
-                        className="bg-white border border-stone-200 rounded-xl p-3 cursor-move hover:shadow-md hover:border-stone-300 transition-all select-none"
+                        className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3 cursor-move hover:shadow-md hover:border-stone-300 transition-all select-none"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <p className="text-sm font-semibold text-stone-800 line-clamp-2">{lead.name}</p>
+                          <p className="text-sm font-semibold text-[var(--text-1)] line-clamp-2">{lead.name}</p>
                           <div className={cn('w-2 h-2 rounded-full shrink-0 mt-1', priorityCfg.dot)} />
                         </div>
                         {lead.company && (
-                          <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
+                          <div className="flex items-center gap-1.5 text-xs text-[var(--text-2)] mb-1">
                             <Building2 className="h-3 w-3 text-stone-300" />
                             <span className="truncate">{lead.company}</span>
                           </div>
@@ -237,10 +237,10 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 mb-1">
                             <DollarSign className="h-3 w-3" />
                             <span>{formatCurrency(lead.value, currency)}</span>
-                            {lead.probability > 0 && <span className="text-stone-400">({lead.probability}%)</span>}
+                            {lead.probability > 0 && <span className="text-[var(--text-3)]">({lead.probability}%)</span>}
                           </div>
                         )}
-                        <div className="flex items-center gap-2 text-xs text-stone-400 mt-2 pt-2 border-t border-stone-100">
+                        <div className="flex items-center gap-2 text-xs text-[var(--text-3)] mt-2 pt-2 border-t border-[var(--border)]">
                           {lead.email && <Mail className="h-3 w-3" />}
                           {lead.phone && <Phone className="h-3 w-3" />}
                           {lead.expectedCloseDate && (
@@ -258,7 +258,7 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
                   {stageLeads.length === 0 && (
                     <div className={cn(
                       'border-2 border-dashed rounded-xl p-4 text-center text-xs transition-colors',
-                      isOver ? 'border-amber-300 text-amber-400' : 'border-stone-200 text-stone-300'
+                      isOver ? 'border-amber-300 text-amber-400' : 'border-[var(--border)] text-stone-300'
                     )}>
                       Drop here
                     </div>
@@ -266,7 +266,7 @@ export default function CRMPageClient({ storeId, currency }: CRMPageClientProps)
                 </div>
 
                 {stageLeads.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-stone-200 text-xs text-stone-500 font-semibold px-2">
+                  <div className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--text-2)] font-semibold px-2">
                     Total: {formatCurrency(stageValue, currency)}
                   </div>
                 )}

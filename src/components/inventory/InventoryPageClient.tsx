@@ -206,18 +206,18 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-[var(--text-1)] flex items-center gap-2">
             <Boxes className="w-7 h-7" />
             Inventory Management
           </h1>
-          <p className="text-stone-400 text-sm mt-1">Track and manage product stock levels</p>
+          <p className="text-[var(--text-3)] text-sm mt-1">Track and manage product stock levels</p>
         </div>
         <div className="flex items-center gap-2">
           {/* CSV Import button */}
           <button
             onClick={() => csvInputRef.current?.click()}
             disabled={csvImporting}
-            className="flex items-center gap-2 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 text-sm rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-2)] text-sm rounded-lg transition-colors disabled:opacity-50"
           >
             <Upload className="w-4 h-4" />
             {csvImporting ? 'Importing…' : 'Import CSV'}
@@ -236,7 +236,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors',
               showChart
                 ? 'bg-amber-500 text-white'
-                : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
+                : 'bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-2)]'
             )}
           >
             <TrendingUp className="w-4 h-4" />
@@ -281,11 +281,11 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
             {alertProducts.map(p => (
               <div
                 key={p.id}
-                className="flex items-center justify-between bg-white border border-orange-100 rounded-lg px-3 py-2"
+                className="flex items-center justify-between bg-[var(--bg-card)] border border-orange-100 rounded-lg px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-stone-800 truncate">{p.name}</p>
-                  {p.sku && <p className="text-xs text-stone-400">{p.sku}</p>}
+                  <p className="text-sm font-medium text-[var(--text-1)] truncate">{p.name}</p>
+                  {p.sku && <p className="text-xs text-[var(--text-3)]">{p.sku}</p>}
                 </div>
                 <div className="ml-3 shrink-0 text-right">
                   <span className={cn(
@@ -296,7 +296,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                   )}>
                     {p.stock === 0 ? 'OUT' : `${p.stock} left`}
                   </span>
-                  <p className="text-xs text-stone-400 mt-0.5">min {p.lowStock}</p>
+                  <p className="text-xs text-[var(--text-3)] mt-0.5">min {p.lowStock}</p>
                 </div>
               </div>
             ))}
@@ -306,8 +306,8 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
       {/* ── Stock History Chart ──────────────────────────────────────────────── */}
       {showChart && products.length > 0 && (
-        <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-stone-700 mb-4">Stock History — Last 30 Days (top 3 products)</h2>
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-[var(--text-1)] mb-4">Stock History — Last 30 Days (top 3 products)</h2>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -347,7 +347,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-2)]" />
           <input
             type="text"
             placeholder="Search by name or SKU..."
@@ -356,7 +356,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               setSearch(e.target.value)
               setPage(1)
             }}
-            className="w-full pl-10 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
         </div>
 
@@ -367,7 +367,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors',
               filter === 'all'
                 ? 'bg-amber-500 text-white'
-                : 'bg-stone-100 text-stone-400 hover:bg-stone-700'
+                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700'
             )}
           >
             All
@@ -378,7 +378,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2',
               filter === 'low'
                 ? 'bg-orange-600 text-white'
-                : 'bg-stone-100 text-stone-400 hover:bg-stone-700'
+                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700'
             )}
           >
             <AlertTriangle className="w-4 h-4" />
@@ -390,7 +390,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
               'px-4 py-2 rounded-lg font-medium transition-colors',
               filter === 'out'
                 ? 'bg-red-600 text-white'
-                : 'bg-stone-100 text-stone-400 hover:bg-stone-700'
+                : 'bg-[var(--bg-muted)] text-[var(--text-3)] hover:bg-stone-700'
             )}
           >
             Out of Stock
@@ -399,30 +399,30 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
       </div>
 
       {/* Table */}
-      <div className="bg-stone-100 rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-[var(--bg-muted)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-stone-50 border-b border-stone-200">
-                <th className="text-left px-4 py-3 text-sm font-semibold text-stone-400">Product</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-stone-400">SKU</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-stone-400">Category</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-stone-400">Current Stock</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-stone-400">Low Stock Alert</th>
-                <th className="text-center px-4 py-3 text-sm font-semibold text-stone-400">Status</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-stone-400">Actions</th>
+              <tr className="bg-[var(--bg-subtle)] border-b border-[var(--border)]">
+                <th className="text-left px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Product</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-[var(--text-3)]">SKU</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Category</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Current Stock</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Low Stock Alert</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Status</th>
+                <th className="text-right px-4 py-3 text-sm font-semibold text-[var(--text-3)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-[var(--text-2)]">
                     Loading...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-[var(--text-2)]">
                     No products found
                   </td>
                 </tr>
@@ -430,10 +430,10 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                 products.map((product) => {
                   const status = getStockStatus(product)
                   return (
-                    <tr key={product.id} className="border-b border-stone-200 hover:bg-stone-700/50">
+                    <tr key={product.id} className="border-b border-[var(--border)] hover:bg-stone-700/50">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-stone-700">{product.name}</div>
-                        <div className="text-sm text-stone-400">{formatCurrency(product.price)}</div>
+                        <div className="font-medium text-[var(--text-1)]">{product.name}</div>
+                        <div className="text-sm text-[var(--text-3)]">{formatCurrency(product.price)}</div>
                       </td>
                       <td className="px-4 py-3 text-stone-300 text-sm">
                         {product.sku || '-'}
@@ -442,11 +442,11 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                         {product.category?.name || '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-lg font-semibold text-stone-800">
+                        <span className="text-lg font-semibold text-[var(--text-1)]">
                           {product.stock}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-stone-400">
+                      <td className="px-4 py-3 text-center text-[var(--text-3)]">
                         {product.lowStock}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -468,7 +468,7 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
                           </button>
                           <button
                             onClick={() => handleViewLogs(product)}
-                            className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm rounded-lg transition-colors flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-[var(--bg-muted)] hover:bg-stone-200 text-[var(--text-1)] text-sm rounded-lg transition-colors flex items-center gap-1.5"
                           >
                             <History className="w-4 h-4" />
                             Logs
@@ -485,8 +485,8 @@ export default function InventoryPageClient({ storeId }: InventoryPageClientProp
 
         {/* Pagination */}
         {!loading && products.length > 0 && (
-          <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
-            <div className="text-sm text-stone-400">
+          <div className="px-4 py-3 bg-[var(--bg-subtle)] border-t border-[var(--border)] flex items-center justify-between">
+            <div className="text-sm text-[var(--text-3)]">
               Showing {products.length} of {total} products
             </div>
           </div>
