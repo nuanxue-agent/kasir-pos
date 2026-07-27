@@ -233,3 +233,164 @@ describe('Supplier validation', () => {
     expect(validateSupplier({ name: 'PT Sumber', phone: '+62 812 3456 7890' })).toBeNull()
   })
 })
+
+// ── Receive workflow helpers ──────────────────────────────────────────────────
+
+interface ReceiveLine {
+  id: string
+  receivedQty: number
+}
+
+function validateReceiveLines(lines: ReceiveLine[], poLines: POLine[]): string | null {
+  if (!lines || lines.length === 0) return 'lines required'
+  for (const rl of lines) {
+    const poLine = poLines.find(l => l.id === rl.id)
+    if (!poLine) return `Line ${rl.id} tidak ditemukan`
+    if (rl.receivedQty <= 0) return 'receivedQty harus lebih dari 0'
+    const remaining = poLine.qty - poLine.receivedQty
+    if (rl.receivedQty > remaining) return `Melebihi sisa qty pada line ${rl.id}`
+  }
+  return null
+}
+
+function applyReceiveLines(poLines: POLine[], receiveLines: ReceiveLine[]): POLine[] {
+  return poLines.map(line => {
+    const incoming = receiveLines.find(r => r.id === line.id)
+    if (!incoming) return line
+    return { ...line, receivedQty: line.receivedQty + incoming.receivedQty }
+  })
+}
+
+function calcStockDelta(receiveLines: ReceiveLine[]): number {
+  return receiveLines.reduce((s, r) => s + r.receivedQty, 0)
+}
+
+// ── Duplicate PO helper ───────────────────────────────────────────────────────
+
+function duplicatePO(po: PurchaseOrder): PurchaseOrder {
+  return {
+    ...po,
+    id: `${po.id}_copy`,
+    status: 'DRAFT',
+    lines: po.lines.map(l => ({ ...l, receivedQty: 0 })),
+  }
+}
+
+// ── Supplier metrics helper ───────────────────────────────────────────────────
+
+interface SupplierOrder {
+  status: POStatus
+  total: number
+  orderDate: string
+  updatedAt: string
+}
+
+function calcSupplierMetrics(orders: SupplierOrder[]) {
+  const totalOrders = orders.length
+  const totalValue = orders.reduce((s, o) => s + o.total, 0)
+  const received = orders.filter(o => o.status === 'RECEIVED')
+  const avgDeliveryDays = received.length === 0 ? null
+    : Math.round(
+        received.reduce((s, o) => {
+          const days = (new Date(o.updatedAt).getTime() - new Date(o.orderDate).getTime()) / (1000 * 60 * 60 * 24)
+          return s + days
+        }, 0) / received.length
+      )
+  return { totalOrders, totalValue, avgDeliveryDays, receivedCount: received.length }
+}
+
+// ── Receive workflow tests ────────────────────────────────────────────────────
+
+describe('Receive workflow validation', () => {
+  const baseLines: POLine[] = [
+    { id: 'l1', productId: 'p1', productName: 'Item A', qty: 10, unitCost: 5000, receivedQty: 0, subtotal: 50000 },
+    { id: 'l2', productId: 'p2', productName: 'Item B', qty: 5,  unitCost: 20000, receivedQty: 0, subtotal: 100000 },
+  ]
+
+  it('accepts valid receive lines', () => {
+    expect(validateReceiveLines([{ id: 'l1', receivedQty: 5 }], baseLines)).toBeNull()
+  })
+  it('rejects empty lines array', () => {
+    expect(validateReceiveLines([], baseLines)).toBe('lines required')
+  })
+  it('rejects unknown line id', () => {
+    expect(validateReceiveLines([{ id: 'unknown', receivedQty: 1 }], baseLines)).toBe('Line unknown tidak ditemukan')
+  })
+  it('rejects zero receivedQty', () => {
+    expect(validateReceiveLines([{ id: 'l1', receivedQty: 0 }], baseLines)).toBe('receivedQty harus lebih dari 0')
+  })
+  it('rejects quantity exceeding remaining', () => {
+    expect(validateReceiveLines([{ id: 'l1', receivedQty: 11 }], baseLines)).toMatch(/Melebihi sisa qty/)
+  })
+  it('applies receive lines to PO lines correctly', () => {
+    const updated = applyReceiveLines(baseLines, [{ id: 'l1', receivedQty: 5 }])
+    expect(updated[0].receivedQty).toBe(5)
+    expect(updated[1].receivedQty).toBe(0)
+  })
+  it('calculates total stock delta from receive lines', () => {
+    expect(calcStockDelta([{ id: 'l1', receivedQty: 5 }, { id: 'l2', receivedQty: 3 }])).toBe(8)
+  })
+})
+
+// ── Duplicate PO tests ────────────────────────────────────────────────────────
+
+describe('Duplicate PO', () => {
+  const sourcePO: PurchaseOrder = {
+    id: 'po1',
+    supplierId: 's1',
+    status: 'RECEIVED',
+    subtotal: 150000,
+    taxAmt: 15000,
+    total: 165000,
+    lines: [
+      { id: 'l1', productId: 'p1', productName: 'Item A', qty: 10, unitCost: 5000, receivedQty: 10, subtotal: 50000 },
+      { id: 'l2', productId: 'p2', productName: 'Item B', qty: 5,  unitCost: 20000, receivedQty: 5,  subtotal: 100000 },
+    ],
+  }
+
+  it('creates a DRAFT copy', () => {
+    expect(duplicatePO(sourcePO).status).toBe('DRAFT')
+  })
+  it('resets receivedQty to 0 on all lines', () => {
+    const copy = duplicatePO(sourcePO)
+    expect(copy.lines.every(l => l.receivedQty === 0)).toBe(true)
+  })
+  it('preserves supplier, lines qty, and totals', () => {
+    const copy = duplicatePO(sourcePO)
+    expect(copy.supplierId).toBe('s1')
+    expect(copy.lines[0].qty).toBe(10)
+    expect(copy.total).toBe(165000)
+  })
+})
+
+// ── Supplier metrics tests ────────────────────────────────────────────────────
+
+describe('Supplier performance metrics', () => {
+  const orders: SupplierOrder[] = [
+    { status: 'RECEIVED', total: 200000, orderDate: '2024-01-01', updatedAt: '2024-01-05' }, // 4 days
+    { status: 'RECEIVED', total: 300000, orderDate: '2024-02-01', updatedAt: '2024-02-09' }, // 8 days
+    { status: 'DRAFT',    total: 100000, orderDate: '2024-03-01', updatedAt: '2024-03-01' },
+  ]
+
+  it('counts total orders including all statuses', () => {
+    expect(calcSupplierMetrics(orders).totalOrders).toBe(3)
+  })
+  it('sums total value across all orders', () => {
+    expect(calcSupplierMetrics(orders).totalValue).toBe(600000)
+  })
+  it('calculates avg delivery days from RECEIVED orders only', () => {
+    // avg of 4 and 8 = 6
+    expect(calcSupplierMetrics(orders).avgDeliveryDays).toBe(6)
+  })
+  it('returns null avgDeliveryDays when no RECEIVED orders', () => {
+    const draftOnly: SupplierOrder[] = [
+      { status: 'DRAFT', total: 50000, orderDate: '2024-01-01', updatedAt: '2024-01-01' },
+    ]
+    expect(calcSupplierMetrics(draftOnly).avgDeliveryDays).toBeNull()
+  })
+  it('returns 0 totalOrders and 0 totalValue for empty history', () => {
+    const m = calcSupplierMetrics([])
+    expect(m.totalOrders).toBe(0)
+    expect(m.totalValue).toBe(0)
+  })
+})

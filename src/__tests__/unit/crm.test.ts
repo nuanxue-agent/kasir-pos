@@ -330,3 +330,186 @@ describe('Follow-up activities', () => {
     expect(due.every(a => a.type === 'FOLLOW_UP')).toBe(true)
   })
 })
+
+// ── Additional types & functions for extended CRM tests ───────────────────────
+
+interface ConvertedCustomer {
+  id: string
+  name: string
+  company?: string
+  email?: string
+  phone?: string
+  sourceLeadId: string
+  convertedAt: string
+}
+
+function convertLeadToCustomer(lead: Lead, asOf: string): { ok: boolean; customer?: ConvertedCustomer; error?: string } {
+  if (lead.status !== 'WON') {
+    return { ok: false, error: 'Hanya lead berstatus WON yang dapat dikonversi' }
+  }
+  return {
+    ok: true,
+    customer: {
+      id: `cust-${lead.id}`,
+      name: lead.name,
+      company: lead.company,
+      email: lead.email,
+      phone: lead.phone,
+      sourceLeadId: lead.id,
+      convertedAt: asOf,
+    },
+  }
+}
+
+function validateActivity(data: any): string | null {
+  if (!data.title || data.title.trim().length < 3) return 'Judul aktivitas minimal 3 karakter'
+  if (!data.type) return 'Tipe aktivitas wajib diisi'
+  const validTypes: ActivityType[] = ['CALL', 'EMAIL', 'MEETING', 'NOTE', 'FOLLOW_UP']
+  if (!validTypes.includes(data.type)) return 'Tipe aktivitas tidak valid'
+  if (data.dueDate && isNaN(Date.parse(data.dueDate))) return 'Tanggal jatuh tempo tidak valid'
+  return null
+}
+
+function validateExpectedCloseDate(date: string, createdAt: string): string | null {
+  if (isNaN(Date.parse(date))) return 'Tanggal tidak valid'
+  if (date < createdAt.slice(0, 10)) return 'Tanggal penutupan tidak boleh sebelum tanggal pembuatan'
+  return null
+}
+
+function calcLeadScore(lead: Lead, activities: Activity[]): number {
+  let score = 0
+  // Base score from stage
+  const stageScore: Record<LeadStatus, number> = {
+    NEW: 10, CONTACTED: 20, QUALIFIED: 35, PROPOSAL: 50, NEGOTIATION: 70, WON: 100, LOST: 0,
+  }
+  score += stageScore[lead.status]
+  // Activity bonus: +5 per completed activity, up to 25
+  const completedActivities = activities.filter(a => a.leadId === lead.id && a.completedAt)
+  score += Math.min(completedActivities.length * 5, 25)
+  // Priority bonus
+  if (lead.priority === 'HIGH') score += 10
+  else if (lead.priority === 'MEDIUM') score += 5
+  return score
+}
+
+// ── Extended tests ─────────────────────────────────────────────────────────────
+
+describe('Pipeline stage validation (extended)', () => {
+  it('NEGOTIATION is a valid pipeline stage', () => {
+    expect(PIPELINE_ORDER).toContain('NEGOTIATION')
+  })
+
+  it('WON and LOST are terminal stages and cannot advance', () => {
+    expect(nextStage('WON')).toBeNull()
+    expect(nextStage('LOST')).toBeNull()
+    expect(canAdvanceStage('WON')).toBe(false)
+    expect(canAdvanceStage('LOST')).toBe(false)
+  })
+
+  it('pipeline order has exactly 7 stages', () => {
+    expect(PIPELINE_ORDER).toHaveLength(7)
+  })
+})
+
+describe('Lead conversion workflow', () => {
+  const wonLead: Lead = {
+    id: 'l1', name: 'PT Maju Jaya', company: 'PT Maju', email: 'info@maju.com',
+    status: 'WON', priority: 'HIGH', value: 5_000_000, probability: 100, createdAt: '2025-01-01',
+  }
+
+  it('converts WON lead to customer successfully', () => {
+    const result = convertLeadToCustomer(wonLead, '2025-06-01')
+    expect(result.ok).toBe(true)
+    expect(result.customer?.sourceLeadId).toBe('l1')
+    expect(result.customer?.name).toBe('PT Maju Jaya')
+    expect(result.customer?.convertedAt).toBe('2025-06-01')
+  })
+
+  it('preserves contact details when converting', () => {
+    const result = convertLeadToCustomer(wonLead, '2025-06-01')
+    expect(result.customer?.email).toBe('info@maju.com')
+    expect(result.customer?.company).toBe('PT Maju')
+  })
+
+  it('rejects conversion of non-WON lead', () => {
+    const lead: Lead = { ...wonLead, status: 'NEGOTIATION' }
+    const result = convertLeadToCustomer(lead, '2025-06-01')
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('WON')
+  })
+})
+
+describe('Activity logging requirements', () => {
+  it('accepts valid activity data', () => {
+    expect(validateActivity({ title: 'Follow up call', type: 'CALL', dueDate: '2025-07-01' })).toBeNull()
+  })
+
+  it('rejects activity with short title', () => {
+    expect(validateActivity({ title: 'Hi', type: 'CALL' })).toContain('minimal 3')
+  })
+
+  it('rejects activity with invalid type', () => {
+    const err = validateActivity({ title: 'Valid Title', type: 'UNKNOWN' })
+    expect(err).toContain('tidak valid')
+  })
+
+  it('rejects activity with invalid due date', () => {
+    const err = validateActivity({ title: 'Valid Title', type: 'CALL', dueDate: 'not-a-date' })
+    expect(err).toContain('Tanggal')
+  })
+})
+
+describe('Expected close date validation', () => {
+  it('accepts future close date', () => {
+    expect(validateExpectedCloseDate('2025-12-31', '2025-06-01')).toBeNull()
+  })
+
+  it('rejects close date before creation date', () => {
+    const err = validateExpectedCloseDate('2025-01-01', '2025-06-01')
+    expect(err).toContain('sebelum tanggal pembuatan')
+  })
+
+  it('rejects invalid date string', () => {
+    const err = validateExpectedCloseDate('not-a-date', '2025-06-01')
+    expect(err).toContain('tidak valid')
+  })
+
+  it('accepts same-day close date', () => {
+    expect(validateExpectedCloseDate('2025-06-01', '2025-06-01')).toBeNull()
+  })
+})
+
+describe('Lead score calculation', () => {
+  const lead: Lead = {
+    id: 'l1', name: 'Test Lead', status: 'QUALIFIED', priority: 'HIGH',
+    value: 1_000_000, probability: 40, createdAt: '2025-01-01',
+  }
+
+  const activities: Activity[] = [
+    { id: 'a1', leadId: 'l1', type: 'CALL', title: 'Call 1', completedAt: '2025-05-01T10:00:00Z' },
+    { id: 'a2', leadId: 'l1', type: 'EMAIL', title: 'Email 1', completedAt: '2025-05-02T10:00:00Z' },
+    { id: 'a3', leadId: 'l2', type: 'CALL', title: 'Other lead', completedAt: '2025-05-03T10:00:00Z' },
+  ]
+
+  it('calculates score with stage + priority + activities', () => {
+    // QUALIFIED=35, HIGH priority=10, 2 completed activities=10 → 55
+    expect(calcLeadScore(lead, activities)).toBe(55)
+  })
+
+  it('activity bonus is capped at 25', () => {
+    const manyActivities: Activity[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `a${i}`, leadId: 'l1', type: 'CALL' as ActivityType,
+      title: `Act ${i}`, completedAt: `2025-05-${String(i + 1).padStart(2, '0')}T10:00:00Z`,
+    }))
+    // QUALIFIED=35, HIGH=10, capped at 25 → 70
+    expect(calcLeadScore(lead, manyActivities)).toBe(70)
+  })
+
+  it('only counts activities belonging to the lead', () => {
+    const otherActivities: Activity[] = [
+      { id: 'a9', leadId: 'l-other', type: 'CALL', title: 'Not mine', completedAt: '2025-05-01T10:00:00Z' },
+    ]
+    // QUALIFIED=35, HIGH=10, 0 activities → 45
+    expect(calcLeadScore(lead, otherActivities)).toBe(45)
+  })
+})

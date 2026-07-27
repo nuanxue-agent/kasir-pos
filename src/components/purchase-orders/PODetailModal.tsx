@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { X, Truck, CheckCircle2, Clock, Send, XCircle, Package, ChevronDown } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { X, Truck, CheckCircle2, Package, Copy, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
+import { ExportButton } from '@/components/ExportButton'
+import type { ExportColumn } from '@/lib/export'
 
 interface Props {
   po: any
@@ -33,10 +35,20 @@ const NEXT_STATUSES: Record<POStatus, POStatus[]> = {
   CANCELLED: [],
 }
 
+const PO_LINE_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'productName', label: 'Produk' },
+  { key: 'qty',         label: 'Qty' },
+  { key: 'unitCost',    label: 'Harga Satuan' },
+  { key: 'receivedQty', label: 'Diterima' },
+  { key: 'subtotal',    label: 'Subtotal' },
+]
+
 export default function PODetailModal({ po, storeId, currency, onClose, onUpdated }: Props) {
+  const qc = useQueryClient()
   const [receiving, setReceiving] = useState(false)
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [receiptNote, setReceiptNote] = useState('')
 
   const { data: linesRaw, isLoading } = useQuery({
@@ -48,6 +60,15 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
   const cfg = STATUS_CONFIG[po.status as POStatus]
   const canReceive = ['SENT', 'CONFIRMED'].includes(po.status)
   const canChangeStatus = NEXT_STATUSES[po.status as POStatus]
+
+  // PDF export rows from lines
+  const exportRows = lines.map(l => ({
+    productName: l.productName,
+    qty: l.qty,
+    unitCost: l.unitCost,
+    receivedQty: l.receivedQty,
+    subtotal: l.subtotal,
+  }))
 
   async function changeStatus(status: POStatus) {
     setSaving(true)
@@ -67,25 +88,44 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
   }
 
   async function submitReceipt() {
-    const receive = Object.entries(receiveQtys)
-      .filter(([, qty]) => qty > 0)
-      .map(([lineId, qty]) => ({ lineId, qty }))
-    if (receive.length === 0) return
+    const receiveLines = lines
+      .filter(l => (receiveQtys[l.id] ?? 0) > 0)
+      .map(l => ({ id: l.id, receivedQty: receiveQtys[l.id] }))
+    if (receiveLines.length === 0) return
     setSaving(true)
-    const res = await fetch(`/api/purchase-orders/${po.id}?storeId=${storeId}`, {
-      method: 'PATCH',
+    const res = await fetch(`/api/purchase-orders/${po.id}/receive?storeId=${storeId}`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ receive, note: receiptNote }),
+      body: JSON.stringify({ lines: receiveLines, note: receiptNote }),
     })
     const data = await res.json() as any
     setSaving(false)
     if (res.ok) {
-      toast.success('Barang diterima', `${receive.length} item stok diperbarui`)
+      toast.success('Barang diterima', `${receiveLines.length} item stok diperbarui`)
       setReceiving(false)
       setReceiveQtys({})
+      setReceiptNote('')
+      qc.invalidateQueries({ queryKey: ['po-lines', po.id] })
       onUpdated({ ...po, status: data.status ?? po.status })
     } else {
-      toast.error('Gagal menerima barang')
+      toast.error(data.error ?? 'Gagal menerima barang')
+    }
+  }
+
+  async function duplicatePO() {
+    if (!confirm('Buat salinan PO ini sebagai draft baru?')) return
+    setDuplicating(true)
+    const res = await fetch(`/api/purchase-orders/${po.id}/duplicate?storeId=${storeId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const data = await res.json() as any
+    setDuplicating(false)
+    if (res.ok) {
+      toast.success('PO diduplikasi', `Draft baru: ${data.number}`)
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+    } else {
+      toast.error(data.error ?? 'Gagal menduplikasi PO')
     }
   }
 
@@ -109,9 +149,33 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
               <Truck className="h-3 w-3" /> {po.supplierName}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
-            <X className="h-4 w-4 text-stone-500" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* PDF export for this PO */}
+            {lines.length > 0 && (
+              <ExportButton
+                type="pdf"
+                label=""
+                data={exportRows}
+                columns={PO_LINE_EXPORT_COLUMNS}
+                filename={`PO-${po.number}`}
+                title={`Purchase Order ${po.number} — ${po.supplierName}`}
+                currency={currency}
+                className="!px-2 !py-1.5"
+              />
+            )}
+            {/* Duplicate PO */}
+            <button
+              onClick={duplicatePO}
+              disabled={duplicating}
+              title="Duplikasi PO"
+              className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors disabled:opacity-50"
+            >
+              <Copy className="h-4 w-4 text-stone-400" />
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors">
+              <X className="h-4 w-4 text-stone-500" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -158,13 +222,18 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
                         <span>@ {formatCurrency(line.unitCost, currency)}</span>
                         <span className="font-semibold text-stone-600">{formatCurrency(line.subtotal, currency)}</span>
                       </div>
+                      {/* Receive input per line */}
                       {receiving && lineStatus !== 'RECEIVED' && (
                         <div className="mt-2 flex items-center gap-2">
                           <label className="text-xs text-stone-500 shrink-0">Terima:</label>
-                          <input type="number" min="0" max={line.qty - line.receivedQty}
+                          <input
+                            type="number"
+                            min="0"
+                            max={line.qty - line.receivedQty}
                             value={receiveQtys[line.id] ?? 0}
                             onChange={e => setReceiveQtys(q => ({ ...q, [line.id]: Number(e.target.value) }))}
-                            className="w-20 bg-white border border-stone-200 rounded-lg px-2 py-1 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
+                            className="w-20 bg-white border border-stone-200 rounded-lg px-2 py-1 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+                          />
                           <span className="text-xs text-stone-400">dari {line.qty - line.receivedQty} sisa</span>
                         </div>
                       )}
@@ -205,17 +274,26 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
           {po.note && (
             <p className="text-xs text-stone-500 bg-stone-50 rounded-xl px-3 py-2">{po.note}</p>
           )}
+
+          {po.expectedDate && (
+            <p className="text-xs text-stone-400">
+              Estimasi tiba: <span className="font-medium text-stone-600">{formatDate(po.expectedDate)}</span>
+            </p>
+          )}
         </div>
 
         {/* Actions */}
         <div className="border-t border-stone-100 p-4 space-y-2">
           {receiving ? (
             <div className="flex gap-3">
-              <button onClick={() => setReceiving(false)} className="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-600 text-sm font-semibold hover:bg-stone-200 transition-colors">
+              <button onClick={() => { setReceiving(false); setReceiveQtys({}) }} className="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-600 text-sm font-semibold hover:bg-stone-200 transition-colors">
                 Batal
               </button>
-              <button onClick={submitReceipt} disabled={saving || Object.values(receiveQtys).every(q => q === 0)}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold shadow-md shadow-amber-200 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              <button
+                onClick={submitReceipt}
+                disabled={saving || lines.filter(l => (receiveQtys[l.id] ?? 0) > 0).length === 0}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold shadow-md shadow-amber-200 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {saving ? 'Menyimpan…' : 'Konfirmasi Terima'}
               </button>
             </div>
