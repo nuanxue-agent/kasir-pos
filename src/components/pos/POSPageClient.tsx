@@ -5,6 +5,7 @@ import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smart
 import { cn } from '@/lib/utils'
 import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 import BarcodeScanner from './BarcodeScanner'
+import { useCurrentStore } from '@/context/StoreContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,12 @@ function fmt(n: number, currency: string) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function POSPageClient({ storeId, storeName, taxRate, currency, staffId, initialProducts, categories, receiptNote }: POSPageClientProps) {
+export default function POSPageClient({ storeId, storeName, taxRate: taxRateProp, currency: currencyProp, staffId, initialProducts, categories, receiptNote: receiptNoteProp }: POSPageClientProps) {
+  // Read live store settings from context (updated when user switches store)
+  const currentStore = useCurrentStore()
+  const currency = currentStore?.currency ?? currencyProp
+  const taxRate = currentStore?.taxRate ?? taxRateProp
+  const receiptNote = currentStore?.receiptNote ?? receiptNoteProp
   const [products] = useState<Product[]>(initialProducts)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)

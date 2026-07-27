@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users } from 'lucide-react'
+import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Scale, BarChart2 } from 'lucide-react'
+import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
 import { SalesChart } from './SalesChart'
 import { TopProductsChart } from './TopProductsChart'
@@ -160,6 +161,36 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
           />
         </div>
         </div>
+
+      {/* Financial Report Links */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Link
+          href="/dashboard/reports/balance-sheet"
+          className="group bg-white border border-stone-100 rounded-2xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+            <Scale className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-stone-800">Neraca</p>
+            <p className="text-xs text-stone-400 mt-0.5">Balance sheet — posisi keuangan</p>
+          </div>
+          <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
+        </Link>
+        <Link
+          href="/dashboard/reports/pnl"
+          className="group bg-white border border-stone-100 rounded-2xl p-5 shadow-sm hover:border-amber-200 hover:shadow-md transition-all flex items-center gap-4"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+            <BarChart2 className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-stone-800">Laba Rugi</p>
+            <p className="text-xs text-stone-400 mt-0.5">P&amp;L — pendapatan &amp; beban</p>
+          </div>
+          <TrendingUp className="h-4 w-4 text-stone-300 ml-auto group-hover:text-amber-400 transition-colors" />
+        </Link>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

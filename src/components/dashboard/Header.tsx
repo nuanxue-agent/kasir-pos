@@ -8,7 +8,7 @@ import { Bell, ChevronDown, Store, User, LogOut, Menu, Settings, AlertTriangle, 
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/permissions'
 
-interface StoreOption { id: string; name: string }
+interface StoreOption { id: string; name: string; [key: string]: unknown }
 
 interface HeaderProps {
   userName: string
