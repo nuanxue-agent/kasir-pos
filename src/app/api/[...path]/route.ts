@@ -187,6 +187,45 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── PRODUCTS/RECENT ──────────────────────────────────────────────────────
+    if (segs[0] === 'products' && segs[1] === 'recent' && method === 'GET') {
+      const limit = Math.min(20, Math.max(1, parseInt(sp.get('limit') ?? '5')))
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const todayISO = today.toISOString()
+      const rows = await query(
+        `SELECT p.id, p.name, p.price, p.stock, p.trackStock, p.sku, p.barcode,
+                p.image, p.categoryId,
+                c.id as catId, c.name as catName, c.color as catColor, c.icon as catIcon,
+                COUNT(oi.id) as soldQty
+         FROM OrderItem oi
+         JOIN "Order" o ON oi.orderId = o.id
+         JOIN Product p ON oi.productId = p.id
+         LEFT JOIN Category c ON p.categoryId = c.id
+         WHERE o.storeId = ? AND o.status = 'PAID' AND o.createdAt >= ? AND p.active = 1
+         GROUP BY p.id
+         ORDER BY soldQty DESC
+         LIMIT ?`,
+        [storeId, todayISO, limit],
+      )
+      return ok(
+        rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          price: r.price,
+          stock: r.stock,
+          trackStock: r.trackStock,
+          sku: r.sku,
+          barcode: r.barcode,
+          image: r.image,
+          variants: [],
+          category: r.catId
+            ? { id: r.catId, name: r.catName, color: r.catColor, icon: r.catIcon }
+            : null,
+        })),
+      )
+    }
+
     // ─── CATEGORIES ───────────────────────────────────────────────────────────
     if (segs[0] === 'categories') {
       if (method === 'GET')
@@ -942,6 +981,31 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         topProducts,
         paymentBreakdown: payments,
       })
+    }
+
+    // ─── REPORTS / GROSS PROFIT ───────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'gross-profit' && method === 'GET') {
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+      const to = sp.get('to') ?? new Date().toISOString()
+      const [revenueRow, cogsRow] = await Promise.all([
+        queryOne(
+          `SELECT COALESCE(SUM(total),0) as revenue FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+          [storeId, from, to],
+        ),
+        queryOne(
+          `SELECT COALESCE(SUM(oi.qty * COALESCE(p.cost,0)),0) as cogs
+           FROM OrderItem oi
+           JOIN "Order" o ON oi.orderId=o.id
+           LEFT JOIN Product p ON oi.productId=p.id
+           WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ?`,
+          [storeId, from, to],
+        ),
+      ])
+      const revenue = Number((revenueRow as any)?.revenue ?? 0)
+      const cogs = Number((cogsRow as any)?.cogs ?? 0)
+      const grossProfit = revenue - cogs
+      const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
+      return ok({ revenue, cogs, grossProfit, grossMargin })
     }
 
     // ─── REPORTS / ANALYTICS ──────────────────────────────────────────────────
@@ -1765,6 +1829,77 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           storeId,
         ])
         return ok({ success: true })
+      }
+    }
+
+    // ── accounting/journal alias ──────────────────────────────────────────────
+    // POST /api/accounting/journal  →  create a journal entry
+    // GET  /api/accounting/journal  →  list journal entries
+    if (segs[0] === 'accounting' && segs[1] === 'journal') {
+      if (method === 'GET') {
+        const from = sp.get('from') ?? ''
+        const to = sp.get('to') ?? ''
+        let q = `SELECT * FROM JournalEntry WHERE storeId=?`
+        const params: any[] = [storeId]
+        if (from) {
+          q += ' AND date >= ?'
+          params.push(from)
+        }
+        if (to) {
+          q += ' AND date <= ?'
+          params.push(to)
+        }
+        q += ' ORDER BY date DESC, createdAt DESC LIMIT 100'
+        const entries = await query(q, params)
+        return ok(entries)
+      }
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.date) return err('Tanggal harus diisi')
+        if (!b.description || b.description.trim().length < 2)
+          return err('Deskripsi minimal 2 karakter')
+        if (!b.lines || b.lines.length < 2) return err('Minimal 2 baris jurnal')
+        const totalDebit = b.lines.reduce((s: number, l: any) => s + Number(l.debit ?? 0), 0)
+        const totalCredit = b.lines.reduce((s: number, l: any) => s + Number(l.credit ?? 0), 0)
+        if (Math.abs(totalDebit - totalCredit) > 0.01)
+          return err('Jurnal tidak balance (debit ≠ kredit)')
+        const count = await queryOne<any>(
+          `SELECT COUNT(*) as c FROM JournalEntry WHERE storeId=?`,
+          [storeId],
+        )
+        const num = `JE-${String((count?.c ?? 0) + 1).padStart(5, '0')}`
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO JournalEntry (id,storeId,userId,number,date,description,reference,status,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            user.id,
+            num,
+            b.date,
+            b.description.trim(),
+            b.reference ?? null,
+            'DRAFT',
+            t,
+            t,
+          ],
+        )
+        for (const line of b.lines) {
+          await exec(
+            `INSERT INTO JournalLine (id,entryId,accountId,debit,credit,description,createdAt) VALUES (?,?,?,?,?,?,?)`,
+            [
+              newId(),
+              id,
+              line.accountId,
+              Number(line.debit ?? 0),
+              Number(line.credit ?? 0),
+              line.description ?? null,
+              t,
+            ],
+          )
+        }
+        return ok({ id, number: num }, 201)
       }
     }
 

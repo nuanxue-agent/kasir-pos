@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
 import { BottomNav } from '@/components/dashboard/BottomNav'
+import { QuickActions } from '@/components/ui/QuickActions'
 import { StoreProvider } from '@/context/StoreContext'
 import type { UserRole } from '@/lib/permissions'
 
@@ -45,7 +46,8 @@ export function DashboardShell({
 
   // Derive modules from the current store if not explicitly provided
   const currentStore = stores.find(s => s.id === currentStoreId) ?? stores[0]
-  const activeModules = modules ?? currentStore?.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
+  const activeModules = modules ??
+    currentStore?.modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
 
   return (
     <StoreProvider stores={stores} initialStoreId={currentStoreId}>
@@ -60,10 +62,12 @@ export function DashboardShell({
           modules={activeModules}
           stores={stores}
           currentStoreId={currentStoreId}
-          onStoreChange={(id) => { setCurrentStoreId(id) }}
+          onStoreChange={id => {
+            setCurrentStoreId(id)
+          }}
         />
 
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Header
             userName={userName}
             userEmail={userEmail}
@@ -72,7 +76,7 @@ export function DashboardShell({
             stores={stores as any}
             currentStoreId={currentStoreId}
             onStoreChange={setCurrentStoreId}
-            onMenuToggle={() => setSidebarOpen((v) => !v)}
+            onMenuToggle={() => setSidebarOpen(v => !v)}
           />
 
           <main className="flex-1 overflow-y-auto bg-[var(--bg-base)] pb-20 lg:pb-0">
@@ -81,6 +85,7 @@ export function DashboardShell({
         </div>
 
         <BottomNav modules={activeModules} />
+        <QuickActions />
       </div>
     </StoreProvider>
   )

@@ -11,6 +11,7 @@ import {
   Scale,
   BarChart2,
   LineChart,
+  Percent,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
@@ -39,6 +40,13 @@ interface ReportData {
   topProducts: Array<{ name: string; revenue: number; qty: number }>
   dailySales: Array<{ date: string; total: number; orders: number }>
   paymentBreakdown: Array<{ method: string; total: number; count: number }>
+}
+
+interface GrossProfitData {
+  revenue: number
+  cogs: number
+  grossProfit: number
+  grossMargin: number
 }
 
 function getDateRange(range: DateRange): { from: string; to: string } {
@@ -100,6 +108,16 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
       const params = new URLSearchParams({ storeId, from, to })
       const res = await fetch(`/api/reports/summary?${params}`)
       if (!res.ok) throw new Error('Failed to fetch reports')
+      return res.json()
+    },
+  })
+
+  const { data: gp, isLoading: gpLoading } = useQuery<GrossProfitData>({
+    queryKey: ['reports-gross-profit', storeId, from, to],
+    queryFn: async () => {
+      const params = new URLSearchParams({ storeId, from, to })
+      const res = await fetch(`/api/reports/gross-profit?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch gross profit')
       return res.json()
     },
   })
@@ -254,6 +272,27 @@ export function ReportsPageClient({ storeId, currency, taxRate }: ReportsPageCli
               <p className="text-2xl font-bold text-[var(--text-1)]">
                 {formatCurrency(data?.totalRevenue ?? 0, currency)}
               </p>
+            </div>
+            {/* Gross Profit */}
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm lg:col-span-2">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50">
+                  <Percent className="h-4 w-4 text-teal-600" />
+                </div>
+                <p className="text-xs font-medium text-[var(--text-3)]">Laba Kotor</p>
+              </div>
+              {gpLoading ? (
+                <div className="h-7 w-24 animate-pulse rounded-lg bg-[var(--bg-subtle)]" />
+              ) : (
+                <>
+                  <p className="text-xl font-bold text-teal-600">
+                    {formatCurrency(gp?.grossProfit ?? 0, currency)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--text-3)]">
+                    Margin {(gp?.grossMargin ?? 0).toFixed(1)}%
+                  </p>
+                </>
+              )}
             </div>
             {/* Pengeluaran */}
             <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
