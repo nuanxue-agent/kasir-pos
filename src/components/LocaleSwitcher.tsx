@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { locales, localeNames, localeFlags, localeDir, defaultLocale, type Locale } from '@/i18n'
+import { locales, localeNames, localeFlags, localeDir, defaultLocale, type Locale } from '@/i18n/routing'
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () => void) {
   useEffect(() => {
