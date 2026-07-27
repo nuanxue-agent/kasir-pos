@@ -54,6 +54,29 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        {/* Inline script: apply theme before first paint to avoid flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+  try {
+    var ACCENT_MAP = {
+      amber:  { primary: '#f59e0b', accent: '#ea580c' },
+      blue:   { primary: '#3b82f6', accent: '#2563eb' },
+      green:  { primary: '#22c55e', accent: '#16a34a' },
+      purple: { primary: '#8b5cf6', accent: '#7c3aed' },
+      red:    { primary: '#ef4444', accent: '#dc2626' },
+    };
+    var theme = localStorage.getItem('theme') || 'auto';
+    var isDark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) document.documentElement.classList.add('dark');
+    var accent = localStorage.getItem('accent-color') || 'amber';
+    var colors = ACCENT_MAP[accent] || ACCENT_MAP.amber;
+    document.documentElement.style.setProperty('--primary', colors.primary);
+    document.documentElement.style.setProperty('--accent', colors.accent);
+  } catch(e) {}
+})();`,
+          }}
+        />
       </head>
       <body className={inter.className}>
         <Providers locale={locale} messages={messages}>

@@ -4492,6 +4492,88 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ projections, avgRevenue, avgExpenses })
     }
 
+    // ─── REPORTS / PRODUCTS ───────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'products' && method === 'GET') {
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+      const to = sp.get('to') ?? new Date().toISOString()
+
+      // Aggregate OrderItems → product totals for the period
+      const rows = await query(
+        `SELECT
+          oi.productId,
+          MAX(oi.name)                          AS name,
+          COALESCE(SUM(oi.subtotal), 0)         AS totalRevenue,
+          COALESCE(SUM(oi.qty), 0)              AS qtySold,
+          COALESCE(AVG(p.stock), 0)             AS avgStock
+        FROM OrderItem oi
+        JOIN "Order" o  ON oi.orderId  = o.id
+        LEFT JOIN Product p ON oi.productId = p.id
+        WHERE o.storeId = ? AND o.status = 'PAID'
+          AND o.createdAt BETWEEN ? AND ?
+        GROUP BY oi.productId
+        ORDER BY totalRevenue DESC`,
+        [storeId, from, to],
+      ) as any[]
+
+      // Also fetch products with 0 sales (slow movers) in the same period
+      const allProducts = await query(
+        `SELECT id AS productId, name, stock AS avgStock
+         FROM Product
+         WHERE storeId = ? AND active = 1`,
+        [storeId],
+      ) as any[]
+
+      // Merge: products not in rows get qtySold=0 / totalRevenue=0
+      const soldIds = new Set(rows.map((r: any) => r.productId))
+      const zeroRows = allProducts
+        .filter((p: any) => !soldIds.has(p.productId))
+        .map((p: any) => ({
+          productId: p.productId,
+          name: p.name,
+          totalRevenue: 0,
+          qtySold: 0,
+          avgStock: Number(p.avgStock ?? 0),
+        }))
+
+      const combined: any[] = [
+        ...rows.map((r: any) => ({
+          productId: r.productId,
+          name: r.name,
+          totalRevenue: Number(r.totalRevenue),
+          qtySold: Number(r.qtySold),
+          avgStock: Number(r.avgStock ?? 0),
+        })),
+        ...zeroRows,
+      ]
+
+      const grandTotal = combined.reduce((s: number, r: any) => s + r.totalRevenue, 0)
+
+      // ABC classification: sort DESC by revenue, assign classes by cumulative %
+      combined.sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
+      let cumulative = 0
+      const result = combined.map((r: any) => {
+        cumulative += r.totalRevenue
+        const pct = grandTotal > 0 ? (cumulative / grandTotal) * 100 : 100
+        const abcClass: 'A' | 'B' | 'C' = pct <= 80 ? 'A' : pct <= 95 ? 'B' : 'C'
+        const percentOfTotal =
+          grandTotal > 0 ? Math.round((r.totalRevenue / grandTotal) * 10000) / 100 : 0
+        const turnoverRate =
+          r.avgStock > 0 ? Math.round((r.qtySold / r.avgStock) * 100) / 100 : 0
+        return {
+          productId: r.productId,
+          name: r.name,
+          totalRevenue: r.totalRevenue,
+          qtySold: r.qtySold,
+          percentOfTotal,
+          abcClass,
+          avgStock: r.avgStock,
+          turnoverRate,
+        }
+      })
+
+      return okCached(result, 'private, max-age=30')
+    }
+
     // ─── HR / PAYROLL ─────────────────────────────────────────────────────────
     // Tables created lazily on first access
     if (segs[0] === 'hr' && segs[1] === 'payroll') {
@@ -4776,6 +4858,210 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           counts: { orders, products, customers, employees },
           storageEstimate: { totalRows, estimatedKB },
         })
+      }
+    }
+
+    // ─── STOCK OPNAME ─────────────────────────────────────────────────────────
+    if (segs[0] === 'stock-opname') {
+      // Lazy-create tables
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StockOpname (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'IN_PROGRESS',
+          startedAt TEXT NOT NULL,
+          completedAt TEXT,
+          notes TEXT,
+          createdAt TEXT NOT NULL
+        )
+      `)
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StockOpnameItem (
+          id TEXT PRIMARY KEY,
+          opnameId TEXT NOT NULL,
+          productId TEXT NOT NULL,
+          systemQty REAL NOT NULL DEFAULT 0,
+          countedQty REAL,
+          variance REAL NOT NULL DEFAULT 0,
+          FOREIGN KEY (opnameId) REFERENCES StockOpname(id),
+          FOREIGN KEY (productId) REFERENCES Product(id)
+        )
+      `)
+
+      // GET /api/stock-opname?storeId= — list sessions with total variance
+      if (segs.length === 1 && method === 'GET') {
+        const sessions = await query<any>(
+          `SELECT s.*,
+                  COUNT(i.id) as itemCount,
+                  COALESCE(SUM(i.variance), 0) as totalVariance
+           FROM StockOpname s
+           LEFT JOIN StockOpnameItem i ON i.opnameId = s.id
+           WHERE s.storeId = ?
+           GROUP BY s.id
+           ORDER BY s.startedAt DESC`,
+          [storeId],
+        )
+        return ok(sessions)
+      }
+
+      // POST /api/stock-opname — create new session, snapshot current stock
+      if (segs.length === 1 && method === 'POST') {
+        const b = (await req.json()) as { storeId?: string; notes?: string }
+        const sid = b.storeId ?? storeId
+        const sessionId = newId()
+        const t = nowISO()
+
+        await exec(
+          `INSERT INTO StockOpname (id, storeId, status, startedAt, completedAt, notes, createdAt)
+           VALUES (?, ?, 'IN_PROGRESS', ?, NULL, ?, ?)`,
+          [sessionId, sid, t, b.notes ?? null, t],
+        )
+
+        // Snapshot all trackStock products at current qty
+        const products = await query<any>(
+          `SELECT id, stock FROM Product WHERE storeId = ? AND trackStock = 1 AND active = 1`,
+          [sid],
+        )
+        for (const p of products) {
+          await exec(
+            `INSERT INTO StockOpnameItem (id, opnameId, productId, systemQty, countedQty, variance)
+             VALUES (?, ?, ?, ?, NULL, 0)`,
+            [newId(), sessionId, p.id, p.stock],
+          )
+        }
+
+        // Return full session with items
+        const session = await queryOne<any>(`SELECT * FROM StockOpname WHERE id = ?`, [sessionId])
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku, p.barcode as productBarcode
+           FROM StockOpnameItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.opnameId = ?
+           ORDER BY p.name ASC`,
+          [sessionId],
+        )
+        return ok({ ...session, items }, 201)
+      }
+
+      // GET /api/stock-opname/:id — get session with items
+      if (segs.length === 2 && method === 'GET') {
+        const sessionId = segs[1]
+        const session = await queryOne<any>(
+          `SELECT * FROM StockOpname WHERE id = ? AND storeId = ?`,
+          [sessionId, storeId],
+        )
+        if (!session) return err('Session not found', 404, 'NOT_FOUND')
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku, p.barcode as productBarcode
+           FROM StockOpnameItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.opnameId = ?
+           ORDER BY p.name ASC`,
+          [sessionId],
+        )
+        return ok({ ...session, items })
+      }
+
+      // PATCH /api/stock-opname/:id — update counts and optionally submit
+      if (segs.length === 2 && method === 'PATCH') {
+        const sessionId = segs[1]
+        const session = await queryOne<any>(
+          `SELECT * FROM StockOpname WHERE id = ? AND storeId = ?`,
+          [sessionId, storeId],
+        )
+        if (!session) return err('Session not found', 404, 'NOT_FOUND')
+        if (session.status === 'COMPLETED')
+          return err('Session already completed', 400, 'ALREADY_COMPLETED')
+
+        const b = (await req.json()) as {
+          items?: { productId: string; countedQty: number }[]
+          notes?: string
+          action?: string
+        }
+
+        const t = nowISO()
+
+        // Update counted quantities and variance
+        if (b.items && Array.isArray(b.items)) {
+          for (const it of b.items) {
+            const sysRow = await queryOne<any>(
+              `SELECT systemQty FROM StockOpnameItem WHERE opnameId = ? AND productId = ?`,
+              [sessionId, it.productId],
+            )
+            if (!sysRow) continue
+            const variance = it.countedQty - sysRow.systemQty
+            await exec(
+              `UPDATE StockOpnameItem SET countedQty = ?, variance = ?
+               WHERE opnameId = ? AND productId = ?`,
+              [it.countedQty, variance, sessionId, it.productId],
+            )
+          }
+        }
+
+        // Update notes
+        if (b.notes !== undefined) {
+          await exec(`UPDATE StockOpname SET notes = ? WHERE id = ?`, [b.notes, sessionId])
+        }
+
+        // Submit: mark COMPLETED + apply stock adjustments
+        if (b.action === 'submit') {
+          // Get all items with variance
+          const opnameItems = await query<any>(
+            `SELECT * FROM StockOpnameItem WHERE opnameId = ?`,
+            [sessionId],
+          )
+          const withVariance = opnameItems.filter(
+            (i: any) => i.countedQty !== null && i.variance !== 0,
+          )
+
+          for (const item of withVariance) {
+            // Adjust product stock
+            await exec(
+              `UPDATE Product SET stock = stock + ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
+              [item.variance, t, item.productId, storeId],
+            )
+            // Create StockLog entry
+            await exec(
+              `INSERT INTO StockLog (id, storeId, productId, userId, type, qty, note, createdAt)
+               VALUES (?, ?, ?, ?, 'ADJUSTMENT', ?, ?, ?)`,
+              [
+                newId(),
+                storeId,
+                item.productId,
+                user.id,
+                Math.abs(item.variance),
+                `Stock opname #${sessionId.slice(-8)}`,
+                t,
+              ],
+            )
+          }
+
+          await exec(
+            `UPDATE StockOpname SET status = 'COMPLETED', completedAt = ? WHERE id = ?`,
+            [t, sessionId],
+          )
+
+          logAudit({
+            storeId,
+            userId: user.id,
+            action: 'STOCK_OPNAME_COMPLETE',
+            resourceType: 'StockOpname',
+            resourceId: sessionId,
+            meta: { itemsAdjusted: withVariance.length },
+          }).catch(() => {})
+        }
+
+        // Return updated session with items
+        const updated = await queryOne<any>(`SELECT * FROM StockOpname WHERE id = ?`, [sessionId])
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku, p.barcode as productBarcode
+           FROM StockOpnameItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.opnameId = ?
+           ORDER BY p.name ASC`,
+          [sessionId],
+        )
+        return ok({ ...updated, items })
       }
     }
 
