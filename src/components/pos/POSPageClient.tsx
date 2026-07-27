@@ -38,6 +38,13 @@ import BarcodeScanner from './BarcodeScanner'
 import { useCurrentStore } from '@/context/StoreContext'
 import POSTour, { shouldShowTour } from './POSTour'
 import { useCustomerDisplay, type DisplayPayload } from './CustomerDisplay'
+import {
+  SUPPORTED_CURRENCIES,
+  convertAmount,
+  formatCurrencyForeign,
+  getRateForPair,
+  type ExchangeRate,
+} from '@/lib/currency'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -237,6 +244,10 @@ export default function POSPageClient({
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FLAT'>('PERCENT')
   const [discountValue, setDiscountValue] = useState('')
 
+  // Multi-currency state
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([])
+  const [checkoutCurrency, setCheckoutCurrency] = useState<string>(currency)
+
   // Customer display (pole display) via BroadcastChannel
   const { broadcast } = useCustomerDisplay()
 
@@ -248,6 +259,14 @@ export default function POSPageClient({
       setShowTour(true)
     }
   }, [])
+
+  // Load exchange rates for multi-currency checkout
+  useEffect(() => {
+    fetch(`/api/exchange-rates?storeId=${storeId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: unknown) => setExchangeRates(data as ExchangeRate[]))
+      .catch(() => {})
+  }, [storeId])
 
   // Computed manual discount amount
   const manualDiscountAmt = () => {
@@ -1473,12 +1492,30 @@ export default function POSPageClient({
             </div>
 
             <div className="flex items-center gap-2">
-            <button
-              data-tour="checkout-button"
-              onClick={() => setShowCheckout(true)}
-              className="mt-1 flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-opacity hover:opacity-90"
-            >
-                <span>Bayar — {fmt(total, currency)}</span>
+              {/* Currency selector for checkout */}
+              {exchangeRates.length > 0 && (
+                <select
+                  value={checkoutCurrency}
+                  onChange={e => setCheckoutCurrency(e.target.value)}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-3 text-xs font-medium text-[var(--text-2)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  aria-label="Pilih mata uang pembayaran"
+                >
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                data-tour="checkout-button"
+                onClick={() => setShowCheckout(true)}
+                className="mt-1 flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-opacity hover:opacity-90"
+              >
+                <span>
+                  Bayar —{' '}
+                  {checkoutCurrency !== currency && exchangeRates.length > 0
+                    ? formatCurrencyForeign(convertAmount(total, currency, checkoutCurrency, exchangeRates), checkoutCurrency)
+                    : fmt(total, currency)}
+                </span>
                 <kbd className="rounded border border-white/30 bg-[var(--bg-card)]/20 px-1.5 py-0.5 font-mono text-[10px]">
                   F2
                 </kbd>
@@ -1552,6 +1589,8 @@ export default function POSPageClient({
           note={orderNote}
           tableId={selectedTable?.id}
           tableNumber={selectedTable?.number}
+          checkoutCurrency={checkoutCurrency}
+          exchangeRates={exchangeRates}
           onClose={() => setShowCheckout(false)}
           onSuccess={handleOrderSuccess}
         />
@@ -1964,6 +2003,8 @@ function ProductRow({
     note,
     tableId,
     tableNumber,
+    checkoutCurrency,
+    exchangeRates,
     onClose,
     onSuccess,
   }: {
@@ -1982,6 +2023,8 @@ function ProductRow({
     note?: string
     tableId?: string
     tableNumber?: number
+    checkoutCurrency?: string
+    exchangeRates?: ExchangeRate[]
     onClose: () => void
     onSuccess: (order: ReceiptData) => void
   }) {
@@ -1998,6 +2041,13 @@ function ProductRow({
 
     // Total remaining after gift card
     const totalAfterGc = Math.max(0, total - gcApplied)
+
+    // Multi-currency derived values
+    const isForeignCurrency = checkoutCurrency && checkoutCurrency !== currency
+    const fxRate = isForeignCurrency && exchangeRates?.length
+      ? (() => { try { return getRateForPair(exchangeRates, currency, checkoutCurrency!) } catch { return null } })()
+      : null
+    const totalForeign = fxRate != null ? totalAfterGc * fxRate : null
 
     const totalPaid = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
     const canPay =
@@ -2141,6 +2191,9 @@ function ProductRow({
             taxAmt,
             total,
             discountAmt: (pointsDiscount ?? 0) + (manualDiscountAmt ?? 0) + gcApplied,
+            ...(isForeignCurrency && checkoutCurrency && fxRate != null
+              ? { foreignCurrency: checkoutCurrency, exchangeRate: fxRate, foreignTotal: totalForeign }
+              : {}),
           }),
         })
         const data = (await res.json()) as any
@@ -2210,7 +2263,14 @@ function ProductRow({
               )}
               <div className="flex justify-between border-t border-[var(--border)] pt-1.5 text-base font-bold text-[var(--text-1)]">
                 <span>Total</span>
-                <span>{fmt(totalAfterGc, currency)}</span>
+                <div className="text-right">
+                  <span>{fmt(totalAfterGc, currency)}</span>
+                  {totalForeign != null && checkoutCurrency && (
+                    <p className="text-xs font-normal text-amber-400">
+                      ≈ {formatCurrencyForeign(totalForeign, checkoutCurrency)}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
