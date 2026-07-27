@@ -41,6 +41,7 @@ interface Product {
   trackStock: boolean
   sku?: string | null
   barcode?: string | null
+  image?: string | null
   category?: { id: string; name: string; color?: string | null; icon?: string | null } | null
   variants: Array<{ id: string; name: string; price?: number | null; stock: number }>
 }
@@ -1246,14 +1247,31 @@ function ProductCard({
           : 'cursor-pointer border-[var(--border)] bg-[var(--bg-subtle)] hover:border-amber-400/60 hover:bg-amber-500/10',
       )}
     >
-      {product.category?.color && (
+      {!product.image && product.category?.color && (
         <div
           className="mb-2 h-1.5 w-1.5 rounded-full"
           style={{ background: product.category.color }}
         />
       )}
-      <div className="mb-3 flex aspect-square w-full items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-2xl">
-        {product.category?.icon || '📦'}
+      <div className="mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-subtle)] text-2xl">
+        {product.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image}
+            alt={product.name}
+            className="h-full w-full object-cover"
+            onError={e => {
+              const el = e.currentTarget as HTMLImageElement
+              el.style.display = 'none'
+              const parent = el.parentElement
+              if (parent) {
+                parent.textContent = product.category?.icon || '📦'
+              }
+            }}
+          />
+        ) : (
+          product.category?.icon || '📦'
+        )}
       </div>
       <p className="line-clamp-2 text-sm leading-tight font-medium text-[var(--text-1)]">
         {product.name}
