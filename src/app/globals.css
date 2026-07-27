@@ -1,63 +1,63 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --radius: 0.625rem;
 
   /* Lakoo light — warm, low-contrast, easy on eyes */
-  --bg-base:    #faf8f4;   /* warmer, less yellow than before */
-  --bg-card:    #fefefe;   /* near-white, not pure white */
-  --bg-subtle:  #f5f2ec;   /* muted warm gray for hover/subtle bg */
-  --bg-muted:   #ede9e1;   /* deeper muted for pressed states */
-  --border:     #e8e3da;   /* warm gray, not amber — much softer */
-  --border-mid: #d4cfc6;   /* medium border, replaces harsh amber */
-  --text-1:     #2c2825;   /* warm near-black, not pure stone-900 */
-  --text-2:     #6b6560;   /* muted body text */
-  --text-3:     #a09890;   /* placeholder / caption */
-  --primary:    #d97706;   /* amber-600 — less glaring than amber-500 */
-  --primary-fg: #fffbf0;   /* warm white on primary */
+  --bg-base: #faf8f4; /* warmer, less yellow than before */
+  --bg-card: #fefefe; /* near-white, not pure white */
+  --bg-subtle: #f5f2ec; /* muted warm gray for hover/subtle bg */
+  --bg-muted: #ede9e1; /* deeper muted for pressed states */
+  --border: #e8e3da; /* warm gray, not amber — much softer */
+  --border-mid: #d4cfc6; /* medium border, replaces harsh amber */
+  --text-1: #2c2825; /* warm near-black, not pure stone-900 */
+  --text-2: #6b6560; /* muted body text */
+  --text-3: #a09890; /* placeholder / caption */
+  --primary: #d97706; /* amber-600 — less glaring than amber-500 */
+  --primary-fg: #fffbf0; /* warm white on primary */
   --primary-subtle: #fef3c7; /* amber-100 for light primary bg */
-  --accent:     #ea580c;   /* orange-600 for destructive/hot accents */
-  --success:    #16a34a;   /* green-600 */
+  --accent: #ea580c; /* orange-600 for destructive/hot accents */
+  --success: #16a34a; /* green-600 */
   --success-subtle: #dcfce7;
-  --danger:     #dc2626;
+  --danger: #dc2626;
   --danger-subtle: #fee2e2;
-  --warning:    #d97706;
+  --warning: #d97706;
   --warning-subtle: #fef3c7;
-  --info:       #0284c7;
+  --info: #0284c7;
   --info-subtle: #e0f2fe;
 
   /* shadows — tinted warm, soft */
-  --shadow-sm:  0 1px 3px 0 rgba(44,40,37,0.06), 0 1px 2px -1px rgba(44,40,37,0.04);
-  --shadow-md:  0 4px 8px -2px rgba(44,40,37,0.08), 0 2px 4px -2px rgba(44,40,37,0.04);
-  --shadow-lg:  0 10px 24px -4px rgba(44,40,37,0.10), 0 4px 8px -4px rgba(44,40,37,0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(44, 40, 37, 0.06), 0 1px 2px -1px rgba(44, 40, 37, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(44, 40, 37, 0.08), 0 2px 4px -2px rgba(44, 40, 37, 0.04);
+  --shadow-lg: 0 10px 24px -4px rgba(44, 40, 37, 0.1), 0 4px 8px -4px rgba(44, 40, 37, 0.04);
 }
 
 .dark {
-  --bg-base:    #1e1b17;
-  --bg-card:    #262219;
-  --bg-subtle:  #2e2a22;
-  --bg-muted:   #38332a;
-  --border:     #3a3529;
+  --bg-base: #1e1b17;
+  --bg-card: #262219;
+  --bg-subtle: #2e2a22;
+  --bg-muted: #38332a;
+  --border: #3a3529;
   --border-mid: #4d4740;
-  --text-1:     #f5f1ea;
-  --text-2:     #a09890;
-  --text-3:     #6b6560;
-  --primary:    #f59e0b;
+  --text-1: #f5f1ea;
+  --text-2: #a09890;
+  --text-3: #6b6560;
+  --primary: #f59e0b;
   --primary-fg: #1c1712;
   --primary-subtle: #422006;
-  --accent:     #f97316;
-  --success:    #22c55e;
+  --accent: #f97316;
+  --success: #22c55e;
   --success-subtle: #14532d;
-  --danger:     #f87171;
+  --danger: #f87171;
   --danger-subtle: #7f1d1d;
-  --warning:    #fbbf24;
+  --warning: #fbbf24;
   --warning-subtle: #451a03;
-  --info:       #38bdf8;
+  --info: #38bdf8;
   --info-subtle: #0c4a6e;
 
-  --shadow-sm:  0 1px 3px 0 rgba(0,0,0,0.20);
-  --shadow-md:  0 4px 8px -2px rgba(0,0,0,0.28);
-  --shadow-lg:  0 10px 24px -4px rgba(0,0,0,0.35);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 10px 24px -4px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -68,17 +68,32 @@ body {
   background-color: var(--bg-base);
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 /* ── Scrollbars ───────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
 
-.scrollbar-hide::-webkit-scrollbar { display: none; }
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
 /* ── Focus rings — warm, not blue ────────────────────────────────────────── */
 :focus-visible {
@@ -97,9 +112,15 @@ body {
 
 /* ── Barcode scanner animation ───────────────────────────────────────────── */
 @keyframes scan-line {
-  0%   { top: 10%; }
-  50%  { top: 85%; }
-  100% { top: 10%; }
+  0% {
+    top: 10%;
+  }
+  50% {
+    top: 85%;
+  }
+  100% {
+    top: 10%;
+  }
 }
 
 .animate-scan-line {
@@ -121,22 +142,48 @@ body {
 }
 
 /* Text alignment overrides */
-[dir='rtl'] .text-left { text-align: right; }
-[dir='rtl'] .text-right { text-align: left; }
+[dir='rtl'] .text-left {
+  text-align: right;
+}
+[dir='rtl'] .text-right {
+  text-align: left;
+}
 
 /* Spacing/margin mirrors */
-[dir='rtl'] .ml-auto { margin-left: unset; margin-right: auto; }
-[dir='rtl'] .mr-auto { margin-right: unset; margin-left: auto; }
-[dir='rtl'] .pl-4 { padding-left: unset; padding-right: 1rem; }
-[dir='rtl'] .pr-4 { padding-right: unset; padding-left: 1rem; }
-[dir='rtl'] .pl-3 { padding-left: unset; padding-right: 0.75rem; }
-[dir='rtl'] .pr-3 { padding-right: unset; padding-left: 0.75rem; }
+[dir='rtl'] .ml-auto {
+  margin-left: unset;
+  margin-right: auto;
+}
+[dir='rtl'] .mr-auto {
+  margin-right: unset;
+  margin-left: auto;
+}
+[dir='rtl'] .pl-4 {
+  padding-left: unset;
+  padding-right: 1rem;
+}
+[dir='rtl'] .pr-4 {
+  padding-right: unset;
+  padding-left: 1rem;
+}
+[dir='rtl'] .pl-3 {
+  padding-left: unset;
+  padding-right: 0.75rem;
+}
+[dir='rtl'] .pr-3 {
+  padding-right: unset;
+  padding-left: 0.75rem;
+}
 
 /* Gap/flex direction stays — Flexbox handles RTL automatically in most cases */
 
 /* Rounded corner swaps for sidebar */
-[dir='rtl'] .rounded-l-xl { border-radius: 0 0.75rem 0.75rem 0; }
-[dir='rtl'] .rounded-r-xl { border-radius: 0.75rem 0 0 0.75rem; }
+[dir='rtl'] .rounded-l-xl {
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+[dir='rtl'] .rounded-r-xl {
+  border-radius: 0.75rem 0 0 0.75rem;
+}
 
 /* Form inputs */
 [dir='rtl'] input,
@@ -150,4 +197,25 @@ body {
 [dir='rtl'] input[type='tel'] {
   direction: ltr;
   text-align: right;
+}
+
+/* ─── Print / PDF export ─────────────────────────────────────────────────── */
+@media print {
+  .no-print,
+  nav,
+  aside,
+  header,
+  .bottom-nav {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print-break {
+    page-break-before: always;
+  }
 }

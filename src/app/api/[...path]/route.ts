@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, queryOne, exec, batchExec, newId, nowISO } from '@/lib/db'
 import { postJournalEntry } from '@/lib/accounting'
+import { logAudit, getAuditLogs } from '@/lib/audit'
 
 function ok(data: any, status = 200) {
   return NextResponse.json(data, { status })
@@ -132,8 +133,8 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           const pid = newId()
           const t = nowISO()
           await exec(
-            `INSERT INTO Product (id,storeId,name,price,description,sku,barcode,categoryId,cost,trackStock,stock,lowStock,active,createdAt,updatedAt)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            `INSERT INTO Product (id,storeId,name,price,description,sku,barcode,categoryId,cost,trackStock,stock,lowStock,active,image,createdAt,updatedAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
               pid,
               storeId,
@@ -148,6 +149,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
               Number(b.stock) || 0,
               Number(b.lowStock) || 5,
               b.active !== false ? 1 : 0,
+              b.image || null,
               t,
               t,
             ],
@@ -308,6 +310,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             })
           }
           await batchExec(stmts)
+          // ── Audit log ────────────────────────────────────────────────────
+          logAudit({
+            storeId,
+            userId: user.id,
+            action: 'ORDER_CREATE',
+            resourceType: 'Order',
+            resourceId: oid,
+            meta: { number, total: Number(b.total) || 0 },
+          }).catch(() => {})
           // ── Auto-post journal entry for the sale ─────────────────────────
           // Determine debit account: Cash (1100) for CASH payments, AR (1200) otherwise
           const primaryPayment = (b.payments as any[])[0]
@@ -438,6 +449,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           }
         }
         await batchExec(stmts)
+        // ── Audit log ────────────────────────────────────────────────────
+        logAudit({
+          storeId,
+          userId: user.id,
+          action: 'ORDER_REFUND',
+          resourceType: 'Order',
+          resourceId: oid,
+          meta: { number: order.number },
+        }).catch(() => {})
         return ok({ success: true, status: 'REFUNDED' })
       }
     }
@@ -594,6 +614,15 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             t,
           ],
         )
+        // ── Audit log ────────────────────────────────────────────────────
+        logAudit({
+          storeId: sid,
+          userId: user.id,
+          action: 'STOCK_ADJUST',
+          resourceType: 'Product',
+          resourceId: product.id,
+          meta: { sku: b.sku, adjustment: b.adjustment, note: b.note },
+        }).catch(() => {})
         return ok({ success: true, productName: product.name, newStock })
       }
 
@@ -2686,6 +2715,19 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         [storeId, like, like, like],
       )
       return ok(rows)
+    }
+
+    // ─── AUDIT LOG ────────────────────────────────────────────────────────────
+    if (segs[0] === 'audit') {
+      if (method === 'GET') {
+        // OWNER / SUPERADMIN only
+        const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
+        if (!['OWNER', 'SUPERADMIN'].includes(callerRole)) return err('Forbidden', 403)
+        const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
+        const action = sp.get('action') ?? undefined
+        const result = await getAuditLogs({ storeId, page, pageSize: 20, action })
+        return ok(result)
+      }
     }
 
     return err('Not found', 404)
