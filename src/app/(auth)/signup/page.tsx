@@ -43,7 +43,8 @@ export default function SignupPage() {
       })
       const result = await res.json()
       if (!res.ok) { setError(result.error || 'Pendaftaran gagal'); return }
-      router.push('/login')
+      // Auto-logged in — go straight to onboarding
+      router.push(result.redirect ?? '/onboarding')
     } catch {
       setError('Terjadi kesalahan. Coba lagi.')
     } finally {

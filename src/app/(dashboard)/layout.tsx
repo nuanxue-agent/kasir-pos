@@ -16,6 +16,11 @@ export default async function DashboardLayout({
 
   const { user } = session
 
+  // New users who haven't completed onboarding
+  if (!(user as any).onboarded) {
+    redirect('/onboarding')
+  }
+
   return (
     <DashboardShell
       userName={user.name ?? 'User'}

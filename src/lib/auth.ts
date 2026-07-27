@@ -46,7 +46,8 @@ export interface SessionUser {
   email: string
   role: string
   tenantId?: string
-  stores: Array<{ id: string; name: string; role: string; currency: string; taxRate: number }>
+  onboarded?: boolean
+  stores: Array<{ id: string; name: string; role: string; currency: string; taxRate: number; modules?: string[] }>
 }
 
 export interface Session {

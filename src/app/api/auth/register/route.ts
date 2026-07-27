@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, exec, batchExec, newId, nowISO } from '@/lib/db'
+import { createSession, setSessionCookie } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
 
 const schema = z.object({
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { businessName, name, email, password } = parsed.data
 
     const existing = await queryOne(`SELECT id FROM User WHERE email = ?`, [email])
-    if (existing) return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
+    if (existing) return NextResponse.json({ error: 'Email sudah terdaftar' }, { status: 409 })
 
     const plan = await queryOne<any>(`SELECT id FROM Plan WHERE name = 'FREE' LIMIT 1`)
     const planId = (plan as any)?.id ?? 'plan_free'
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     await batchExec([
       { sql: `INSERT INTO Tenant (id,name,slug,email,planId,status,createdAt,updatedAt) VALUES (?,?,?,?,?,'TRIAL',?,?)`,
         params: [tenantId, businessName, slug, email, planId, t, t] },
-      { sql: `INSERT INTO User (id,tenantId,name,email,password,role,active,isSuperAdmin,createdAt,updatedAt) VALUES (?,?,?,?,?,'OWNER',1,0,?,?)`,
+      { sql: `INSERT INTO User (id,tenantId,name,email,password,role,active,isSuperAdmin,onboarded,createdAt,updatedAt) VALUES (?,?,?,?,?,'OWNER',1,0,0,?,?)`,
         params: [userId, tenantId, name, email, hashedPassword, t, t] },
       { sql: `INSERT INTO Store (id,tenantId,name,taxRate,currency,timezone,active,createdAt,updatedAt) VALUES (?,?,?,0,'IDR','Asia/Jakarta',1,?,?)`,
         params: [storeId, tenantId, businessName, t, t] },
@@ -39,8 +40,15 @@ export async function POST(req: NextRequest) {
         params: [newId(), storeId, userId] },
     ])
 
-    return NextResponse.json({ success: true, email }, { status: 201 })
+    // Auto-login: create session and set cookie
+    const stores = [{ id: storeId, name: businessName, role: 'OWNER', currency: 'IDR', taxRate: 0, modules: ['pos','inventory','customers','discounts','reports'] }]
+    const sessionUser = { id: userId, name, email, role: 'OWNER', tenantId, onboarded: false, stores }
+    const token = await createSession(sessionUser)
+    const res = NextResponse.json({ success: true, email, redirect: '/onboarding' }, { status: 201 })
+    setSessionCookie(res, token)
+    return res
   } catch (e: any) {
-    return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
+    console.error('Register error:', e)
+    return NextResponse.json({ error: 'Pendaftaran gagal' }, { status: 500 })
   }
 }

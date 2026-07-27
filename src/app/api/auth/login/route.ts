@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     const sessionUser = {
       id: user.id, name: user.name, email: user.email,
       role: user.role, tenantId: user.tenantId,
+      onboarded: !!user.onboarded,
       stores: stores.map((s: any) => ({
         ...s,
         modules: (() => { try { return JSON.parse(s.modules) } catch { return ['pos','inventory','customers','discounts','reports'] } })()
