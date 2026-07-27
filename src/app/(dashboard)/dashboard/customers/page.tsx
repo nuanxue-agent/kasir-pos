@@ -8,6 +8,7 @@ export default async function CustomersPage() {
   const user = session.user as any
   const storeId = user.stores?.[0]?.id ?? ''
   const currency = user.stores?.[0]?.currency ?? 'IDR'
+  const userRole = user.stores?.[0]?.role ?? user.role ?? 'CASHIER'
 
-  return <CustomersPageClient storeId={storeId} currency={currency} />
+  return <CustomersPageClient storeId={storeId} currency={currency} userRole={userRole} />
 }

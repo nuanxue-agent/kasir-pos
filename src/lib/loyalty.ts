@@ -55,11 +55,30 @@ export function getTier(points: number, tiers: LoyaltyTierDef[]): LoyaltyTierDef
 
 /**
  * Check whether a customer has enough points to perform a redemption.
- * @param points         - current customer points balance
- * @param minRedeemable  - minimum points required to redeem
+ * @param points - current customer points balance
+ * @param minRedeemable - minimum points required to redeem
  * @returns true if eligible
  */
 export function isEligibleForRedemption(points: number, minRedeemable: number): boolean {
   if (minRedeemable <= 0) return points > 0
   return points >= minRedeemable
+}
+
+/**
+ * Validate a manual point adjustment request.
+ * @param delta - adjustment amount (positive to add, negative to deduct)
+ * @param currentPoints - customer's current points balance
+ * @param maxDelta - maximum allowed absolute delta (default 100 000)
+ * @returns null if valid, or an error string describing why it's invalid
+ */
+export function validateManualAdjustment(
+  delta: number,
+  currentPoints: number,
+  maxDelta = 100_000,
+): string | null {
+  if (!Number.isInteger(delta)) return 'delta must be a whole number'
+  if (delta === 0) return 'delta must not be zero'
+  if (Math.abs(delta) > maxDelta) return `delta exceeds maximum allowed (±${maxDelta})`
+  if (currentPoints + delta < 0) return 'adjustment would result in negative points balance'
+  return null
 }
