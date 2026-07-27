@@ -37,7 +37,9 @@ describe('buildReceiptLines', () => {
 
   it('includes order number', () => {
     const lines = buildReceiptLines(sampleOrder)
-    const orderLine = lines.find(l => l.left?.includes('TRX-00123') || l.text?.includes('TRX-00123'))
+    const orderLine = lines.find(
+      l => l.left?.includes('TRX-00123') || l.text?.includes('TRX-00123'),
+    )
     expect(orderLine).toBeDefined()
   })
 
@@ -109,7 +111,7 @@ describe('buildReceiptLines', () => {
   })
 
   it('works with USD currency', () => {
-    const usd = { ...sampleOrder, currency: 'USD', total: 12.50 }
+    const usd = { ...sampleOrder, currency: 'USD', total: 12.5 }
     const lines = buildReceiptLines(usd)
     const totalLine = lines.find(l => l.left === 'TOTAL')
     expect(totalLine?.right).toContain('12')
@@ -142,13 +144,25 @@ describe('buildReceiptLines', () => {
 
 describe('isSerialAvailable', () => {
   it('returns false in test environment (no browser)', () => {
-    // In vitest (Node env), window.serial is not available
     expect(isSerialAvailable()).toBe(false)
   })
 })
 
 describe('Receipt currency formatting', () => {
-  const currencies = ['IDR', 'USD', 'EUR', 'GBP', 'SGD', 'MYR', 'THB', 'VND', 'CNY', 'JPY', 'AED', 'SAR']
+  const currencies = [
+    'IDR',
+    'USD',
+    'EUR',
+    'GBP',
+    'SGD',
+    'MYR',
+    'THB',
+    'VND',
+    'CNY',
+    'JPY',
+    'AED',
+    'SAR',
+  ]
 
   currencies.forEach(currency => {
     it(`handles ${currency} currency`, () => {
@@ -157,5 +171,86 @@ describe('Receipt currency formatting', () => {
       const lines = buildReceiptLines(receipt)
       expect(lines.length).toBeGreaterThan(5)
     })
+  })
+})
+
+describe('Receipt HTML structure (renderLineHTML via buildReceiptLines)', () => {
+  it('store name line has center alignment', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    expect(lines[0].align).toBe('center')
+  })
+
+  it('TOTAL line has bold flag', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    const totalLine = lines.find(l => l.left === 'TOTAL')
+    expect(totalLine?.bold).toBe(true)
+  })
+
+  it('store address line has small size', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    const addrLine = lines.find(l => l.text === sampleOrder.storeAddress)
+    expect(addrLine?.size).toBe('small')
+  })
+
+  it('store name line has large size', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    expect(lines[0].size).toBe('large')
+  })
+
+  it('omits address line when not provided', () => {
+    const noAddr = { ...sampleOrder, storeAddress: undefined }
+    const lines = buildReceiptLines(noAddr)
+    expect(lines.find(l => l.text === sampleOrder.storeAddress)).toBeUndefined()
+  })
+
+  it('includes taxId when provided', () => {
+    const withTaxId = { ...sampleOrder, taxId: 'NPWP-123456' }
+    const lines = buildReceiptLines(withTaxId)
+    expect(lines.find(l => l.text?.includes('NPWP-123456'))).toBeDefined()
+  })
+
+  it('includes loyalty points line when points > 0', () => {
+    const withPoints = { ...sampleOrder, points: 150 }
+    const lines = buildReceiptLines(withPoints)
+    expect(lines.find(l => l.text?.includes('150'))).toBeDefined()
+  })
+
+  it('item subtotals appear as right values on item lines', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    const kopiLine = lines.find(l => l.left === 'Kopi Susu')
+    expect(kopiLine).toBeDefined()
+    expect(kopiLine?.right).toBeDefined()
+  })
+
+  it('payment method line included when provided', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    const pmLine = lines.find(l => l.text?.includes('Cash'))
+    expect(pmLine).toBeDefined()
+  })
+
+  it('cashier name included when provided', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    const cashierLine = lines.find(l => l.text?.includes('Budi'))
+    expect(cashierLine).toBeDefined()
+  })
+
+  it('change value is IDR formatted (contains number)', () => {
+    const lines = buildReceiptLines(sampleOrder)
+    const changeLine = lines.find(l => l.left === 'Change')
+    expect(changeLine?.right).toBeDefined()
+    expect(changeLine!.right!.length).toBeGreaterThan(0)
+  })
+})
+
+describe('Receipt with zero-value edge cases', () => {
+  it('zero total receipt does not throw', () => {
+    const free = { ...sampleOrder, subtotal: 0, total: 0, taxAmt: 0, paid: 0, change: 0 }
+    expect(() => buildReceiptLines(free)).not.toThrow()
+  })
+
+  it('very large total (IDR millions) renders without error', () => {
+    const big = { ...sampleOrder, subtotal: 50000000, total: 55000000, taxAmt: 5000000 }
+    const lines = buildReceiptLines(big)
+    expect(lines.find(l => l.left === 'TOTAL')).toBeDefined()
   })
 })
