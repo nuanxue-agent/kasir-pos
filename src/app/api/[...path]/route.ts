@@ -176,6 +176,19 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
               params: [newId(), oid, pay.method, Number(pay.amount), pay.reference||null, Number(pay.change)||0, t] })
           }
           await batchExec(stmts)
+          // ── Points: award earned, subtract redeemed ──────────────────────
+          let pointsEarned = 0
+          if (b.customerId) {
+            const redeemed = Math.max(0, Number(b.pointsRedeemed) || 0)
+            pointsEarned = Math.floor(Number(b.total) / 1000)
+            const net = pointsEarned - redeemed
+            if (net !== 0) {
+              await exec(
+                `UPDATE Customer SET points = MAX(0, points + ?), updatedAt = ? WHERE id = ? AND storeId = ?`,
+                [net, t, b.customerId, storeId]
+              )
+            }
+          }
           // Return full order with items and payments for receipt display
           const orderItems = await query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid])
           const orderPayments = await query(`SELECT * FROM Payment WHERE orderId = ?`, [oid])
@@ -183,6 +196,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             id: oid,
             number,
             status: 'PAID',
+            pointsEarned,
             createdAt: t,
             subtotal: Number(b.subtotal) || 0,
             taxAmt: Number(b.taxAmt) || 0,

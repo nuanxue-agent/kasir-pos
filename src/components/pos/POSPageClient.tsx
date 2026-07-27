@@ -1,9 +1,9 @@
 'use client'
+'use client'
 
-import { useState, useCallback } from 'react'
-import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2 } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,16 +29,23 @@ interface CartItem {
   subtotal: number
 }
 
+interface Customer {
+  id: string
+  name: string
+  phone: string | null
+  points: number
+}
+
 interface POSPageClientProps {
   storeId: string
-  storeName: string
   taxRate: number
   currency: string
   staffId: string
   initialProducts: Product[]
   categories: Category[]
-  receiptNote?: string | null
 }
+
+type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS'
 
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS'
 
@@ -50,7 +57,7 @@ function fmt(n: number, currency: string) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function POSPageClient({ storeId, storeName, taxRate, currency, staffId, initialProducts, categories, receiptNote }: POSPageClientProps) {
+export default function POSPageClient({ storeId, taxRate, currency, staffId, initialProducts, categories }: POSPageClientProps) {
   const [products] = useState<Product[]>(initialProducts)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -58,7 +65,11 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
   const [cart, setCart] = useState<CartItem[]>([])
   const [showCheckout, setShowCheckout] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
-  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+
+  // Customer selector state
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false)
+  const [redeemPoints, setRedeemPoints] = useState(false)
 
   const filtered = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
@@ -68,7 +79,12 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
 
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0)
   const taxAmt = Math.round(subtotal * taxRate)
-  const total = subtotal + taxAmt
+  const baseTotal = subtotal + taxAmt
+  // Points redemption: 1 point = Rp 100, max redeem = all customer points
+  const maxRedeemablePoints = selectedCustomer?.points ?? 0
+  const pointsDiscount = redeemPoints ? Math.min(maxRedeemablePoints * 100, baseTotal) : 0
+  const pointsRedeemed = redeemPoints ? Math.floor(pointsDiscount / 100) : 0
+  const total = baseTotal - pointsDiscount
 
   const addToCart = useCallback((product: Product) => {
     if (product.trackStock && product.stock <= 0) return
@@ -104,12 +120,16 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
 
   const clearCart = useCallback(() => setCart([]), [])
 
-  const handleOrderSuccess = (order: ReceiptData) => {
+  const handleOrderSuccess = (orderNumber: string, pointsEarned?: number) => {
     clearCart()
     setShowCheckout(false)
-    setReceiptData(order)
+    setSelectedCustomer(null)
+    setRedeemPoints(false)
+    setShowCustomerSearch(false)
+    const earned = pointsEarned ? ` (+${pointsEarned} pts)` : ''
+    setSuccessMsg(`Order ${orderNumber} paid!${earned}`)
+    setTimeout(() => setSuccessMsg(''), 3500)
   }
-
   const handleReceiptClose = (orderNumber: string) => {
     setReceiptData(null)
     setSuccessMsg(`Order ${orderNumber} paid!`)
@@ -228,23 +248,93 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           )}
         </div>
 
-        {/* Summary + Checkout */}
+        {/* Customer selector + Summary + Checkout */}
         {cart.length > 0 && (
-          <div className="border-t border-white/5 p-4 space-y-2">
-            <div className="flex justify-between text-sm text-white/50">
-              <span>Subtotal</span><span>{fmt(subtotal, currency)}</span>
-            </div>
-            {taxRate > 0 && (
-              <div className="flex justify-between text-sm text-white/50">
-                <span>Tax ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt, currency)}</span>
+          <div className="border-t border-white/5 p-4 space-y-3">
+            {/* Customer section */}
+            {!selectedCustomer ? (
+              <div>
+                {!showCustomerSearch ? (
+                  <button
+                    onClick={() => setShowCustomerSearch(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-white/20 text-xs text-white/40 hover:text-white/70 hover:border-white/40 transition-colors"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Add Customer
+                  </button>
+                ) : (
+                  <CustomerSearch
+                    storeId={storeId}
+                    onSelect={(c) => { setSelectedCustomer(c); setShowCustomerSearch(false) }}
+                    onClose={() => setShowCustomerSearch(false)}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-white">{selectedCustomer.name}</p>
+                    <p className="text-[10px] text-white/40 flex items-center gap-0.5">
+                      <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
+                      {selectedCustomer.points} pts
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setSelectedCustomer(null); setRedeemPoints(false) }}
+                  className="text-white/30 hover:text-white/70 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
-            <div className="flex justify-between text-base font-bold text-white pt-1 border-t border-white/10">
-              <span>Total</span><span>{fmt(total, currency)}</span>
+
+            {/* Redeem points toggle */}
+            {selectedCustomer && selectedCustomer.points > 0 && (
+              <button
+                onClick={() => setRedeemPoints(r => !r)}
+                className={cn(
+                  'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-colors',
+                  redeemPoints
+                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                    : 'border-white/10 bg-white/5 text-white/50 hover:text-white hover:border-white/20'
+                )}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Star className={cn('h-3 w-3', redeemPoints ? 'fill-amber-400 text-amber-400' : '')} />
+                  Redeem {maxRedeemablePoints} pts = {fmt(maxRedeemablePoints * 100, currency)} off
+                </span>
+                <span className={cn('font-medium', redeemPoints ? 'text-amber-400' : 'text-white/30')}>
+                  {redeemPoints ? 'ON' : 'OFF'}
+                </span>
+              </button>
+            )}
+
+            {/* Totals */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-sm text-white/50">
+                <span>Subtotal</span><span>{fmt(subtotal, currency)}</span>
+              </div>
+              {taxRate > 0 && (
+                <div className="flex justify-between text-sm text-white/50">
+                  <span>Tax ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt, currency)}</span>
+                </div>
+              )}
+              {redeemPoints && pointsDiscount > 0 && (
+                <div className="flex justify-between text-sm text-amber-400">
+                  <span>Points discount ({pointsRedeemed} pts)</span>
+                  <span>-{fmt(pointsDiscount, currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base font-bold text-white pt-1 border-t border-white/10">
+                <span>Total</span><span>{fmt(total, currency)}</span>
+              </div>
             </div>
             <button
               onClick={() => setShowCheckout(true)}
-              className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/20"
+              className="w-full mt-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/20"
             >
               Checkout — {fmt(total, currency)}
             </button>
@@ -263,6 +353,8 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           subtotal={subtotal}
           taxAmt={taxAmt}
           total={total}
+          customerId={selectedCustomer?.id}
+          pointsRedeemed={pointsRedeemed}
           onClose={() => setShowCheckout(false)}
           onSuccess={handleOrderSuccess}
         />
@@ -286,6 +378,80 @@ export default function POSPageClient({ storeId, storeName, taxRate, currency, s
           <span>✓</span> {successMsg}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Customer Search ──────────────────────────────────────────────────────────
+
+function CustomerSearch({ storeId, onSelect, onClose }: {
+  storeId: string
+  onSelect: (c: Customer) => void
+  onClose: () => void
+}) {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  useEffect(() => {
+    if (!q.trim()) { setResults([]); return }
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/customers?storeId=${storeId}&q=${encodeURIComponent(q)}&limit=5`)
+        if (res.ok) {
+          const data = await res.json()
+          setResults(Array.isArray(data) ? data : (data.customers ?? []))
+        }
+      } finally {
+        setLoading(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [q, storeId])
+
+  return (
+    <div className="bg-white/5 rounded-lg border border-white/10 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
+        <Search className="h-3.5 w-3.5 text-white/30 shrink-0" />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search customer name or phone…"
+          className="flex-1 bg-transparent text-xs text-white placeholder-white/30 focus:outline-none"
+        />
+        <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {loading && (
+        <div className="flex justify-center py-3">
+          <Loader2 className="h-4 w-4 text-white/30 animate-spin" />
+        </div>
+      )}
+      {!loading && q.trim() && results.length === 0 && (
+        <p className="text-xs text-white/30 text-center py-3">No customers found</p>
+      )}
+      {results.map(c => (
+        <button
+          key={c.id}
+          onClick={() => onSelect(c)}
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/10 transition-colors text-left border-t border-white/5 first:border-t-0"
+        >
+          <div>
+            <p className="text-xs font-medium text-white">{c.name}</p>
+            {c.phone && <p className="text-[10px] text-white/40">{c.phone}</p>}
+          </div>
+          <span className="flex items-center gap-1 text-[10px] text-amber-400 shrink-0">
+            <Star className="h-2.5 w-2.5 fill-amber-400" />
+            {c.points} pts
+          </span>
+        </button>
+      ))}
     </div>
   )
 }
@@ -379,10 +545,11 @@ const PAYMENT_METHODS = [
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]
 
-function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, onClose, onSuccess }: {
+function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, onClose, onSuccess }: {
   storeId: string; taxRate: number; currency: string; staffId: string
   cart: CartItem[]; subtotal: number; taxAmt: number; total: number
-  onClose: () => void; onSuccess: (order: ReceiptData) => void
+  customerId?: string; pointsRedeemed?: number
+  onClose: () => void; onSuccess: (orderNumber: string, pointsEarned?: number) => void
 }) {
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [cashGiven, setCashGiven] = useState('')
@@ -415,11 +582,13 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
           })),
           payments: [{ method, amount: method === 'CASH' ? cashAmount : total, change }],
           subtotal, taxAmt, total, discountAmt: 0,
+          ...(customerId ? { customerId } : {}),
+          ...(pointsRedeemed ? { pointsRedeemed } : {}),
         }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Payment failed'); return }
-      onSuccess(data as ReceiptData)
+      onSuccess(data.number || data.id, data.pointsEarned)
     } catch {
       setError('Network error. Please try again.')
     } finally {
@@ -440,6 +609,12 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
           <div className="bg-white/5 rounded-xl p-4 space-y-1.5">
             <div className="flex justify-between text-sm text-white/50"><span>Subtotal</span><span>{fmt(subtotal, currency)}</span></div>
             {taxAmt > 0 && <div className="flex justify-between text-sm text-white/50"><span>Tax</span><span>{fmt(taxAmt, currency)}</span></div>}
+            {!!pointsRedeemed && (
+              <div className="flex justify-between text-sm text-amber-400">
+                <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400" />Points ({pointsRedeemed} pts)</span>
+                <span>-{fmt(pointsRedeemed * 100, currency)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-base font-bold text-white pt-1.5 border-t border-white/10"><span>Total</span><span>{fmt(total, currency)}</span></div>
           </div>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, Search, Loader2 } from 'lucide-react'
+import { Users, UserPlus, Search, Loader2, Star } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { CustomerFormModal } from './CustomerFormModal'
 import { CustomerDetailModal } from './CustomerDetailModal'
@@ -175,7 +175,8 @@ export function CustomersPageClient({ storeId, currency }: CustomersPageClientPr
                         {customer.email || '—'}
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full text-xs font-medium">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full text-xs font-medium">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                           {customer.points}
                         </span>
                       </td>
