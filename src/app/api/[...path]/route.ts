@@ -1537,16 +1537,16 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const type = url.searchParams.get('type') ?? ''
         const rows = type
           ? await query(
-              `SELECT * FROM Account WHERE storeId=? AND active=1 AND type=? ORDER BY code`,
+              `SELECT * FROM ChartOfAccount WHERE storeId=? AND active=1 AND type=? ORDER BY code`,
               [storeId, type],
             )
-          : await query(`SELECT * FROM Account WHERE storeId=? AND active=1 ORDER BY code`, [
+          : await query(`SELECT * FROM ChartOfAccount WHERE storeId=? AND active=1 ORDER BY code`, [
               storeId,
             ])
         // Also include system accounts from demo store for new tenants without seeded accounts
         if ((rows as any[]).length === 0) {
           const demo = await query(
-            `SELECT * FROM Account WHERE storeId='store_demo' AND active=1 ORDER BY code`,
+            `SELECT * FROM ChartOfAccount WHERE storeId='store_demo' AND active=1 ORDER BY code`,
             [],
           )
           return ok(demo)
@@ -1562,7 +1562,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const id = newId()
         const t = nowISO()
         await exec(
-          `INSERT INTO Account (id,storeId,code,name,type,normalBalance,parentId,balance,active,isSystem,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,0,1,0,?,?)`,
+          `INSERT INTO ChartOfAccount (id,storeId,code,name,type,normalBalance,parentId,balance,active,isSystem,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,0,1,0,?,?)`,
           [id, storeId, b.code, b.name.trim(), b.type, normalBalance, b.parentId ?? null, t, t],
         )
         return ok({ id }, 201)
@@ -1580,25 +1580,23 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         if (b.name) cols.name = (b.name as string).trim()
         if (Object.keys(cols).length === 0) return err('No valid fields')
         const { setClauses, values } = buildUpdate(cols)
-        await exec(`UPDATE Account SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [
-          ...values,
-          nowISO(),
-          segs[1],
-          storeId,
-        ])
+        await exec(
+          `UPDATE ChartOfAccount SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`,
+          [...values, nowISO(), segs[1], storeId],
+        )
         return ok({ success: true })
       }
       if (segs[1] && method === 'DELETE') {
-        const account = await queryOne<any>(`SELECT * FROM Account WHERE id=? AND storeId=?`, [
-          segs[1],
-          storeId,
-        ])
+        const account = await queryOne<any>(
+          `SELECT * FROM ChartOfAccount WHERE id=? AND storeId=?`,
+          [segs[1], storeId],
+        )
         if (!account) return err('Akun tidak ditemukan', 404)
         if (account.isSystem) return err('Akun sistem tidak dapat dihapus', 403)
         if (account.balance !== 0)
           return err('Tidak dapat menghapus akun dengan saldo tidak nol', 409)
         // Soft-delete: set active=0 so journal history is preserved
-        await exec(`UPDATE Account SET active=0, updatedAt=? WHERE id=? AND storeId=?`, [
+        await exec(`UPDATE ChartOfAccount SET active=0, updatedAt=? WHERE id=? AND storeId=?`, [
           nowISO(),
           segs[1],
           storeId,
@@ -1638,7 +1636,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const entryId = url.searchParams.get('entryId')
         if (!entryId) return err('entryId required')
         const lines = await query(
-          `SELECT jl.*, a.code, a.name as accountName FROM JournalLine jl JOIN Account a ON jl.accountId=a.id WHERE jl.entryId=? ORDER BY jl.debit DESC`,
+          `SELECT jl.*, a.code, a.name as accountName FROM JournalLine jl JOIN ChartOfAccount a ON jl.accountId=a.id WHERE jl.entryId=? ORDER BY jl.debit DESC`,
           [entryId],
         )
         return ok(lines)
@@ -1725,7 +1723,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
       if (segs[1] === 'pnl') {
         const accounts = await query<any>(
-          `SELECT * FROM Account WHERE storeId=? OR storeId='store_demo' AND active=1`,
+          `SELECT * FROM ChartOfAccount WHERE storeId=? OR storeId='store_demo' AND active=1`,
           [storeId],
         )
         const entries = await query<any>(
@@ -1768,7 +1766,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
       if (segs[1] === 'balance-sheet') {
         const storeAccs = await query<any>(
-          `SELECT * FROM Account WHERE (storeId=? OR storeId='store_demo') AND active=1`,
+          `SELECT * FROM ChartOfAccount WHERE (storeId=? OR storeId='store_demo') AND active=1`,
           [storeId],
         )
         const lines = await query<any>(
