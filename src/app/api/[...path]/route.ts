@@ -1618,14 +1618,62 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         for (const r of cogsRows) cogsMap[parseInt(r.month, 10)] = Number(r.cogs)
         for (const r of opexRows) opexMap[parseInt(r.month, 10)] = Number(r.opex)
 
+        // Monthly depreciation from active assets
+        // Lazy-ensure Asset table exists (may not exist on first P&L load)
+        try {
+          await exec(`CREATE TABLE IF NOT EXISTS Asset (
+            id TEXT PRIMARY KEY,
+            storeId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'Peralatan',
+            purchaseDate TEXT NOT NULL,
+            purchasePrice REAL NOT NULL DEFAULT 0,
+            usefulLife INTEGER NOT NULL DEFAULT 5,
+            method TEXT NOT NULL DEFAULT 'STRAIGHT_LINE',
+            salvageValue REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'ACTIVE',
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          )`)
+        } catch {}
+
+        const assetRows = await query<any>(
+          `SELECT purchasePrice, salvageValue, usefulLife, method FROM Asset WHERE storeId = ? AND status = 'ACTIVE'`,
+          [storeId],
+        )
+
+        // Calculate per-asset monthly depreciation (flat across all months)
+        function calcMonthlyDep(a: any): number {
+          const pp = Number(a.purchasePrice)
+          const sv = Number(a.salvageValue)
+          const ul = Number(a.usefulLife)
+          if (ul <= 0) return 0
+          if (a.method === 'STRAIGHT_LINE') {
+            return (pp - sv) / (ul * 12)
+          }
+          // Declining balance: approximate as total dep / total months
+          const rate = 2 / ul
+          let bv = pp
+          let totalDep = 0
+          for (let yr = 0; yr < ul; yr++) {
+            const dep = yr < ul - 1 ? bv * rate : Math.max(0, bv - sv)
+            totalDep += Math.max(0, bv - Math.max(sv, bv - dep))
+            bv = Math.max(sv, bv - bv * rate)
+          }
+          return totalDep / (ul * 12)
+        }
+
+        const totalMonthlyDep = assetRows.reduce((s: number, a: any) => s + calcMonthlyDep(a), 0)
+
         const months = Array.from({ length: 12 }, (_, i) => {
           const m = i + 1
           const revenue = revenueMap[m] ?? 0
           const cogs = cogsMap[m] ?? 0
           const grossProfit = revenue - cogs
-          const operatingExpenses = opexMap[m] ?? 0
+          const operatingExpenses = (opexMap[m] ?? 0) + totalMonthlyDep
+          const depreciation = totalMonthlyDep
           const netProfit = grossProfit - operatingExpenses
-          return { month: m, revenue, cogs, grossProfit, operatingExpenses, netProfit }
+          return { month: m, revenue, cogs, grossProfit, operatingExpenses, depreciation, netProfit }
         })
 
         const totals = months.reduce(
@@ -1634,9 +1682,10 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
             cogs: acc.cogs + m.cogs,
             grossProfit: acc.grossProfit + m.grossProfit,
             operatingExpenses: acc.operatingExpenses + m.operatingExpenses,
+            depreciation: acc.depreciation + (m.depreciation ?? 0),
             netProfit: acc.netProfit + m.netProfit,
           }),
-          { revenue: 0, cogs: 0, grossProfit: 0, operatingExpenses: 0, netProfit: 0 },
+          { revenue: 0, cogs: 0, grossProfit: 0, operatingExpenses: 0, depreciation: 0, netProfit: 0 },
         )
 
         return { year: y, months, totals }
@@ -1888,6 +1937,115 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         customerStats: { newCustomers, returningCustomers, retentionRate },
         paymentMethods,
       })
+    }
+
+    // ─── ASSETS ───────────────────────────────────────────────────────────────
+    if (segs[0] === 'assets') {
+      // Lazy-init tables
+      await exec(`CREATE TABLE IF NOT EXISTS Asset (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'Peralatan',
+        purchaseDate TEXT NOT NULL,
+        purchasePrice REAL NOT NULL DEFAULT 0,
+        usefulLife INTEGER NOT NULL DEFAULT 5,
+        method TEXT NOT NULL DEFAULT 'STRAIGHT_LINE',
+        salvageValue REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+      await exec(`CREATE TABLE IF NOT EXISTS MaintenanceLog (
+        id TEXT PRIMARY KEY,
+        assetId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        cost REAL NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL
+      )`)
+
+      // GET /api/assets — list assets for store
+      if (segs.length === 1 && method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM Asset WHERE storeId = ? ORDER BY createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/assets — create asset
+      if (segs.length === 1 && method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['name', 'purchaseDate', 'purchasePrice', 'usefulLife'])
+        validatePositive(b.purchasePrice, 'purchasePrice')
+        if (Number(b.usefulLife) < 1)
+          throw new ValidationError('usefulLife must be at least 1', 'INVALID_VALUE')
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO Asset (id,storeId,name,category,purchaseDate,purchasePrice,usefulLife,method,salvageValue,status,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            storeId,
+            b.name,
+            b.category ?? 'Peralatan',
+            b.purchaseDate,
+            Number(b.purchasePrice),
+            Number(b.usefulLife),
+            b.method ?? 'STRAIGHT_LINE',
+            Number(b.salvageValue) || 0,
+            b.status ?? 'ACTIVE',
+            t,
+            t,
+          ],
+        )
+        return ok({ id, name: b.name }, 201)
+      }
+
+      // PATCH /api/assets/:id — update asset
+      if (segs.length === 2 && method === 'PATCH') {
+        const assetId = segs[1]
+        const b: any = await req.json()
+        const ALLOWED_ASSET_COLS = new Set([
+          'name', 'category', 'purchaseDate', 'purchasePrice',
+          'usefulLife', 'method', 'salvageValue', 'status',
+        ])
+        const cols = filterCols(b, ALLOWED_ASSET_COLS)
+        if (Object.keys(cols).length === 0) return err('No valid fields to update')
+        const t = nowISO()
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(
+          `UPDATE Asset SET ${setClauses}, updatedAt = ? WHERE id = ? AND storeId = ?`,
+          [...values, t, assetId, storeId],
+        )
+        return ok({ success: true })
+      }
+
+      // GET /api/assets/:id/maintenance — list maintenance logs
+      if (segs.length === 3 && segs[2] === 'maintenance' && method === 'GET') {
+        const assetId = segs[1]
+        const rows = await query(
+          `SELECT * FROM MaintenanceLog WHERE assetId = ? ORDER BY date DESC, createdAt DESC`,
+          [assetId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/assets/:id/maintenance — add maintenance log
+      if (segs.length === 3 && segs[2] === 'maintenance' && method === 'POST') {
+        const assetId = segs[1]
+        const b: any = await req.json()
+        validateRequired(b, ['date', 'description'])
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO MaintenanceLog (id,assetId,date,description,cost,createdAt) VALUES (?,?,?,?,?,?)`,
+          [id, assetId, b.date, b.description, Number(b.cost) || 0, t],
+        )
+        return ok({ id }, 201)
+      }
     }
 
     // ─── EXPENSES ─────────────────────────────────────────────────────────────
@@ -5584,6 +5742,254 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           ],
         )
         return ok({ id: rid, employeeName: emp.name, score }, 201)
+      }
+    }
+
+    // ─── HR / COMMISSION RULES ────────────────────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'commission-rules') {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS CommissionRule (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          employeeId TEXT,
+          type TEXT NOT NULL DEFAULT 'PERCENTAGE',
+          value REAL NOT NULL DEFAULT 0,
+          tiers TEXT,
+          effectiveFrom TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )`,
+        [],
+      )
+
+      // GET /api/hr/commission-rules?storeId=
+      if (method === 'GET') {
+        const rows = await query<any>(
+          `SELECT cr.*, e.name as employeeName
+           FROM CommissionRule cr
+           LEFT JOIN Employee e ON cr.employeeId = e.id
+           WHERE cr.storeId = ?
+           ORDER BY cr.effectiveFrom DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/hr/commission-rules — create rule
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.type || !['PERCENTAGE', 'FLAT', 'TIERED'].includes(b.type))
+          return err('type must be PERCENTAGE, FLAT, or TIERED')
+        if (!b.effectiveFrom) return err('effectiveFrom required')
+        const t = nowISO()
+        const rid = newId()
+        await exec(
+          `INSERT INTO CommissionRule (id,storeId,employeeId,type,value,tiers,effectiveFrom,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [
+            rid,
+            storeId,
+            b.employeeId ?? null,
+            b.type,
+            Number(b.value) || 0,
+            b.tiers ? JSON.stringify(b.tiers) : null,
+            b.effectiveFrom,
+            t,
+            t,
+          ],
+        )
+        return ok({ id: rid }, 201)
+      }
+
+      // PATCH /api/hr/commission-rules?id= — update rule
+      if (method === 'PATCH') {
+        const ruleId = sp.get('id')
+        if (!ruleId) return err('id required')
+        const b = (await req.json()) as any
+        const t = nowISO()
+        await exec(
+          `UPDATE CommissionRule SET
+             employeeId=?, type=?, value=?, tiers=?, effectiveFrom=?, updatedAt=?
+           WHERE id=? AND storeId=?`,
+          [
+            b.employeeId ?? null,
+            b.type,
+            Number(b.value) || 0,
+            b.tiers ? JSON.stringify(b.tiers) : null,
+            b.effectiveFrom,
+            t,
+            ruleId,
+            storeId,
+          ],
+        )
+        return ok({ success: true })
+      }
+
+      // DELETE /api/hr/commission-rules?id=
+      if (method === 'DELETE') {
+        const ruleId = sp.get('id')
+        if (!ruleId) return err('id required')
+        await exec(`DELETE FROM CommissionRule WHERE id=? AND storeId=?`, [ruleId, storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ─── HR / COMMISSION (summary + calculate) ────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'commission') {
+      // Ensure tables exist
+      await exec(
+        `CREATE TABLE IF NOT EXISTS CommissionRule (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          employeeId TEXT,
+          type TEXT NOT NULL DEFAULT 'PERCENTAGE',
+          value REAL NOT NULL DEFAULT 0,
+          tiers TEXT,
+          effectiveFrom TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )`,
+        [],
+      )
+      await exec(
+        `CREATE TABLE IF NOT EXISTS CommissionSummary (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          employeeId TEXT NOT NULL,
+          month INTEGER NOT NULL,
+          year INTEGER NOT NULL,
+          ordersClosed INTEGER NOT NULL DEFAULT 0,
+          totalSales REAL NOT NULL DEFAULT 0,
+          commissionEarned REAL NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          UNIQUE(storeId, employeeId, month, year)
+        )`,
+        [],
+      )
+
+      // Helper: calculate commission for an employee given their total sales
+      function calcCommissionAmount(
+        totalSales: number,
+        orderCount: number,
+        rule: { type: string; value: number; tiers: string | null },
+      ): number {
+        if (rule.type === 'PERCENTAGE') {
+          return Math.round((totalSales * rule.value) / 100)
+        }
+        if (rule.type === 'FLAT') {
+          return Math.round(rule.value * orderCount)
+        }
+        if (rule.type === 'TIERED' && rule.tiers) {
+          const tiers: Array<{ upTo: number | null; rate: number }> =
+            typeof rule.tiers === 'string' ? JSON.parse(rule.tiers) : rule.tiers
+          let remaining = totalSales
+          let commission = 0
+          let prevThreshold = 0
+          for (const tier of tiers) {
+            if (remaining <= 0) break
+            const ceiling = tier.upTo === null ? Infinity : tier.upTo
+            const band = Math.min(remaining, ceiling - prevThreshold)
+            if (band > 0) {
+              commission += (band * tier.rate) / 100
+              remaining -= band
+            }
+            if (tier.upTo !== null) prevThreshold = tier.upTo
+          }
+          return Math.round(commission)
+        }
+        return 0
+      }
+
+      // GET /api/hr/commission?storeId=&month=&year=
+      if (method === 'GET' && !segs[2]) {
+        const month = parseInt(sp.get('month') ?? '0')
+        const year = parseInt(sp.get('year') ?? '0')
+        if (!month || !year) return err('month and year required')
+        const rows = await query<any>(
+          `SELECT cs.*, e.name as employeeName, e.position
+           FROM CommissionSummary cs
+           JOIN Employee e ON cs.employeeId = e.id
+           WHERE cs.storeId=? AND cs.month=? AND cs.year=?
+           ORDER BY cs.totalSales DESC`,
+          [storeId, month, year],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/hr/commission/calculate — calculate & persist commission summaries
+      if (method === 'POST' && segs[2] === 'calculate') {
+        const b = (await req.json()) as any
+        const month = parseInt(b.month ?? '0')
+        const year = parseInt(b.year ?? '0')
+        if (!month || month < 1 || month > 12) return err('month must be 1-12')
+        if (!year || year < 2000) return err('year invalid')
+
+        const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
+        const periodEnd = new Date(year, month, 0).toISOString().slice(0, 10)
+
+        const employees = await query<any>(
+          `SELECT * FROM Employee WHERE storeId=? AND active=1 AND employmentStatus='ACTIVE'`,
+          [storeId],
+        )
+        if (!employees.length) return err('Tidak ada karyawan aktif')
+
+        // Fetch all active rules for this store ordered by specificity (employee-specific first)
+        const rules = await query<any>(
+          `SELECT * FROM CommissionRule
+           WHERE storeId=? AND effectiveFrom <= ?
+           ORDER BY employeeId IS NULL ASC, effectiveFrom DESC`,
+          [storeId, periodEnd],
+        )
+
+        const t = nowISO()
+        const results: any[] = []
+
+        for (const emp of employees) {
+          // Find the applicable rule: employee-specific first, then store-wide
+          const rule =
+            (rules as any[]).find(r => r.employeeId === emp.id) ??
+            (rules as any[]).find(r => r.employeeId === null) ??
+            null
+
+          // Aggregate orders for this employee in the period
+          const [salesRow] = await query<any>(
+            `SELECT COUNT(*) as orderCount, COALESCE(SUM(o.total),0) as totalSales
+             FROM "Order" o
+             WHERE o.storeId=? AND o.userId=? AND o.status='PAID'
+               AND o.createdAt >= ? AND o.createdAt <= ?`,
+            [storeId, emp.userId, periodStart + 'T00:00:00.000Z', periodEnd + 'T23:59:59.999Z'],
+          )
+
+          const ordersClosed = Number(salesRow?.orderCount ?? 0)
+          const totalSales = Number(salesRow?.totalSales ?? 0)
+          const commissionEarned = rule
+            ? calcCommissionAmount(totalSales, ordersClosed, rule)
+            : 0
+
+          // Upsert
+          await exec(
+            `INSERT INTO CommissionSummary
+               (id,storeId,employeeId,month,year,ordersClosed,totalSales,commissionEarned,createdAt,updatedAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?)
+             ON CONFLICT(storeId,employeeId,month,year) DO UPDATE SET
+               ordersClosed=excluded.ordersClosed,
+               totalSales=excluded.totalSales,
+               commissionEarned=excluded.commissionEarned,
+               updatedAt=excluded.updatedAt`,
+            [newId(), storeId, emp.id, month, year, ordersClosed, totalSales, commissionEarned, t, t],
+          )
+
+          results.push({
+            employeeId: emp.id,
+            employeeName: emp.name,
+            ordersClosed,
+            totalSales,
+            commissionEarned,
+          })
+        }
+
+        return ok({ month, year, count: results.length, data: results }, 201)
       }
     }
 
