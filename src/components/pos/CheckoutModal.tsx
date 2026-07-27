@@ -3,14 +3,20 @@
 import { useState } from 'react'
 import { useCartStore } from '@/store/cart'
 import { formatCurrency } from '@/lib/utils'
-import { X, Banknote, CreditCard, Smartphone, ArrowLeftRight, Check } from 'lucide-react'
+import { X, Banknote, CreditCard, Smartphone, ArrowLeftRight, Check, Printer } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { printReceiptBrowser, isSerialAvailable, printReceiptSerial, type ReceiptData } from '@/lib/receipt'
 
 interface PembayaranModalProps {
   storeId: string
   taxRate: number
   currency: string
   staffId: string
+  storeName?: string
+  storeAddress?: string
+  storePhone?: string
+  receiptNote?: string
+  cashierName?: string
   onClose: () => void
   onSuccess: (orderId: string) => void
 }
@@ -25,7 +31,8 @@ const PAYMENT_METHODS = [
 ]
 
 export default function PembayaranModal({
-  storeId, taxRate, currency, staffId, onClose, onSuccess
+  storeId, taxRate, currency, staffId, onClose, onSuccess,
+  storeName = 'Lakoo Store', storeAddress, storePhone, receiptNote, cashierName,
 }: PembayaranModalProps) {
   const { items, customerId, discountId, discountAmt, note, total, subtotal, taxAmt, clearCart } = useCartStore()
   const [method, setMethod] = useState<PaymentMethod>('CASH')
@@ -89,6 +96,33 @@ export default function PembayaranModal({
 
       const order = await res.json() as any
       clearCart()
+
+      // ── Auto-print receipt ───────────────────────────────────────────────
+      const receiptData: ReceiptData = {
+        storeName,
+        storeAddress,
+        storePhone,
+        receiptNote,
+        orderNumber: order.number ?? order.id,
+        date: new Date().toLocaleString(),
+        cashier: cashierName,
+        items: items.map(i => ({
+          name: i.variantName ? `${i.name} (${i.variantName})` : i.name,
+          qty: i.qty,
+          price: i.price,
+          subtotal: i.price * i.qty - (i.discount ?? 0),
+        })),
+        subtotal: subtotal(),
+        taxAmt: taxAmt(taxRate),
+        discountAmt: discountAmt(),
+        total: orderTotal,
+        paid: method === 'CASH' ? cashAmount : undefined,
+        change: method === 'CASH' ? change : undefined,
+        currency,
+        paymentMethod: method,
+      }
+      printReceiptBrowser(receiptData)
+
       onSuccess(order.id)
     } catch (e) {
       setError('Network error, please try again')
