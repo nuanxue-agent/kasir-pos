@@ -1,9 +1,9 @@
 'use client'
-'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User } from 'lucide-react'
+import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +14,7 @@ interface Product {
   stock: number
   trackStock: boolean
   sku?: string | null
+  barcode?: string | null
   category?: { id: string; name: string; color?: string | null; icon?: string | null } | null
   variants: Array<{ id: string; name: string; price?: number | null; stock: number }>
 }
@@ -38,14 +39,14 @@ interface Customer {
 
 interface POSPageClientProps {
   storeId: string
+  storeName: string
   taxRate: number
   currency: string
   staffId: string
   initialProducts: Product[]
   categories: Category[]
+  receiptNote?: string | null
 }
-
-type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS'
 
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'QRIS'
 
@@ -57,7 +58,7 @@ function fmt(n: number, currency: string) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function POSPageClient({ storeId, taxRate, currency, staffId, initialProducts, categories }: POSPageClientProps) {
+export default function POSPageClient({ storeId, storeName, taxRate, currency, staffId, initialProducts, categories, receiptNote }: POSPageClientProps) {
   const [products] = useState<Product[]>(initialProducts)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -65,11 +66,61 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
   const [cart, setCart] = useState<CartItem[]>([])
   const [showCheckout, setShowCheckout] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   // Customer selector state
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [redeemPoints, setRedeemPoints] = useState(false)
+
+  // Barcode scanner state
+  const barcodeBuffer = useRef('')
+  const lastKeyTime = useRef(0)
+  const barcodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't capture if user is typing in search input
+      if (document.activeElement === searchRef.current) return
+      const now = Date.now()
+      const timeDiff = now - lastKeyTime.current
+      lastKeyTime.current = now
+
+      if (e.key === 'Enter') {
+        const buf = barcodeBuffer.current
+        barcodeBuffer.current = ''
+        if (barcodeTimer.current) { clearTimeout(barcodeTimer.current); barcodeTimer.current = null }
+        if (buf.length >= 4) {
+          const product = products.find(p => p.barcode === buf)
+          if (product) {
+            if (product.trackStock && product.stock <= 0) {
+              setSuccessMsg(`⚠ ${product.name} is out of stock`)
+            } else {
+              addToCart(product)
+              setSuccessMsg(`✓ Added: ${product.name}`)
+            }
+          } else {
+            setSuccessMsg(`✗ Barcode not found: ${buf}`)
+          }
+          setTimeout(() => setSuccessMsg(''), 2500)
+        }
+        return
+      }
+
+      // Accumulate if keys come fast (scanner types < 50ms apart)
+      if (e.key.length === 1) {
+        if (timeDiff < 50 || barcodeBuffer.current.length > 0) {
+          barcodeBuffer.current += e.key
+          // Auto-clear buffer after 200ms of no input
+          if (barcodeTimer.current) clearTimeout(barcodeTimer.current)
+          barcodeTimer.current = setTimeout(() => { barcodeBuffer.current = '' }, 200)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [products]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
@@ -85,7 +136,6 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
   const pointsDiscount = redeemPoints ? Math.min(maxRedeemablePoints * 100, baseTotal) : 0
   const pointsRedeemed = redeemPoints ? Math.floor(pointsDiscount / 100) : 0
   const total = baseTotal - pointsDiscount
-
   const addToCart = useCallback((product: Product) => {
     if (product.trackStock && product.stock <= 0) return
     setCart(prev => {
@@ -120,19 +170,20 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
 
   const clearCart = useCallback(() => setCart([]), [])
 
-  const handleOrderSuccess = (orderNumber: string, pointsEarned?: number) => {
+  const handleOrderSuccess = (order: ReceiptData) => {
     clearCart()
     setShowCheckout(false)
     setSelectedCustomer(null)
     setRedeemPoints(false)
     setShowCustomerSearch(false)
-    const earned = pointsEarned ? ` (+${pointsEarned} pts)` : ''
-    setSuccessMsg(`Order ${orderNumber} paid!${earned}`)
-    setTimeout(() => setSuccessMsg(''), 3500)
+    setReceiptData(order)
   }
+
   const handleReceiptClose = (orderNumber: string) => {
     setReceiptData(null)
-    setSuccessMsg(`Order ${orderNumber} paid!`)
+    const earned = (receiptData as any)?.pointsEarned
+    const suffix = earned ? ` (+${earned} pts earned)` : ''
+    setSuccessMsg(`Order ${orderNumber} paid!${suffix}`)
     setTimeout(() => setSuccessMsg(''), 3500)
   }
 
@@ -145,6 +196,7 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
             <input
+              ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search products…"
@@ -158,6 +210,11 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
             <button onClick={() => setViewMode('list')} className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-white/5 text-white/40 hover:text-white')}>
               <List className="h-4 w-4" />
             </button>
+          </div>
+          {/* Barcode scanner indicator */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10" title="Barcode scanner ready">
+            <ScanBarcode className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-[10px] font-medium text-emerald-400 hidden sm:block">Scanner</span>
           </div>
         </div>
 
@@ -345,32 +402,33 @@ export default function POSPageClient({ storeId, taxRate, currency, staffId, ini
       {/* ── Checkout Modal ── */}
       {showCheckout && (
         <CheckoutModal
-          storeId={storeId}
-          taxRate={taxRate}
-          currency={currency}
-          staffId={staffId}
-          cart={cart}
-          subtotal={subtotal}
-          taxAmt={taxAmt}
-          total={total}
-          customerId={selectedCustomer?.id}
-          pointsRedeemed={pointsRedeemed}
-          onClose={() => setShowCheckout(false)}
-          onSuccess={handleOrderSuccess}
-        />
-      )}
+            storeId={storeId}
+            taxRate={taxRate}
+            currency={currency}
+            staffId={staffId}
+            cart={cart}
+            subtotal={subtotal}
+            taxAmt={taxAmt}
+            total={total}
+            customerId={selectedCustomer?.id}
+            pointsRedeemed={pointsRedeemed}
+            pointsDiscount={pointsDiscount}
+            onClose={() => setShowCheckout(false)}
+            onSuccess={handleOrderSuccess}
+          />
+        )}
 
-      {/* ── Receipt Modal ── */}
-      {receiptData && (
-        <ReceiptModal
-          receipt={receiptData}
-          storeName={storeName}
-          currency={currency}
-          taxRate={taxRate}
-          receiptNote={receiptNote}
-          onClose={() => handleReceiptClose(receiptData.number)}
-        />
-      )}
+        {/* ── Receipt Modal ── */}
+        {receiptData && (
+          <ReceiptModal
+            receipt={receiptData}
+            storeName={storeName}
+            currency={currency}
+            taxRate={taxRate}
+            receiptNote={receiptNote}
+            onClose={() => handleReceiptClose(receiptData.number)}
+          />
+        )}
 
       {/* ── Success toast ── */}
       {successMsg && (
@@ -545,58 +603,58 @@ const PAYMENT_METHODS = [
   { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
 ]
 
-function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, onClose, onSuccess }: {
+function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, taxAmt, total, customerId, pointsRedeemed, pointsDiscount, onClose, onSuccess }: {
   storeId: string; taxRate: number; currency: string; staffId: string
   cart: CartItem[]; subtotal: number; taxAmt: number; total: number
-  customerId?: string; pointsRedeemed?: number
-  onClose: () => void; onSuccess: (orderNumber: string, pointsEarned?: number) => void
+  customerId?: string; pointsRedeemed?: number; pointsDiscount?: number
+  onClose: () => void; onSuccess: (order: ReceiptData) => void
 }) {
-  const [method, setMethod] = useState<PaymentMethod>('CASH')
-  const [cashGiven, setCashGiven] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+    const [method, setMethod] = useState<PaymentMethod>('CASH')
+    const [cashGiven, setCashGiven] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
 
-  const cashAmount = parseFloat(cashGiven) || 0
-  const change = method === 'CASH' ? Math.max(0, cashAmount - total) : 0
-  const canPay = method !== 'CASH' || cashAmount >= total
+    const cashAmount = parseFloat(cashGiven) || 0
+    const change = method === 'CASH' ? Math.max(0, cashAmount - total) : 0
+    const canPay = method !== 'CASH' || cashAmount >= total
 
-  const quickAmounts = [
-    Math.ceil(total / 10000) * 10000,
-    Math.ceil(total / 50000) * 50000,
-    Math.ceil(total / 100000) * 100000,
-  ].filter((v, i, a) => a.indexOf(v) === i && v >= total).slice(0, 3)
+    const quickAmounts = [
+      Math.ceil(total / 10000) * 10000,
+      Math.ceil(total / 50000) * 50000,
+      Math.ceil(total / 100000) * 100000,
+    ].filter((v, i, a) => a.indexOf(v) === i && v >= total).slice(0, 3)
 
-  const handlePay = async () => {
-    if (!canPay) { setError('Cash given is less than total'); return }
-    setLoading(true); setError('')
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storeId, userId: staffId,
-          items: cart.map(i => ({
-            productId: i.productId, name: i.name,
-            price: i.price, qty: i.qty, discount: 0,
-            subtotal: i.subtotal,
-          })),
-          payments: [{ method, amount: method === 'CASH' ? cashAmount : total, change }],
-          subtotal, taxAmt, total, discountAmt: 0,
-          ...(customerId ? { customerId } : {}),
-          ...(pointsRedeemed ? { pointsRedeemed } : {}),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Payment failed'); return }
-      onSuccess(data.number || data.id, data.pointsEarned)
-    } catch {
-      setError('Network error. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+    const handlePay = async () => {
+      if (!canPay) { setError('Cash given is less than total'); return }
+      setLoading(true); setError('')
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storeId, userId: staffId,
+            customerId: customerId ?? null,
+            pointsRedeemed: pointsRedeemed ?? 0,
+            items: cart.map(i => ({
+              productId: i.productId, name: i.name,
+              price: i.price, qty: i.qty, discount: 0,
+              subtotal: i.subtotal,
+            })),
+            payments: [{ method, amount: method === 'CASH' ? cashAmount : total, change }],
+            subtotal, taxAmt, total, discountAmt: pointsDiscount ?? 0,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) { setError(data.error || 'Payment failed'); return }
+        onSuccess(data as ReceiptData)
+      } catch {
+        setError('Network error. Please try again.')
+        } finally {
+          setLoading(false)
+        }
+        }
 
-  return (
+        return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-md bg-[#0d0d14] rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
@@ -677,3 +735,4 @@ function CheckoutModal({ storeId, taxRate, currency, staffId, cart, subtotal, ta
     </div>
   )
 }
+
