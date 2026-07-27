@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface CartItem {
   id: string
@@ -119,6 +119,19 @@ export const useCartStore = create<CartState>()(
         return Math.round(sub - get().discountAmt + get().taxAmt(taxRate))
       },
     }),
-    { name: 'kasir-cart' }
+    {
+      name: 'kasir-cart',
+      storage: createJSONStorage(() => localStorage),
+      // Only persist non-function fields
+      partialize: (state) => ({
+        storeId: state.storeId,
+        items: state.items,
+        customerId: state.customerId,
+        discountId: state.discountId,
+        discountCode: state.discountCode,
+        discountAmt: state.discountAmt,
+        note: state.note,
+      }),
+    }
   )
 )
