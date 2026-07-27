@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NextIntlClientProvider } from 'next-intl'
 import { useState } from 'react'
+import { Toaster } from '@/components/ui/Toaster'
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -23,6 +24,7 @@ export function Providers({ children, locale, messages }: ProvidersProps) {
     <NextIntlClientProvider locale={locale} messages={messages}>
       <QueryClientProvider client={queryClient}>
         {children}
+        <Toaster />
       </QueryClientProvider>
     </NextIntlClientProvider>
   )

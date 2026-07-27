@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode, Scan, ShoppingCart } from 'lucide-react'
+import { Search, Grid3x3, List, Minus, Plus, Trash2, CreditCard, Banknote, Smartphone, ArrowLeftRight, X, Loader2, UserPlus, Star, User, ScanBarcode, Scan, ShoppingCart, PauseCircle, PlayCircle, Percent, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReceiptModal, { type ReceiptData } from './ReceiptModal'
 import BarcodeScanner from './BarcodeScanner'

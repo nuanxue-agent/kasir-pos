@@ -1296,6 +1296,90 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     }
   }
 
+  // ─── DASHBOARD QUICK STATS ────────────────────────────────────────────────
+  if (segs[0] === 'dashboard' && segs[1] === 'quick-stats' && method === 'GET') {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+    const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString()
+
+    const [todayRev, yesterdayRev, todayCount, yesterdayCount, lowStock, topProduct, activeShift] = await Promise.all([
+      queryOne<any>(
+        `SELECT COALESCE(SUM(total), 0) as revenue FROM "Order" WHERE storeId=? AND status='COMPLETED' AND createdAt >= ? AND createdAt < ?`,
+        [storeId, todayStart, tomorrowStart]
+      ),
+      queryOne<any>(
+        `SELECT COALESCE(SUM(total), 0) as revenue FROM "Order" WHERE storeId=? AND status='COMPLETED' AND createdAt >= ? AND createdAt < ?`,
+        [storeId, yesterdayStart, todayStart]
+      ),
+      queryOne<any>(
+        `SELECT COUNT(*) as count FROM "Order" WHERE storeId=? AND status='COMPLETED' AND createdAt >= ? AND createdAt < ?`,
+        [storeId, todayStart, tomorrowStart]
+      ),
+      queryOne<any>(
+        `SELECT COUNT(*) as count FROM "Order" WHERE storeId=? AND status='COMPLETED' AND createdAt >= ? AND createdAt < ?`,
+        [storeId, yesterdayStart, todayStart]
+      ),
+      queryOne<any>(
+        `SELECT COUNT(*) as count FROM Product WHERE storeId=? AND trackStock=1 AND active=1 AND stock <= lowStock`,
+        [storeId]
+      ),
+      queryOne<any>(
+        `SELECT p.id, p.name, COALESCE(SUM(oi.qty), 0) as totalQty, COALESCE(SUM(oi.total), 0) as totalRevenue
+         FROM OrderItem oi
+         JOIN "Order" o ON oi.orderId = o.id
+         JOIN Product p ON oi.productId = p.id
+         WHERE o.storeId=? AND o.status='COMPLETED' AND o.createdAt >= ? AND o.createdAt < ?
+         GROUP BY p.id, p.name ORDER BY totalQty DESC LIMIT 1`,
+        [storeId, todayStart, tomorrowStart]
+      ),
+      queryOne<any>(
+        `SELECT * FROM Shift WHERE storeId=? AND closedAt IS NULL ORDER BY openedAt DESC LIMIT 1`,
+        [storeId]
+      ),
+    ])
+
+    return ok({
+      todayRevenue: todayRev?.revenue ?? 0,
+      yesterdayRevenue: yesterdayRev?.revenue ?? 0,
+      todayOrderCount: todayCount?.count ?? 0,
+      yesterdayOrderCount: yesterdayCount?.count ?? 0,
+      lowStockCount: lowStock?.count ?? 0,
+      topProductToday: topProduct ?? null,
+      activeShift: activeShift ?? null,
+    })
+  }
+
+  // ─── PRODUCTS SEARCH ──────────────────────────────────────────────────────
+  if (segs[0] === 'products' && segs[1] === 'search' && method === 'GET') {
+    const q = sp.get('q') ?? ''
+    if (!q.trim()) return ok([])
+    const like = `%${q}%`
+    const rows = await query(
+      `SELECT p.*, c.name as categoryName, c.color as categoryColor
+       FROM Product p LEFT JOIN Category c ON p.categoryId = c.id
+       WHERE p.storeId=? AND p.active=1
+         AND (p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ?)
+       ORDER BY p.name LIMIT 50`,
+      [storeId, like, like, like]
+    )
+    return ok(rows)
+  }
+
+  // ─── CUSTOMERS SEARCH ─────────────────────────────────────────────────────
+  if (segs[0] === 'customers' && segs[1] === 'search' && method === 'GET') {
+    const q = sp.get('q') ?? ''
+    if (!q.trim()) return ok([])
+    const like = `%${q}%`
+    const rows = await query(
+      `SELECT id, name, phone, email, address, points FROM Customer
+       WHERE storeId=? AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)
+       ORDER BY name LIMIT 50`,
+      [storeId, like, like, like]
+    )
+    return ok(rows)
+  }
+
   return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)
