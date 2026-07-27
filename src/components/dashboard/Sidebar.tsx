@@ -6,6 +6,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Tag, Receipt,
   Users, Percent, Boxes, BarChart3, UserCog, Store,
   Building2, Settings, LogOut, X, ShoppingBag,
+  TrendingDown, Clock, GitFork,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
@@ -25,8 +26,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Katalog',
     items: [
-      { label: 'Produk',      href: '/dashboard/products',   icon: Package },
-      { label: 'Kategori',    href: '/dashboard/categories', icon: Tag },
+      { label: 'Produk',    href: '/dashboard/products',   icon: Package },
+      { label: 'Varian',    href: '/dashboard/variants',   icon: GitFork },
+      { label: 'Kategori',  href: '/dashboard/categories', icon: Tag },
     ],
   },
   {
@@ -41,6 +43,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Operasional',
     items: [
       { label: 'Stok',        href: '/dashboard/inventory', icon: Boxes },
+      { label: 'Shift & Kas', href: '/dashboard/shifts',    icon: Clock },
+      { label: 'Pengeluaran', href: '/dashboard/expenses',  icon: TrendingDown },
       { label: 'Laporan',     href: '/dashboard/reports',   icon: BarChart3 },
     ],
   },

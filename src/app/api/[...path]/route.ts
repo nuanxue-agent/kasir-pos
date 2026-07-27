@@ -440,10 +440,124 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ totalRevenue: (revenue as any)?.totalRevenue ?? 0, totalOrders: (revenue as any)?.totalOrders ?? 0, avgOrderValue: (revenue as any)?.avgOrderValue ?? 0, newCustomers: (customers as any)?.newCustomers ?? 0, dailySales: daily, topProducts, paymentBreakdown: payments })
     }
 
+    // ─── EXPENSES ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'expenses') {
+      const storeId = sp.get('storeId') ?? defaultStoreId
+      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
+      if (method === 'GET') {
+        const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+        const to   = sp.get('to')   ?? new Date().toISOString()
+        const rows = await query(
+          `SELECT * FROM Expense WHERE storeId=? AND date BETWEEN ? AND ? ORDER BY date DESC, createdAt DESC`,
+          [storeId, from.slice(0,10), to.slice(0,10)]
+        )
+        return ok(rows)
+      }
+      if (method === 'POST') {
+        const b = await req.json()
+        if (!b.description || !b.amount || !b.date) return err('Missing required fields')
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO Expense (id,storeId,userId,category,description,amount,date,note,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [id, storeId, user.id, b.category ?? 'Lain-lain', b.description, Number(b.amount), b.date, b.note ?? null, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json()
+        const allowed = new Set(['category','description','amount','date','note'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE Expense SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+      if (segs[1] && method === 'DELETE') {
+        await exec(`DELETE FROM Expense WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ─── SHIFTS ───────────────────────────────────────────────────────────────
+    if (segs[0] === 'shifts') {
+      const storeId = sp.get('storeId') ?? defaultStoreId
+      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
+      if (method === 'GET') {
+        if (sp.get('active') === 'true') {
+          const shift = await queryOne(`SELECT * FROM Shift WHERE storeId=? AND status='OPEN' ORDER BY openedAt DESC LIMIT 1`, [storeId])
+          return ok(shift ?? null)
+        }
+        const rows = await query(`SELECT s.*, u.name as userName FROM Shift s JOIN User u ON s.userId=u.id WHERE s.storeId=? ORDER BY s.openedAt DESC LIMIT 30`, [storeId])
+        return ok(rows)
+      }
+      if (method === 'POST') {
+        // Open a new shift
+        const b = await req.json()
+        // Close any existing open shift first
+        await exec(`UPDATE Shift SET status='CLOSED', closedAt=?, updatedAt=? WHERE storeId=? AND status='OPEN'`, [nowISO(), nowISO(), storeId])
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO Shift (id,storeId,userId,openingCash,status,openedAt,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?)`,
+          [id, storeId, user.id, Number(b.openingCash ?? 0), 'OPEN', t, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        // Close shift
+        const b = await req.json()
+        const shift = await queryOne<any>(`SELECT * FROM Shift WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!shift) return err('Shift not found', 404)
+        const cashRevenue = await queryOne<any>(
+          `SELECT COALESCE(SUM(p.amount),0) as total FROM Payment p JOIN "Order" o ON p.orderId=o.id WHERE o.storeId=? AND o.status='PAID' AND p.method='CASH' AND o.createdAt >= ?`,
+          [storeId, shift.openedAt]
+        )
+        const expectedCash = (shift.openingCash ?? 0) + (cashRevenue?.total ?? 0)
+        await exec(
+          `UPDATE Shift SET status=?,closedAt=?,closingCash=?,expectedCash=?,note=?,updatedAt=? WHERE id=? AND storeId=?`,
+          ['CLOSED', nowISO(), Number(b.closingCash ?? 0), expectedCash, b.note ?? null, nowISO(), segs[1], storeId]
+        )
+        return ok({ success: true, expectedCash })
+      }
+    }
+
+    // ─── VARIANTS ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'variants') {
+      const storeId = sp.get('storeId') ?? defaultStoreId
+      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403)
+      const productId = sp.get('productId')
+      if (method === 'GET') {
+        if (!productId) return err('productId required')
+        const rows = await query(`SELECT * FROM ProductVariant WHERE productId=? AND storeId=? ORDER BY name`, [productId, storeId])
+        return ok(rows)
+      }
+      if (method === 'POST') {
+        const b = await req.json()
+        if (!b.productId || !b.name) return err('Missing required fields')
+        const id = newId(); const t = nowISO()
+        await exec(
+          `INSERT INTO ProductVariant (id,productId,storeId,name,sku,price,stock,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [id, b.productId, storeId, b.name, b.sku ?? null, b.price != null ? Number(b.price) : null, Number(b.stock ?? 0), 1, t, t]
+        )
+        return ok({ id }, 201)
+      }
+      if (segs[1] && method === 'PATCH') {
+        const b = await req.json()
+        const allowed = new Set(['name','sku','price','stock','active'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(`UPDATE ProductVariant SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`, [...values, nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+      if (segs[1] && method === 'DELETE') {
+        await exec(`DELETE FROM ProductVariant WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
     return err('Not found', 404)
   } catch (e: any) {
     console.error('API error:', e)
-    // Don't leak internal error details to clients
     return err('Internal server error', 500)
   }
 }
