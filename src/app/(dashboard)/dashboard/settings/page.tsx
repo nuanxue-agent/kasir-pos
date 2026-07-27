@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { query, queryOne } from '@/lib/db'
 import SettingsPageClient from '@/components/settings/SettingsPageClient'
+import { LoyaltySettingsClient } from '@/components/settings/LoyaltySettingsClient'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -13,17 +14,31 @@ export default async function SettingsPage() {
     `SELECT name, address, phone, email, taxRate, currency, receiptNote, timezone,
             COALESCE(modules, '["pos","inventory","customers","discounts","reports"]') as modules
      FROM Store WHERE id = ?`,
-    [storeId]
+    [storeId],
   )
 
   const modules = (() => {
-    try { return JSON.parse(store?.modules ?? '[]') } catch { return ['pos','inventory','customers','discounts','reports'] }
+    try {
+      return JSON.parse(store?.modules ?? '[]')
+    } catch {
+      return ['pos', 'inventory', 'customers', 'discounts', 'reports']
+    }
   })()
 
   return (
-    <SettingsPageClient
-      storeId={storeId}
-      store={{ ...(store ?? { name: '', taxRate: 0, currency: 'IDR', timezone: 'Asia/Jakarta' }), modules }}
-    />
+    <div className="space-y-8">
+      <SettingsPageClient
+        storeId={storeId}
+        store={{
+          ...(store ?? { name: '', taxRate: 0, currency: 'IDR', timezone: 'Asia/Jakarta' }),
+          modules,
+        }}
+      />
+      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <LoyaltySettingsClient storeId={storeId} />
+        </div>
+      </div>
+    </div>
   )
 }

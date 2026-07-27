@@ -4,15 +4,16 @@ import {
   calculatePointsValue,
   getTier,
   isEligibleForRedemption,
+  validateManualAdjustment,
 } from '@/lib/loyalty'
 import type { LoyaltyTierDef } from '@/lib/loyalty'
 
 // ─── Sample tiers ─────────────────────────────────────────────────────────────
 
 const tiers: LoyaltyTierDef[] = [
-  { name: 'Bronze', minPoints: 0,    discount: 0,   color: '#cd7f32', icon: '🥉' },
-  { name: 'Silver', minPoints: 500,  discount: 5,   color: '#c0c0c0', icon: '🥈' },
-  { name: 'Gold',   minPoints: 1000, discount: 10,  color: '#ffd700', icon: '🥇' },
+  { name: 'Bronze', minPoints: 0, discount: 0, color: '#cd7f32', icon: '🥉' },
+  { name: 'Silver', minPoints: 500, discount: 5, color: '#c0c0c0', icon: '🥈' },
+  { name: 'Gold', minPoints: 1000, discount: 10, color: '#ffd700', icon: '🥇' },
   { name: 'Platinum', minPoints: 5000, discount: 15, color: '#e5e4e2', icon: '💎' },
 ]
 
@@ -149,5 +150,50 @@ describe('isEligibleForRedemption', () => {
 
   it('returns false for zero points and zero minRedeemable', () => {
     expect(isEligibleForRedemption(0, 0)).toBe(false)
+  })
+})
+
+// ─── validateManualAdjustment ─────────────────────────────────────────────────
+
+describe('validateManualAdjustment', () => {
+  it('returns null for a valid positive adjustment', () => {
+    expect(validateManualAdjustment(100, 500)).toBeNull()
+  })
+
+  it('returns null for a valid negative adjustment that leaves balance at 0', () => {
+    expect(validateManualAdjustment(-500, 500)).toBeNull()
+  })
+
+  it('returns error when delta is zero', () => {
+    expect(validateManualAdjustment(0, 100)).not.toBeNull()
+  })
+
+  it('returns error when delta exceeds maxDelta', () => {
+    expect(validateManualAdjustment(100_001, 0)).not.toBeNull()
+  })
+
+  it('returns null when delta equals maxDelta', () => {
+    expect(validateManualAdjustment(100_000, 0)).toBeNull()
+  })
+
+  it('returns error when delta would produce negative balance', () => {
+    expect(validateManualAdjustment(-600, 500)).not.toBeNull()
+  })
+
+  it('returns error for non-integer delta', () => {
+    expect(validateManualAdjustment(1.5, 100)).not.toBeNull()
+  })
+
+  it('respects custom maxDelta parameter', () => {
+    expect(validateManualAdjustment(200, 0, 100)).not.toBeNull()
+    expect(validateManualAdjustment(100, 0, 100)).toBeNull()
+  })
+
+  it('returns null for large negative adjustment that keeps balance non-negative', () => {
+    expect(validateManualAdjustment(-50_000, 50_000)).toBeNull()
+  })
+
+  it('returns error when negative delta is larger in magnitude than maxDelta', () => {
+    expect(validateManualAdjustment(-100_001, 200_000)).not.toBeNull()
   })
 })

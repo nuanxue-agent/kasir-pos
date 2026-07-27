@@ -1,12 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X } from 'lucide-react'
+import { X, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
+import {
+  generateCombinations,
+  type VariantAttribute,
+  type VariantCombination,
+} from '@/lib/variants'
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
