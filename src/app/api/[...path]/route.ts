@@ -6078,6 +6078,222 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── GOALS ────────────────────────────────────────────────────────────────
+    if (segs[0] === 'goals') {
+      // Lazy-init GoalEntry table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS GoalEntry (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          type TEXT NOT NULL,
+          period TEXT NOT NULL,
+          targetValue REAL NOT NULL,
+          startDate TEXT NOT NULL,
+          endDate TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      `)
+
+      // GET /api/goals?storeId=&period=
+      if (method === 'GET' && segs.length === 1) {
+        const period = sp.get('period') ?? 'MONTHLY'
+        const goals = await query(
+          `SELECT * FROM GoalEntry WHERE storeId = ? AND period = ? ORDER BY createdAt DESC`,
+          [storeId, period],
+        )
+
+        // Build date range for current period
+        const now = new Date()
+        let periodStart: Date, periodEnd: Date
+        if (period === 'MONTHLY') {
+          periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+          periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+        } else {
+          const q = Math.floor(now.getMonth() / 3)
+          periodStart = new Date(now.getFullYear(), q * 3, 1)
+          periodEnd = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59, 999)
+        }
+        const from = periodStart.toISOString()
+        const to = periodEnd.toISOString()
+
+        // Fetch actuals for this period once
+        const [revenueRow, ordersRow, customersRow, aovRow, profitRow] = await Promise.all([
+          queryOne(
+            `SELECT COALESCE(SUM(total),0) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+            [storeId, from, to],
+          ),
+          queryOne(
+            `SELECT COUNT(*) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+            [storeId, from, to],
+          ),
+          queryOne(
+            `SELECT COUNT(*) as v FROM Customer WHERE storeId=? AND createdAt BETWEEN ? AND ?`,
+            [storeId, from, to],
+          ),
+          queryOne(
+            `SELECT COALESCE(AVG(total),0) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+            [storeId, from, to],
+          ),
+          queryOne(
+            `SELECT COALESCE(SUM(o.total - COALESCE(cogs.cogs,0)),0) as v
+             FROM "Order" o
+             LEFT JOIN (
+               SELECT oi.orderId, SUM(oi.qty * COALESCE(p.cost,0)) as cogs
+               FROM OrderItem oi JOIN Product p ON oi.productId=p.id
+               GROUP BY oi.orderId
+             ) cogs ON cogs.orderId=o.id
+             WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ?`,
+            [storeId, from, to],
+          ),
+        ])
+
+        const actuals: Record<string, number> = {
+          REVENUE: Number((revenueRow as any)?.v ?? 0),
+          ORDERS: Number((ordersRow as any)?.v ?? 0),
+          NEW_CUSTOMERS: Number((customersRow as any)?.v ?? 0),
+          AVG_ORDER_VALUE: Number((aovRow as any)?.v ?? 0),
+          GROSS_PROFIT: Number((profitRow as any)?.v ?? 0),
+        }
+
+        const result = (goals as any[]).map(g => {
+          const current = actuals[g.type] ?? 0
+          const pct = g.targetValue > 0 ? (current / g.targetValue) * 100 : 0
+          const overdue = new Date(g.endDate) < now
+          let status = 'ON_TRACK'
+          if (pct >= 100) status = 'ACHIEVED'
+          else if (overdue && pct < 50) status = 'OVERDUE_LOW'
+          else if (pct >= 90) status = 'ALMOST'
+          return { goal: g, currentValue: current, progressPct: pct, status }
+        })
+        return ok(result)
+      }
+
+      // POST /api/goals
+      if (method === 'POST' && segs.length === 1) {
+        const b: any = await req.json()
+        validateRequired(b, ['type', 'period', 'targetValue', 'startDate', 'endDate'])
+        validatePositive(b.targetValue, 'targetValue')
+        const validTypes = ['REVENUE', 'ORDERS', 'NEW_CUSTOMERS', 'AVG_ORDER_VALUE', 'GROSS_PROFIT']
+        if (!validTypes.includes(b.type))
+          return err(`type must be one of ${validTypes.join(', ')}`)
+        if (!['MONTHLY', 'QUARTERLY'].includes(b.period))
+          return err('period must be MONTHLY or QUARTERLY')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO GoalEntry (id,storeId,type,period,targetValue,startDate,endDate,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [id, storeId, b.type, b.period, Number(b.targetValue), b.startDate, b.endDate, t, t],
+        )
+        return ok({ id, type: b.type, period: b.period }, 201)
+      }
+
+      // PATCH /api/goals/:id
+      if (method === 'PATCH' && segs.length === 2) {
+        const gid = segs[1]
+        const b: any = await req.json()
+        const allowed = new Set(['targetValue', 'startDate', 'endDate', 'type', 'period'])
+        const cols = filterCols(b, allowed)
+        if (Object.keys(cols).length === 0) return err('No valid fields to update')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(
+          `UPDATE GoalEntry SET ${setClauses}, updatedAt = ? WHERE id = ? AND storeId = ?`,
+          [...values, nowISO(), gid, storeId],
+        )
+        return ok({ success: true })
+      }
+
+      // DELETE /api/goals/:id
+      if (method === 'DELETE' && segs.length === 2) {
+        await exec(`DELETE FROM GoalEntry WHERE id = ? AND storeId = ?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ─── REPORTS / KPI ────────────────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'kpi' && method === 'GET') {
+      const period = sp.get('period') ?? 'MONTHLY'
+
+      // Lazy-init GoalEntry in case not created yet
+      await exec(`
+        CREATE TABLE IF NOT EXISTS GoalEntry (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          type TEXT NOT NULL,
+          period TEXT NOT NULL,
+          targetValue REAL NOT NULL,
+          startDate TEXT NOT NULL,
+          endDate TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      `)
+
+      // Current period range
+      const now = new Date()
+      let periodStart: Date, periodEnd: Date
+      if (period === 'MONTHLY') {
+        periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+      } else {
+        const q = Math.floor(now.getMonth() / 3)
+        periodStart = new Date(now.getFullYear(), q * 3, 1)
+        periodEnd = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59, 999)
+      }
+      const from = periodStart.toISOString()
+      const to = periodEnd.toISOString()
+
+      const [goals, revenueRow, ordersRow, customersRow] = await Promise.all([
+        query(
+          `SELECT type, targetValue FROM GoalEntry WHERE storeId=? AND period=?`,
+          [storeId, period],
+        ),
+        queryOne(
+          `SELECT COALESCE(SUM(total),0) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+          [storeId, from, to],
+        ),
+        queryOne(
+          `SELECT COUNT(*) as v FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+          [storeId, from, to],
+        ),
+        queryOne(
+          `SELECT COUNT(*) as v FROM Customer WHERE storeId=? AND createdAt BETWEEN ? AND ?`,
+          [storeId, from, to],
+        ),
+      ])
+
+      const goalMap = new Map((goals as any[]).map((g: any) => [g.type, Number(g.targetValue)]))
+      const revenueTarget = goalMap.get('REVENUE') ?? 0
+      const ordersTarget = goalMap.get('ORDERS') ?? 0
+      const customersTarget = goalMap.get('NEW_CUSTOMERS') ?? 0
+
+      const revenueCurrent = Number((revenueRow as any)?.v ?? 0)
+      const ordersCurrent = Number((ordersRow as any)?.v ?? 0)
+      const customersCurrent = Number((customersRow as any)?.v ?? 0)
+
+      return okCached(
+        {
+          revenue: {
+            current: revenueCurrent,
+            target: revenueTarget,
+            pct: revenueTarget > 0 ? (revenueCurrent / revenueTarget) * 100 : 0,
+          },
+          orders: {
+            current: ordersCurrent,
+            target: ordersTarget,
+            pct: ordersTarget > 0 ? (ordersCurrent / ordersTarget) * 100 : 0,
+          },
+          newCustomers: {
+            current: customersCurrent,
+            target: customersTarget,
+            pct: customersTarget > 0 ? (customersCurrent / customersTarget) * 100 : 0,
+          },
+        },
+        'private, max-age=60',
+      )
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
