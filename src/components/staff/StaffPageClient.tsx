@@ -35,10 +35,26 @@ export default function StaffPageClient({ storeId }: StaffPageClientProps) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null)
 
-  const { data: staff = [], isLoading } = useQuery({
+  const { data: rawStaff = [], isLoading } = useQuery({
     queryKey: ['staff', storeId],
     queryFn: () => fetch(`/api/staff?storeId=${storeId}`).then(r => r.json()),
   })
+
+  // Normalize flat API shape → nested shape the template expects
+  const staff: StaffMember[] = rawStaff.map((m: any) => ({
+    id: m.id,
+    storeId,
+    userId: m.id,
+    role: (m.storeRole ?? m.role) as StaffMember['role'],
+    user: {
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      active: m.active === 1 || m.active === true,
+      createdAt: m.createdAt ?? new Date().toISOString(),
+    },
+  }))
 
   const deleteMutation = useMutation({
     mutationFn: (userId: string) => fetch(`/api/staff/${userId}`, { method: 'DELETE' }),
