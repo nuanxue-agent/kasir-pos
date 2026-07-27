@@ -48,6 +48,7 @@ import {
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import ActivityFeedClient from '@/components/dashboard/ActivityFeedClient'
+import { KpiGoalRow } from '@/components/dashboard/KpiGoalRow'
 
 interface DashboardClientPageProps {
   storeId: string
@@ -634,6 +635,9 @@ export default function DashboardClientPage({
           />
         </Link>
       </div>
+
+      {/* ── KPI Goal Row ── */}
+      <KpiGoalRow storeId={storeId} currency={currency} />
 
       {/* ── Today's Performance summary bar ── */}
       {!isLoading && (
