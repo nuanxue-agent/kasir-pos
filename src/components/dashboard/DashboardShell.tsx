@@ -49,7 +49,7 @@ export function DashboardShell({
 
   return (
     <StoreProvider stores={stores} initialStoreId={currentStoreId}>
-      <div className="flex h-screen overflow-hidden bg-[#fffdf7]">
+      <div className="flex h-screen overflow-hidden bg-[var(--bg-base)]">
         <Sidebar
           userRole={userRole}
           isSuperAdmin={isSuperAdmin}
@@ -75,7 +75,7 @@ export function DashboardShell({
             onMenuToggle={() => setSidebarOpen((v) => !v)}
           />
 
-          <main className="flex-1 overflow-y-auto bg-[#fffdf7] pb-20 lg:pb-0">
+          <main className="flex-1 overflow-y-auto bg-[var(--bg-base)] pb-20 lg:pb-0">
             {children}
           </main>
         </div>
