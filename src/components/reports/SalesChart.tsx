@@ -8,7 +8,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 
@@ -23,7 +22,14 @@ interface SalesChartProps {
   currency: string
 }
 
-function CustomTooltip({ active, payload, label, currency }: TooltipProps<number, string> & { currency: string }) {
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: Array<{ value: number; payload: DataPoint }>
+  label?: string
+  currency: string
+}
+
+function CustomTooltip({ active, payload, label, currency }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
 
   return (
@@ -32,11 +38,9 @@ function CustomTooltip({ active, payload, label, currency }: TooltipProps<number
       <p className="text-white font-semibold">
         {formatCurrency(payload[0]?.value ?? 0, currency)}
       </p>
-      {payload[1] && (
-        <p className="text-slate-400 text-xs mt-0.5">
-          {payload[1].value} orders
-        </p>
-      )}
+      <p className="text-slate-400 text-xs mt-0.5">
+        {payload[0]?.payload?.orders ?? 0} orders
+      </p>
     </div>
   )
 }
@@ -54,6 +58,7 @@ export function SalesChart({ data, currency }: SalesChartProps) {
     ...d,
     date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     total: Number(d.total),
+    orders: Number(d.orders),
   }))
 
   return (
@@ -70,10 +75,14 @@ export function SalesChart({ data, currency }: SalesChartProps) {
           tick={{ fill: '#94a3b8', fontSize: 12 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => formatCurrency(v, currency).replace(/[^0-9.,KMB]/g, '')}
+          tickFormatter={(v: number) => {
+            if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+            if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
+            return String(v)
+          }}
           width={60}
         />
-        <Tooltip content={<CustomTooltip currency={currency} />} />
+        <Tooltip content={(props) => <CustomTooltip {...props} currency={currency} />} />
         <Line
           type="monotone"
           dataKey="total"

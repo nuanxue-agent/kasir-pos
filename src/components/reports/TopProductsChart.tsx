@@ -9,7 +9,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  TooltipProps,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 
@@ -24,9 +23,15 @@ interface TopProductsChartProps {
   currency: string
 }
 
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: Array<{ value: number; payload: { name: string; qty: number } }>
+  currency: string
+}
+
 const BAR_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
 
-function CustomTooltip({ active, payload, currency }: TooltipProps<number, string> & { currency: string }) {
+function CustomTooltip({ active, payload, currency }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
@@ -70,7 +75,7 @@ export function TopProductsChart({ data, currency }: TopProductsChartProps) {
           tick={{ fill: '#94a3b8', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => {
+          tickFormatter={(v: number) => {
             if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
             if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
             return String(v)
@@ -84,7 +89,10 @@ export function TopProductsChart({ data, currency }: TopProductsChartProps) {
           tickLine={false}
           width={90}
         />
-        <Tooltip content={<CustomTooltip currency={currency} />} cursor={{ fill: '#1e293b' }} />
+        <Tooltip
+          content={(props) => <CustomTooltip {...props} currency={currency} />}
+          cursor={{ fill: '#1e293b' }}
+        />
         <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
           {formatted.map((_, index) => (
             <Cell key={index} fill={BAR_COLORS[index % BAR_COLORS.length]} />
