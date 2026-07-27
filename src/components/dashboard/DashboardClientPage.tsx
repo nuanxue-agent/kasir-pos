@@ -28,9 +28,9 @@ interface DashboardClientPageProps {
 
 function getGreeting(): string {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
+  if (h < 12) return 'Selamat pagi'
+  if (h < 17) return 'Selamat siang'
+  return 'Selamat malam'
 }
 
 function todayStart() {
@@ -96,7 +96,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
           <h1 className="text-2xl font-bold text-white">
             {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''} 👋
           </h1>
-          <p className="text-stone-400 mt-1 text-sm">Here's what's happening at your store today.</p>
+          <p className="text-stone-400 mt-1 text-sm">Ini ringkasan tokomu hari ini.</p>
         </div>
       </div>
 
@@ -104,28 +104,28 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           icon={DollarSign}
-          label="Today's Revenue"
+          label="Omzet Hari Ini"
           value={formatCurrency(stats.totalRevenue ?? 0, currency)}
           color="green"
           loading={isLoading}
         />
         <StatsCard
           icon={ShoppingCart}
-          label="Today's Orders"
+          label="Pesanan Hari Ini"
           value={String(stats.totalOrders ?? 0)}
           color="blue"
           loading={isLoading}
         />
         <StatsCard
           icon={TrendingUp}
-          label="Avg Order Value"
+          label="Rata-rata Pesanan"
           value={formatCurrency(stats.avgOrderValue ?? 0, currency)}
           color="purple"
           loading={isLoading}
         />
         <StatsCard
           icon={Users}
-          label="New Customers"
+          label="Pelanggan Baru"
           value={String(stats.newCustomers ?? 0)}
           color="orange"
           loading={isLoading}
@@ -139,21 +139,21 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
           className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-indigo-500 hover:to-violet-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-amber-500/20 transition-all duration-150 active:scale-95"
         >
           <Plus size={16} />
-          New Sale
+          Catat Penjualan
         </Link>
         <Link
           href="/dashboard/products"
           className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
         >
           <Package size={16} />
-          Add Product
+          Tambah Produk
         </Link>
         <Link
           href="/dashboard/reports"
           className="inline-flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150"
         >
           <BarChart3 size={16} />
-          View Reports
+          Lihat Laporan
         </Link>
       </div>
 
@@ -163,12 +163,12 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
         {/* Recent orders */}
         <div className="bg-stone-50 backdrop-blur border border-stone-200 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-            <h2 className="font-semibold text-white text-sm">Recent Orders</h2>
+            <h2 className="font-semibold text-stone-800 text-sm">Pesanan Terbaru</h2>
             <Link
               href="/dashboard/orders"
               className="text-amber-600 hover:text-amber-500 text-xs flex items-center gap-1 transition-colors"
             >
-              View all <ArrowRight size={12} />
+              Lihat semua <ArrowRight size={12} />
             </Link>
           </div>
 
@@ -181,7 +181,7 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
           ) : (recentOrders as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <ShoppingCart className="h-8 w-8 text-white/10" />
-              <p className="text-sm text-stone-400">No orders yet today</p>
+              <p className="text-sm text-stone-400">Belum ada pesanan hari ini</p>
             </div>
           ) : (
             <div className="divide-y divide-white/5">
@@ -215,15 +215,15 @@ export default function DashboardClientPage({ storeId, session }: DashboardClien
         {/* Low stock alerts */}
         <div className="bg-stone-50 backdrop-blur border border-stone-200 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-            <h2 className="font-semibold text-white text-sm flex items-center gap-2">
+            <h2 className="font-semibold text-stone-800 text-sm flex items-center gap-2">
               <AlertTriangle size={15} className="text-amber-400" />
-              Low Stock
+              Stok Menipis
             </h2>
             <Link
               href="/dashboard/inventory"
               className="text-amber-600 hover:text-amber-500 text-xs flex items-center gap-1 transition-colors"
             >
-              View all <ArrowRight size={12} />
+              Lihat semua <ArrowRight size={12} />
             </Link>
           </div>
 
