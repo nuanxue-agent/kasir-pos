@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2, Mail, Lock, ArrowRight, ShoppingBag, Zap } from 'lucide-react'
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 
 const loginSchema = z.object({
   email: z.string().email('Email tidak valid'),
@@ -75,6 +76,11 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-6">
+      {/* Language switcher */}
+      <div className="flex justify-end">
+        <LanguageSwitcher />
+      </div>
+
       {/* Logo */}
       <div className="flex flex-col items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[var(--shadow-md)]">

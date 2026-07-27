@@ -536,6 +536,8 @@ export default function POSPageClient({
           <div className="flex overflow-hidden rounded-lg border border-[var(--border)]">
             <button
               onClick={() => setViewMode('grid')}
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
               className={cn(
                 'p-2 transition-colors',
                 viewMode === 'grid'
@@ -543,10 +545,12 @@ export default function POSPageClient({
                   : 'bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-1)]',
               )}
             >
-              <Grid3x3 className="h-4 w-4" />
+              <Grid3x3 className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               onClick={() => setViewMode('list')}
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
               className={cn(
                 'p-2 transition-colors',
                 viewMode === 'list'
@@ -554,12 +558,13 @@ export default function POSPageClient({
                   : 'bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-1)]',
               )}
             >
-              <List className="h-4 w-4" />
+              <List className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
           {/* Camera barcode scanner button */}
           <button
             onClick={() => setShowBarcodeScanner(true)}
+            aria-label="Open barcode scanner"
             className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1.5 transition-colors hover:border-amber-400/60 hover:bg-amber-500/10"
             title="Buka kamera scanner"
           >
@@ -655,7 +660,31 @@ export default function POSPageClient({
               <p className="text-sm">Produk tidak ditemukan</p>
             </div>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div
+              className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+              role="grid"
+              aria-label="Product grid"
+              onKeyDown={e => {
+                // Arrow-key navigation within the product grid
+                const cells = Array.from(
+                  (e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
+                    'button:not([disabled])',
+                  ),
+                )
+                const idx = cells.indexOf(document.activeElement as HTMLButtonElement)
+                if (idx === -1) return
+                // Determine column count from computed style
+                const cols = getComputedStyle(e.currentTarget).gridTemplateColumns.split(' ').length
+                let next = -1
+                if (e.key === 'ArrowRight') next = idx + 1
+                else if (e.key === 'ArrowLeft') next = idx - 1
+                else if (e.key === 'ArrowDown') next = idx + cols
+                else if (e.key === 'ArrowUp') next = idx - cols
+                else return
+                e.preventDefault()
+                cells[Math.max(0, Math.min(cells.length - 1, next))]?.focus()
+              }}
+            >
               {filteredBundles.map(b => (
                 <BundleCard key={b.id} bundle={b} currency={currency} onAdd={addBundleToCart} />
               ))}
@@ -741,9 +770,10 @@ export default function POSPageClient({
               </p>
               <button
                 onClick={() => setShowHeldOrders(false)}
+                aria-label="Close held orders"
                 className="text-[var(--text-3)] hover:text-[var(--text-2)]"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
             {heldOrders.length === 0 ? (
@@ -777,9 +807,10 @@ export default function POSPageClient({
                     </button>
                     <button
                       onClick={() => deleteHeldOrder(h.id)}
+                      aria-label="Delete held order"
                       className="shrink-0 text-stone-300 transition-colors hover:text-red-400"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -827,27 +858,33 @@ export default function POSPageClient({
                     </div>
                     <button
                       onClick={() => removeItem(item.id)}
+                      aria-label={`Remove ${item.name} from cart`}
                       className="mt-0.5 text-stone-300 transition-colors hover:text-red-400"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => updateQty(item.id, item.qty - 1)}
+                        aria-label={`Decrease quantity of ${item.name}`}
                         className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--bg-muted)] text-[var(--text-2)] transition-colors hover:bg-stone-200"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="h-3 w-3" aria-hidden="true" />
                       </button>
-                      <span className="w-8 text-center text-sm font-medium text-[var(--text-1)]">
+                      <span
+                        className="w-8 text-center text-sm font-medium text-[var(--text-1)]"
+                        aria-label={`Quantity: ${item.qty}`}
+                      >
                         {item.qty}
                       </span>
                       <button
                         onClick={() => updateQty(item.id, item.qty + 1)}
+                        aria-label={`Increase quantity of ${item.name}`}
                         className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--bg-muted)] text-[var(--text-2)] transition-colors hover:bg-stone-200"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-3 w-3" aria-hidden="true" />
                       </button>
                     </div>
                     <span className="text-sm font-semibold text-[var(--text-1)]">
@@ -1099,8 +1136,13 @@ export default function POSPageClient({
       </div>
 
       {successMsg && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-500/20">
-          <span>✓</span> {successMsg}
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-500/20"
+        >
+          <span aria-hidden="true">✓</span> {successMsg}
         </div>
       )}
     </div>

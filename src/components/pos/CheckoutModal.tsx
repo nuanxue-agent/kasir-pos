@@ -5,7 +5,12 @@ import { useCartStore } from '@/store/cart'
 import { formatCurrency } from '@/lib/utils'
 import { X, Banknote, CreditCard, Smartphone, ArrowLeftRight, Check, Printer } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { printReceiptBrowser, isSerialAvailable, printReceiptSerial, type ReceiptData } from '@/lib/receipt'
+import {
+  printReceiptBrowser,
+  isSerialAvailable,
+  printReceiptSerial,
+  type ReceiptData,
+} from '@/lib/receipt'
 
 interface PembayaranModalProps {
   storeId: string
@@ -27,14 +32,29 @@ const PAYMENT_METHODS = [
   { id: 'CASH' as PaymentMethod, label: 'Tunai', icon: Banknote, color: 'text-green-400' },
   { id: 'CARD' as PaymentMethod, label: 'Card', icon: CreditCard, color: 'text-violet-500' },
   { id: 'QRIS' as PaymentMethod, label: 'QRIS', icon: Smartphone, color: 'text-purple-400' },
-  { id: 'TRANSFER' as PaymentMethod, label: 'Transfer', icon: ArrowLeftRight, color: 'text-orange-400' },
+  {
+    id: 'TRANSFER' as PaymentMethod,
+    label: 'Transfer',
+    icon: ArrowLeftRight,
+    color: 'text-orange-400',
+  },
 ]
 
 export default function PembayaranModal({
-  storeId, taxRate, currency, staffId, onClose, onSuccess,
-  storeName = 'Lakoo Store', storeAddress, storePhone, receiptNote, cashierName,
+  storeId,
+  taxRate,
+  currency,
+  staffId,
+  onClose,
+  onSuccess,
+  storeName = 'Lakoo Store',
+  storeAddress,
+  storePhone,
+  receiptNote,
+  cashierName,
 }: PembayaranModalProps) {
-  const { items, customerId, discountId, discountAmt, note, total, subtotal, taxAmt, clearCart } = useCartStore()
+  const { items, customerId, discountId, discountAmt, note, total, subtotal, taxAmt, clearCart } =
+    useCartStore()
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [cashGiven, setTunaiGiven] = useState('')
   const [reference, setReference] = useState('')
@@ -79,22 +99,24 @@ export default function PembayaranModal({
             qty: i.qty,
             discount: i.discount,
           })),
-          payments: [{
-            method,
-            amount: method === 'CASH' ? cashAmount : orderTotal,
-            reference: reference || undefined,
-            change,
-          }],
+          payments: [
+            {
+              method,
+              amount: method === 'CASH' ? cashAmount : orderTotal,
+              reference: reference || undefined,
+              change,
+            },
+          ],
         }),
       })
 
       if (!res.ok) {
-        const data = await res.json() as any
+        const data = (await res.json()) as any
         setError(data.error || 'Pembayaran failed')
         return
       }
 
-      const order = await res.json() as any
+      const order = (await res.json()) as any
       clearCart()
 
       // ── Auto-print receipt ───────────────────────────────────────────────
@@ -132,50 +154,67 @@ export default function PembayaranModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl w-full max-w-md shadow-2xl border border-[var(--border)]">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="checkout-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
+    >
+      <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--text-1)]">Pembayaran</h2>
-          <button onClick={onClose} className="text-[var(--text-2)] hover:text-[var(--text-1)] transition-colors">
-            <X size={20} />
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+          <h2 id="checkout-modal-title" className="text-lg font-semibold text-[var(--text-1)]">
+            Pembayaran
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Close checkout"
+            className="text-[var(--text-2)] transition-colors hover:text-[var(--text-1)]"
+          >
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="space-y-5 p-5">
           {/* Order summary */}
-          <div className="bg-[var(--bg-muted)] rounded-lg p-4 space-y-2">
+          <div className="space-y-2 rounded-lg bg-[var(--bg-muted)] p-4">
             <div className="flex justify-between text-sm text-[var(--text-2)]">
-              <span>Subtotal</span><span>{fmt(subtotal())}</span>
+              <span>Subtotal</span>
+              <span>{fmt(subtotal())}</span>
             </div>
             {discountAmt > 0 && (
               <div className="flex justify-between text-sm text-green-400">
-                <span>Diskon</span><span>-{fmt(discountAmt)}</span>
+                <span>Diskon</span>
+                <span>-{fmt(discountAmt)}</span>
               </div>
             )}
             {taxRate > 0 && (
               <div className="flex justify-between text-sm text-[var(--text-2)]">
-                <span>Pajak ({(taxRate * 100).toFixed(0)}%)</span><span>{fmt(taxAmt(taxRate))}</span>
+                <span>Pajak ({(taxRate * 100).toFixed(0)}%)</span>
+                <span>{fmt(taxAmt(taxRate))}</span>
               </div>
             )}
-            <div className="flex justify-between text-lg font-bold text-[var(--text-1)] pt-2 border-t border-[var(--border)]">
-              <span>Total</span><span>{fmt(orderTotal)}</span>
+            <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold text-[var(--text-1)]">
+              <span>Total</span>
+              <span>{fmt(orderTotal)}</span>
             </div>
           </div>
 
           {/* Payment method */}
           <div>
-            <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-2">Metode Pembayaran</p>
+            <p className="mb-2 text-xs font-medium tracking-wider text-[var(--text-2)] uppercase">
+              Metode Pembayaran
+            </p>
             <div className="grid grid-cols-4 gap-2">
               {PAYMENT_METHODS.map(({ id, label, icon: Icon, color }) => (
                 <button
                   key={id}
                   onClick={() => setMethod(id)}
                   className={cn(
-                    'flex flex-col items-center gap-1.5 py-3 rounded-lg border transition-all text-sm',
+                    'flex flex-col items-center gap-1.5 rounded-lg border py-3 text-sm transition-all',
                     method === id
                       ? 'border-indigo-500 bg-amber-500/10 text-amber-600'
-                      : 'border-[var(--border)] bg-[var(--bg-muted)] text-[var(--text-2)] hover:border-[var(--border)]'
+                      : 'border-[var(--border)] bg-[var(--bg-muted)] text-[var(--text-2)] hover:border-[var(--border)]',
                   )}
                 >
                   <Icon size={18} className={method === id ? 'text-amber-600' : color} />
@@ -188,21 +227,23 @@ export default function PembayaranModal({
           {/* Tunai input */}
           {method === 'CASH' && (
             <div>
-              <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-2">Tunai Given</p>
+              <p className="mb-2 text-xs font-medium tracking-wider text-[var(--text-2)] uppercase">
+                Tunai Given
+              </p>
               <input
                 type="number"
                 value={cashGiven}
                 onChange={(e: any) => setTunaiGiven(e.target.value)}
                 placeholder={fmt(orderTotal)}
-                className="w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2.5 text-sm text-[var(--text-1)] focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
               {/* Quick amounts */}
-              <div className="flex gap-2 mt-2">
+              <div className="mt-2 flex gap-2">
                 {quickTunai.slice(0, 3).map(amount => (
                   <button
                     key={amount}
                     onClick={() => setTunaiGiven(String(amount))}
-                    className="flex-1 text-xs py-1.5 rounded bg-[var(--bg-muted)] border border-[var(--border)] text-[var(--text-2)] hover:border-stone-400 transition-colors"
+                    className="flex-1 rounded border border-[var(--border)] bg-[var(--bg-muted)] py-1.5 text-xs text-[var(--text-2)] transition-colors hover:border-stone-400"
                   >
                     {fmt(amount)}
                   </button>
@@ -220,7 +261,7 @@ export default function PembayaranModal({
           {/* Reference for card/transfer */}
           {(method === 'CARD' || method === 'TRANSFER') && (
             <div>
-              <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-2">
+              <p className="mb-2 text-xs font-medium tracking-wider text-[var(--text-2)] uppercase">
                 {method === 'CARD' ? 'Card Reference' : 'Transfer Reference'} (optional)
               </p>
               <input
@@ -228,20 +269,20 @@ export default function PembayaranModal({
                 value={reference}
                 onChange={(e: any) => setReference(e.target.value)}
                 placeholder="Contoh: 4 digit terakhir, nomor ref"
-                className="w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[var(--text-1)] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2.5 text-sm text-[var(--text-1)] focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
             </div>
           )}
 
           {error && (
-            <p className="text-sm text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>
+            <p className="rounded-lg bg-red-400/10 px-3 py-2 text-sm text-red-400">{error}</p>
           )}
 
           {/* Confirm button */}
           <button
             onClick={handlePembayaran}
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:bg-stone-200 disabled:text-[var(--text-2)] text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 py-3 font-semibold text-white transition-colors hover:bg-green-500 disabled:bg-stone-200 disabled:text-[var(--text-2)]"
           >
             {loading ? (
               <span>Processing...</span>
