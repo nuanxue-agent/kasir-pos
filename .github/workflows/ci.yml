@@ -151,17 +151,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build app for E2E
-        run: npm run build
-
-      - name: Start dev server in background
-        run: npm run dev &
-        env:
-          PORT: 3000
-
-      - name: Wait for server to be ready
-        run: npx wait-on http://localhost:3000 --timeout 60000
-
       - name: Run E2E tests
         run: npm run test:e2e
 
