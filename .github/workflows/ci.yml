@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '20.12'
           cache: 'npm'
 
       - name: Install dependencies
@@ -55,7 +55,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '20.12'
           cache: 'npm'
 
       - name: Install dependencies
@@ -81,7 +81,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '20.12'
           cache: 'npm'
 
       - name: Install dependencies
@@ -105,7 +105,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '20.12'
           cache: 'npm'
 
       - name: Install dependencies
@@ -142,7 +142,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '20.12'
           cache: 'npm'
 
       - name: Install dependencies
@@ -186,7 +186,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '20.12'
           cache: 'npm'
 
       - name: Install dependencies
