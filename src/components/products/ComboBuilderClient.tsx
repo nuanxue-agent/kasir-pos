@@ -104,7 +104,7 @@ export default function ComboBuilderClient({
   // ── Enriched combos with per-item prices ──────────────────────────────────
   const enrichedCombos = combos.map(c => ({
     ...c,
-    items: (c as any).items.map((i: any) => (({
+    items: (c as any).items.map((i: any) => ({
       ...i,
       productName: productMap[i.productId]?.name ?? i.productId,
       productPrice: productMap[i.productId]?.price ?? 0,
