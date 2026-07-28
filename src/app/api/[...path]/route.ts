@@ -727,14 +727,75 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── CATEGORIES ───────────────────────────────────────────────────────────
     if (segs[0] === 'categories') {
-      if (method === 'GET')
-        return okCached(
-          await query(
-            `SELECT * FROM Category WHERE storeId = ? AND active = 1 ORDER BY sortOrder`,
-            [storeId],
-          ),
-          'public, max-age=300',
-        )
+      // Lazy-init Category table
+      await exec(`CREATE TABLE IF NOT EXISTS Category (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT DEFAULT '#6b7280',
+        parentId TEXT,
+        sortOrder INTEGER DEFAULT 0,
+        active INTEGER DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+
+      if (!segs[1]) {
+        // GET /api/categories?storeId=
+        if (method === 'GET')
+          return okCached(
+            await query(
+              `SELECT * FROM Category WHERE storeId = ? ORDER BY sortOrder, name`,
+              [storeId],
+            ),
+            'public, max-age=60',
+          )
+
+        // POST /api/categories
+        if (method === 'POST') {
+          const b: any = await req.json()
+          if (!b.name?.trim()) return err('name is required', 400, 'VALIDATION', requestId, startMs)
+          const id = newId()
+          const t = nowISO()
+          await exec(
+            `INSERT INTO Category (id, storeId, name, description, color, parentId, sortOrder, active, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+            [id, storeId, b.name.trim(), b.description ?? null, b.color ?? '#6b7280', b.parentId ?? null, b.sortOrder ?? 0, t, t],
+          )
+          const created = await queryOne(`SELECT * FROM Category WHERE id = ?`, [id])
+          return ok(created, 201)
+        }
+      }
+
+      // PATCH /api/categories/:id
+      if (segs[1] && method === 'PATCH') {
+        const cat = await queryOne(`SELECT * FROM Category WHERE id = ? AND storeId = ?`, [segs[1], storeId])
+        if (!cat) return err('Category not found', 404, 'NOT_FOUND', requestId, startMs)
+        const b: any = await req.json()
+        const fields: string[] = []
+        const vals: any[] = []
+        if (b.name !== undefined) { fields.push('name = ?'); vals.push(b.name.trim()) }
+        if (b.description !== undefined) { fields.push('description = ?'); vals.push(b.description) }
+        if (b.color !== undefined) { fields.push('color = ?'); vals.push(b.color) }
+        if (b.parentId !== undefined) { fields.push('parentId = ?'); vals.push(b.parentId) }
+        if (b.sortOrder !== undefined) { fields.push('sortOrder = ?'); vals.push(b.sortOrder) }
+        if (b.active !== undefined) { fields.push('active = ?'); vals.push(b.active ? 1 : 0) }
+        if (fields.length === 0) return err('No fields to update', 400, 'VALIDATION', requestId, startMs)
+        fields.push('updatedAt = ?'); vals.push(nowISO())
+        vals.push(segs[1])
+        await exec(`UPDATE Category SET ${fields.join(', ')} WHERE id = ?`, vals)
+        const updated = await queryOne(`SELECT * FROM Category WHERE id = ?`, [segs[1]])
+        return ok(updated)
+      }
+
+      // DELETE /api/categories/:id
+      if (segs[1] && method === 'DELETE') {
+        const cat = await queryOne(`SELECT * FROM Category WHERE id = ? AND storeId = ?`, [segs[1], storeId])
+        if (!cat) return err('Category not found', 404, 'NOT_FOUND', requestId, startMs)
+        await exec(`DELETE FROM Category WHERE id = ?`, [segs[1]])
+        return ok({ success: true })
+      }
     }
 
     // ─── ORDERS ───────────────────────────────────────────────────────────────
