@@ -111,3 +111,87 @@ export function totalReplenishments(transactions: PettyCashTransaction[]): numbe
     .filter(t => t.type === 'REPLENISHMENT')
     .reduce((sum, t) => sum + t.amount, 0)
 }
+
+// ── Cash Advance types & pure functions ───────────────────────────────────────
+
+export type AdvanceTransactionType = 'REPLENISH' | 'EXPENSE' | 'ADVANCE' | 'SETTLEMENT'
+export type AdvanceStatus = 'PENDING' | 'APPROVED' | 'SETTLED' | 'REJECTED'
+
+export interface AdvanceTransaction {
+  id: string
+  fundId: string
+  storeId: string
+  type: AdvanceTransactionType
+  amount: number
+  balance: number
+  description: string
+  category: string
+  receiptNo: string
+  requestedBy: string
+  approvedBy: string
+  status: AdvanceStatus
+  createdAt: string
+}
+
+export interface AdvanceCategorySummary {
+  category: string
+  total: number
+  count: number
+}
+
+// Balance after applying a transaction (REPLENISH adds, all others subtract)
+export function calcBalanceAfterTx(
+  currentBalance: number,
+  type: AdvanceTransactionType,
+  amount: number,
+): number {
+  if (type === 'REPLENISH') return currentBalance + amount
+  return currentBalance - amount
+}
+
+// Valid status transitions for an advance
+const VALID_TRANSITIONS: Record<AdvanceStatus, AdvanceStatus[]> = {
+  PENDING:  ['APPROVED', 'REJECTED'],
+  APPROVED: ['SETTLED', 'REJECTED'],
+  SETTLED:  [],
+  REJECTED: [],
+}
+
+export function isValidAdvanceTransition(from: AdvanceStatus, to: AdvanceStatus): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false
+}
+
+// Calculate how much needs to be replenished to reach a target amount
+export function calcReplenishAmount(currentBalance: number, replenishAmount: number): number {
+  return Math.max(0, replenishAmount - currentBalance)
+}
+
+// Aggregate advance transactions by category (EXPENSE + ADVANCE only)
+export function aggregateAdvancesByCategory(
+  transactions: AdvanceTransaction[],
+): AdvanceCategorySummary[] {
+  const map = new Map<string, AdvanceCategorySummary>()
+  for (const tx of transactions) {
+    if (tx.type !== 'EXPENSE' && tx.type !== 'ADVANCE') continue
+    const existing = map.get(tx.category)
+    if (existing) {
+      existing.total += tx.amount
+      existing.count += 1
+    } else {
+      map.set(tx.category, { category: tx.category, total: tx.amount, count: 1 })
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.total - a.total)
+}
+
+// Find unsettled advances (ADVANCE type with status PENDING or APPROVED)
+export function findUnsettledAdvances(transactions: AdvanceTransaction[]): AdvanceTransaction[] {
+  return transactions.filter(
+    tx => tx.type === 'ADVANCE' && (tx.status === 'PENDING' || tx.status === 'APPROVED'),
+  )
+}
+
+// Total outstanding advance amount
+export function totalUnsettledAmount(transactions: AdvanceTransaction[]): number {
+  return findUnsettledAdvances(transactions).reduce((sum, tx) => sum + tx.amount, 0)
+}
