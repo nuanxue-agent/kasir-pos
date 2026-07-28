@@ -65,7 +65,7 @@ describe('generateRawApiKey', () => {
 describe('extractKeyPrefix', () => {
   it('should return the first 16 characters of the key', () => {
     const key = 'ksr_live_abcdefghijklmnopqrstuvwxyz123456'
-    expect(extractKeyPrefix(key)).toBe('ksr_live_abcdefgh')
+    expect(extractKeyPrefix(key)).toBe('ksr_live_abcdefg')
   })
 
   it('prefix from a generated key is 16 chars', () => {
