@@ -1,14 +1,14 @@
 /**
- * RFM (Recency, Frequency, Monetary) analysis utilities.
+ * RFM (Recency, Frequency, Monetary) analysis pure logic.
  * Pure functions — no DB or side effects.
  */
 
 export type RFMSegment = 'Champions' | 'Loyal' | 'AtRisk' | 'Lost' | 'New'
 
 export interface RFMScores {
-  recencyScore: number   // 1–5 (5 = most recent)
+  recencyScore: number // 1–5 (5 = most recent)
   frequencyScore: number // 1–5 (5 = most frequent)
-  monetaryScore: number  // 1–5 (5 = highest spend)
+  monetaryScore: number // 1–5 (5 = highest spend)
 }
 
 export interface RFMCustomer {
@@ -16,9 +16,9 @@ export interface RFMCustomer {
   name: string
   phone: string | null
   email: string | null
-  recency: number   // days since last purchase
+  recency: number // days since last purchase
   frequency: number // number of orders
-  monetary: number  // total spend
+  monetary: number // total spend
   scores: RFMScores
   segment: RFMSegment
 }
@@ -69,9 +69,9 @@ export interface RawCustomerStat {
   name: string
   phone: string | null
   email: string | null
-  recency: number   // days since last purchase (0 = today)
+  recency: number // days since last purchase (0 = today)
   frequency: number // order count
-  monetary: number  // total spend
+  monetary: number // total spend
 }
 
 /**
@@ -80,9 +80,9 @@ export interface RawCustomerStat {
 export function computeRFM(customers: RawCustomerStat[]): RFMCustomer[] {
   if (customers.length === 0) return []
 
-  const recencies  = customers.map((c) => c.recency)
+  const recencies = customers.map((c) => c.recency)
   const frequencies = customers.map((c) => c.frequency)
-  const monetaries  = customers.map((c) => c.monetary)
+  const monetaries = customers.map((c) => c.monetary)
 
   return customers.map((c) => {
     // recency: lower days = better → invert
@@ -105,10 +105,10 @@ export function computeRFM(customers: RawCustomerStat[]): RFMCustomer[] {
  */
 export function generateReferralCode(customerId: string): string {
   const prefix = customerId.replace(/-/g, '').slice(0, 4).toUpperCase()
-  const chars  = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // removed ambiguous chars
-  let suffix   = ''
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // removed ambiguous chars
+  let suffix = ''
   // Use a deterministic seed from the id so the code is stable
-  const seed   = customerId
+  const seed = customerId
   for (let i = 0; i < 6; i++) {
     const charCode = seed.charCodeAt(i % seed.length)
     suffix += chars[charCode % chars.length]
