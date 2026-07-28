@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { queryOne, exec } from '@/lib/db'
 import { resolveGiftCardStatus } from '@/lib/gift-cards'
-import { ensureGiftCardTables } from '../route'
+import { ensureTables } from '../route'
 
 function err(msg: string, status = 400, code = 'ERROR') {
   return NextResponse.json({ error: msg, code }, { status })
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
 
-  await ensureGiftCardTables()
+  await ensureTables()
 
   const b = (await req.json()) as any
   if (!b.code) return err('code required', 400, 'MISSING_FIELD')

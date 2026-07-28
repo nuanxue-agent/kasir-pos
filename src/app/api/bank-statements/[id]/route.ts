@@ -1,8 +1,9 @@
-// PATCH /api/bank-accounts/[id]
+// PATCH /api/bank-statements/[id]
+// Body: { reconciled?: boolean, matchedTransactionId?: string | null }
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { exec, nowISO } from '@/lib/db'
-import { ensureBankAccountTables } from '../route'
+import { ensureBankAccountTables } from '../../bank-accounts/route'
 
 function ok(data: unknown, status = 200) { return NextResponse.json(data, { status }) }
 function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
@@ -23,20 +24,22 @@ export async function PATCH(
     const sets: string[] = []
     const vals: any[] = []
 
-    if (b.name !== undefined)     { sets.push('name = ?');     vals.push(b.name) }
-    if (b.bankName !== undefined) { sets.push('bankName = ?'); vals.push(b.bankName) }
-    if (b.accountNo !== undefined){ sets.push('accountNo = ?');vals.push(b.accountNo) }
-    if (b.currency !== undefined) { sets.push('currency = ?'); vals.push(b.currency) }
-    if (b.balance !== undefined)  { sets.push('balance = ?');  vals.push(Number(b.balance)) }
-    if (b.active !== undefined)   { sets.push('active = ?');   vals.push(b.active ? 1 : 0) }
+    // reconcile
+    if (b.reconciled !== undefined) {
+      sets.push('reconciled = ?')
+      vals.push(b.reconciled ? 1 : 0)
+    }
+
+    // match or unmatch
+    if ('matchedTransactionId' in b) {
+      sets.push('matchedTransactionId = ?')
+      vals.push(b.matchedTransactionId ?? null)
+    }
 
     if (sets.length === 0) return err('No fields to update')
 
-    sets.push('updatedAt = ?')
-    vals.push(nowISO())
     vals.push(id)
-
-    await exec(`UPDATE BankAccount SET ${sets.join(', ')} WHERE id = ?`, vals)
+    await exec(`UPDATE BankStatement SET ${sets.join(', ')} WHERE id = ?`, vals)
     return ok({ ok: true })
   } catch (e: any) {
     return err(e.message ?? 'Internal error', 500)
