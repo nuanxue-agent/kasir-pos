@@ -7983,6 +7983,111 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── VENDOR INVITES ────────────────────────────────────────────────────────
+    // GET  /api/suppliers/invites         — list all invites for store
+    // POST /api/suppliers/:id/invite      — create invite for supplier
+    if (segs[0] === 'suppliers' && segs[1] === 'invites' && !segs[2] && method === 'GET') {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS VendorInvite (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          supplierId  TEXT NOT NULL,
+          email       TEXT NOT NULL,
+          token       TEXT NOT NULL UNIQUE,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          expiresAt   TEXT NOT NULL,
+          createdAt   TEXT NOT NULL
+        )`,
+        [],
+      )
+      const rows = await query(
+        `SELECT vi.*, s.name as supplierName
+         FROM VendorInvite vi
+         JOIN Supplier s ON vi.supplierId = s.id
+         WHERE vi.storeId = ?
+         ORDER BY vi.createdAt DESC`,
+        [storeId],
+      )
+      return ok(rows)
+    }
+
+    if (segs[0] === 'suppliers' && segs[1] && segs[2] === 'invite' && !segs[3] && method === 'POST') {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS VendorInvite (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          supplierId  TEXT NOT NULL,
+          email       TEXT NOT NULL,
+          token       TEXT NOT NULL UNIQUE,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          expiresAt   TEXT NOT NULL,
+          createdAt   TEXT NOT NULL
+        )`,
+        [],
+      )
+      const b = (await req.json()) as any
+      if (!b.email || !b.email.includes('@')) return err('Email tidak valid')
+      const supplierId = segs[1]
+      const supplier = await queryOne<any>(`SELECT id FROM Supplier WHERE id=? AND storeId=?`, [supplierId, storeId])
+      if (!supplier) return err('Supplier tidak ditemukan', 404)
+      const id = newId()
+      const token = `${newId()}-${newId()}`.replace(/-/g, '')
+      const t = nowISO()
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      await exec(
+        `INSERT INTO VendorInvite (id,storeId,supplierId,email,token,status,expiresAt,createdAt)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [id, storeId, supplierId, b.email, token, 'PENDING', expiresAt, t],
+      )
+      const baseUrl = req.headers.get('origin') ?? 'https://app.kasir.id'
+      return ok({ id, token, inviteLink: `${baseUrl}/vendor/accept?token=${token}`, expiresAt }, 201)
+    }
+
+    // ── VENDOR MESSAGES ───────────────────────────────────────────────────────
+    // GET  /api/suppliers/:id/messages    — list thread
+    // POST /api/suppliers/:id/messages    — send message
+    if (segs[0] === 'suppliers' && segs[1] && segs[2] === 'messages' && !segs[3]) {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS VendorMessage (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          supplierId  TEXT NOT NULL,
+          direction   TEXT NOT NULL CHECK(direction IN ('IN','OUT')),
+          subject     TEXT,
+          body        TEXT NOT NULL,
+          sentAt      TEXT NOT NULL
+        )`,
+        [],
+      )
+      const supplierId = segs[1]
+
+      if (method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM VendorMessage
+           WHERE supplierId=? AND storeId=?
+           ORDER BY sentAt ASC`,
+          [supplierId, storeId],
+        )
+        return ok(rows)
+      }
+
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.body || !b.body.trim()) return err('body pesan tidak boleh kosong')
+        if (!['IN', 'OUT'].includes(b.direction ?? 'OUT')) return err('direction harus IN atau OUT')
+        const supplier = await queryOne<any>(`SELECT id FROM Supplier WHERE id=? AND storeId=?`, [supplierId, storeId])
+        if (!supplier) return err('Supplier tidak ditemukan', 404)
+        const id = newId()
+        const sentAt = nowISO()
+        await exec(
+          `INSERT INTO VendorMessage (id,storeId,supplierId,direction,subject,body,sentAt)
+           VALUES (?,?,?,?,?,?,?)`,
+          [id, storeId, supplierId, b.direction ?? 'OUT', b.subject ?? null, b.body.trim(), sentAt],
+        )
+        return ok({ id, sentAt }, 201)
+      }
+    }
+
     // ── SURVEYS ──────────────────────────────────────────────────────────────
     if (segs[0] === 'surveys') {
       // Lazy-init tables
