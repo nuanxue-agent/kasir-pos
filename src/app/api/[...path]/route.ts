@@ -558,6 +558,86 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       )
     }
 
+    // ─── PRODUCTS/BARCODE/:code ──────────────────────────────────────────────
+    // GET /api/products/barcode/:code — lookup product by barcode or SKU
+    if (segs[0] === 'products' && segs[1] === 'barcode' && segs[2] && method === 'GET') {
+      const code = decodeURIComponent(segs[2])
+      const row = await queryOne(
+        `SELECT p.id, p.name, p.price, p.cost, p.stock, p.trackStock, p.sku, p.barcode, p.image,
+                c.id as catId, c.name as catName, c.color as catColor
+         FROM Product p
+         LEFT JOIN Category c ON p.categoryId = c.id
+         WHERE p.storeId = ? AND p.active = 1
+           AND (p.barcode = ? OR p.sku = ?)
+         LIMIT 1`,
+        [storeId, code, code],
+      ) as any
+      if (!row) return err('Product not found', 404, 'NOT_FOUND')
+      return ok({
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        cost: row.cost,
+        stock: row.stock,
+        trackStock: Boolean(row.trackStock),
+        sku: row.sku,
+        barcode: row.barcode,
+        image: row.image,
+        category: row.catId ? { id: row.catId, name: row.catName, color: row.catColor } : null,
+      })
+    }
+
+    // ─── PRODUCTS/:id/BARCODE ────────────────────────────────────────────────
+    // POST /api/products/:id/barcode — assign barcode to product
+    if (segs[0] === 'products' && segs[2] === 'barcode' && segs.length === 3 && method === 'POST') {
+      const pid = segs[1]
+      const b: any = await req.json()
+      validateRequired(b, ['barcode'])
+      const barcode = String(b.barcode).trim()
+      if (!barcode) return err('barcode must not be empty')
+      // Check uniqueness within store
+      const existing = await queryOne(
+        `SELECT id FROM Product WHERE storeId = ? AND barcode = ? AND id != ? AND active = 1`,
+        [storeId, barcode, pid],
+      )
+      if (existing) return err('Barcode already assigned to another product', 409, 'BARCODE_CONFLICT')
+      await exec(
+        `UPDATE Product SET barcode = ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
+        [barcode, nowISO(), pid, storeId],
+      )
+      await logAudit({ storeId, userId: user.id, action: 'product.barcode.assign', meta: { productId: pid, barcode } })
+      return ok({ success: true, productId: pid, barcode })
+    }
+
+    // ─── PRODUCTS/LABELS ─────────────────────────────────────────────────────
+    // GET /api/products/labels?ids=id1,id2,... — get label data for batch print
+    if (segs[0] === 'products' && segs[1] === 'labels' && method === 'GET') {
+      const idsParam = sp.get('ids') ?? ''
+      if (!idsParam.trim()) return ok([])
+      const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 100)
+      if (ids.length === 0) return ok([])
+      const placeholders = ids.map(() => '?').join(',')
+      const rows = await query(
+        `SELECT p.id, p.name, p.price, p.sku, p.barcode, p.image,
+                c.name as categoryName
+         FROM Product p
+         LEFT JOIN Category c ON p.categoryId = c.id
+         WHERE p.storeId = ? AND p.active = 1 AND p.id IN (${placeholders})
+         ORDER BY p.name`,
+        [storeId, ...ids],
+      ) as any[]
+      return ok(rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        price: r.price,
+        sku: r.sku,
+        barcode: r.barcode,
+        image: r.image,
+        category: r.categoryName ?? null,
+        labelCode: r.barcode ?? r.sku ?? r.id,
+      })))
+    }
+
     // ─── CATEGORIES ───────────────────────────────────────────────────────────
     if (segs[0] === 'categories') {
       if (method === 'GET')
