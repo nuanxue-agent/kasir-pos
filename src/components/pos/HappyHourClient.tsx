@@ -152,7 +152,7 @@ export default function HappyHourClient({ storeId }: HappyHourClientProps) {
       })
 
       if (!res.ok) {
-        const err = await res.json()
+        const err = await res.json() as any
         throw new Error(err.error || 'Failed to save')
       }
 

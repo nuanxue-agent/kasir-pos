@@ -313,7 +313,7 @@ export default function OrderTrackingClient({ storeId }: OrderTrackingClientProp
       ) : (
         <div className="space-y-3">
           {filtered.map(order => {
-            const Icon = STATUS_ICONS[order.status]
+            const Icon = STATUS_ICONS[order.status] as any
             const isExpanded = expandedId === order.id
             const estTime = calculateEstimatedTime(order.status, order.createdAt, order.estimatedMinutes)
 
@@ -501,7 +501,7 @@ export function OrderTrackingView({ token, initialData }: OrderTrackingViewProps
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
           {(() => {
-            const Icon = STATUS_ICONS[data.status]
+            const Icon = STATUS_ICONS[data.status] as any
             return <Icon className="h-12 w-12 mx-auto" style={{ color: 'var(--primary)' }} />
           })()}
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>
