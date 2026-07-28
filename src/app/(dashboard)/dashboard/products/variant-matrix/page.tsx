@@ -118,8 +118,7 @@ export default async function VariantMatrixPage({
         <VariantMatrixClient
           storeId={storeId}
           currency={currency}
-          productId={activeProductId}
-          productName={activeProduct.name}
+          products={[activeProduct]}
           initialAttributes={attributes}
           initialVariants={variants}
         />
