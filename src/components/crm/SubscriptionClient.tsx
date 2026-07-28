@@ -172,12 +172,12 @@ export default function SubscriptionClient({ storeId, currency }: SubscriptionCl
     }).then((r) => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions", storeId] }),
   })
-  const processBilling = useMutation({
+  const processBilling = useMutation<{ processed?: number }, Error, void>({
     mutationFn: () => fetch("/api/subscriptions/process-billing", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ storeId }),
-    }).then((r) => r.json()),
-    onSuccess: (data) => {
+    }).then((r) => r.json() as Promise<{ processed?: number }>),
+    onSuccess: (data: { processed?: number }) => {
       qc.invalidateQueries({ queryKey: ["subscriptions", storeId] })
       alert(`Billing diproses: ${data.processed ?? 0} langganan diperbarui`)
     },
@@ -187,8 +187,7 @@ export default function SubscriptionClient({ storeId, currency }: SubscriptionCl
     e.preventDefault()
     createPlan.mutate({
       name: planForm.name, price: Number(planForm.price), cycle: planForm.cycle,
-      benefits: planForm.benefits.split("
-").map((b: string) => b.trim()).filter(Boolean),
+      benefits: planForm.benefits.split('\n').map((b: string) => b.trim()).filter(Boolean),
     })
   }
   function handleSubSubmit(e: React.FormEvent) { e.preventDefault(); createSub.mutate(subForm) }
