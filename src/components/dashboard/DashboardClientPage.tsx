@@ -149,9 +149,9 @@ function HourlyHeatmap({ data }: { data: HourlySlot[] }) {
               title={`${hourLabels[slot.hour]}:00 — ${slot.count} order(s)`}
             >
               <div
-                className="h-8 rounded-sm transition-opacity"
-                style={{ backgroundColor: `rgba(245, 158, 11, ${opacity})` }}
-              />
+                  className="h-8 rounded-sm transition-opacity"
+                  style={{ backgroundColor: `rgba(99, 102, 241, ${opacity})` }}
+                />
               {/* Tooltip on hover */}
               <div className="pointer-events-none absolute -top-8 left-1/2 z-10 hidden -translate-x-1/2 rounded bg-stone-800 px-1.5 py-0.5 text-[9px] whitespace-nowrap text-white group-hover:block">
                 {hourLabels[slot.hour]}h · {slot.count}x
@@ -256,7 +256,7 @@ function TodayVsYesterdaySparkline({ today, yesterday, currency }: HourlyCompare
         <Line
           type="monotone"
           dataKey="today"
-          stroke="#f59e0b"
+          stroke="#6366f1"
           strokeWidth={2}
           dot={false}
           name="Today"
@@ -276,7 +276,7 @@ function TodayVsYesterdaySparkline({ today, yesterday, currency }: HourlyCompare
 }
 
 // Simple SVG sparkline
-function Sparkline({ data, color = '#f59e0b' }: { data: number[]; color?: string }) {
+function Sparkline({ data, color = '#6366f1' }: { data: number[]; color?: string }) {
   if (!data || data.length < 2) return null
   const max = Math.max(...data, 1)
   const min = Math.min(...data)
@@ -508,8 +508,8 @@ export default function DashboardClientPage({
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="mb-1 flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            <span className="text-[11px] font-semibold tracking-widest text-amber-600 capitalize uppercase">
+            <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+            <span className="text-[11px] font-semibold tracking-widest text-indigo-600 dark:text-indigo-400 capitalize uppercase">
               {dateLabel}
             </span>
             {/* Live badge */}
@@ -532,7 +532,7 @@ export default function DashboardClientPage({
         </div>
         <Link
           href="/dashboard/pos"
-          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-amber-200 transition-all hover:shadow-amber-300 active:scale-95"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:-translate-y-0.5 active:scale-95 dark:shadow-indigo-900/40"
         >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Catat Penjualan</span>
@@ -542,7 +542,7 @@ export default function DashboardClientPage({
         {!allDone && !onboardingDismissed && (
           <button
             onClick={() => setShowOnboarding(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-700 transition-all hover:bg-amber-100 active:scale-95"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-700 transition-all hover:bg-indigo-100 active:scale-95 dark:border-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400"
           >
             <Rocket className="h-4 w-4" />
             <span className="hidden sm:inline">
@@ -554,17 +554,17 @@ export default function DashboardClientPage({
       </div>
 
       {/* ── Shift status widget ── */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <div className="rounded-xl border border-indigo-200/60 bg-gradient-to-r from-indigo-50 to-purple-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/40 dark:to-purple-950/30">
         {shiftLoading ? (
-          <div className="h-10 animate-pulse rounded-xl bg-amber-100" />
+          <div className="h-10 animate-pulse rounded-xl bg-indigo-100 dark:bg-indigo-900/30" />
         ) : activeShift ? (
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 shadow-sm shadow-indigo-200 dark:shadow-indigo-900/40">
                 <UserCheck className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
               </div>
               <div>
-                <p className="text-xs font-semibold tracking-widest text-amber-700 uppercase">
+                <p className="text-xs font-semibold tracking-widest text-indigo-700 uppercase dark:text-indigo-400">
                   Shift Aktif
                 </p>
                 <p className="mt-0.5 text-sm font-bold text-[var(--text-1)]">
@@ -594,14 +594,14 @@ export default function DashboardClientPage({
                 <p className="text-[10px] tracking-widest text-[var(--text-3)] uppercase">
                   Omzet Shift
                 </p>
-                <p className="mt-0.5 text-xs font-semibold text-amber-700">
+                <p className="mt-0.5 text-xs font-semibold text-indigo-700 dark:text-indigo-400">
                   {formatCurrency(stats.totalRevenue ?? 0, currency)}
                 </p>
               </div>
             </div>
             <a
               href="/dashboard/shifts"
-              className="shrink-0 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-200 hover:text-amber-800"
+              className="shrink-0 rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200 hover:text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-900/60"
             >
               Detail
             </a>
@@ -609,7 +609,7 @@ export default function DashboardClientPage({
         ) : (
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-200">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-subtle)]">
                 <Clock className="h-4 w-4 text-[var(--text-3)]" />
               </div>
               <div>
@@ -623,7 +623,7 @@ export default function DashboardClientPage({
             </div>
             <a
               href="/dashboard/shifts"
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
             >
               <Plus className="h-3.5 w-3.5" />
               Buka Shift
@@ -634,7 +634,7 @@ export default function DashboardClientPage({
 
       {/* ── Stats grid ── */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Link href="/dashboard/reports" className="block transition-transform active:scale-95">
+        <Link href="/dashboard/reports" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
           <StatsCard
             icon={DollarSign}
             label="Omzet Hari Ini"
@@ -645,7 +645,7 @@ export default function DashboardClientPage({
             sub={sparkRevenue.length > 1 ? '7 hari terakhir ↗' : undefined}
           />
         </Link>
-        <Link href="/dashboard/orders" className="block transition-transform active:scale-95">
+        <Link href="/dashboard/orders" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
           <StatsCard
             icon={ShoppingCart}
             label={`Pesanan${stats.totalOrders ? ` — ${stats.totalOrders} transaksi hari ini` : ''}`}
@@ -655,7 +655,7 @@ export default function DashboardClientPage({
             loading={isLoading}
           />
         </Link>
-        <Link href="/dashboard/reports" className="block transition-transform active:scale-95">
+        <Link href="/dashboard/reports" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
           <StatsCard
             icon={TrendingUp}
             label="Rata-rata Pesanan"
@@ -664,7 +664,7 @@ export default function DashboardClientPage({
             loading={isLoading}
           />
         </Link>
-        <Link href="/dashboard/customers" className="block transition-transform active:scale-95">
+        <Link href="/dashboard/customers" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
           <StatsCard
             icon={Users}
             label="Pelanggan Baru"
@@ -735,7 +735,7 @@ export default function DashboardClientPage({
               <div className="text-right">
                 <p className="text-sm font-bold text-[var(--text-1)]">{responses}</p>
                 <p className="text-xs text-[var(--text-3)]">respons survei</p>
-                <p className="mt-1 flex items-center justify-end gap-0.5 text-[10px] font-medium text-[var(--text-3)] hover:text-amber-600">
+                <p className="mt-1 flex items-center justify-end gap-0.5 text-[10px] font-medium text-[var(--text-3)] hover:text-indigo-600">
                   Lihat detail <ChevronRight className="h-3 w-3" />
                 </p>
               </div>
@@ -830,8 +830,8 @@ export default function DashboardClientPage({
                   {top ? (
                     <>
                       <p className="truncate text-sm font-bold text-[var(--text-1)]">{top.name}</p>
-                      <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-600">
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span className="flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                        <Star className="h-3 w-3 fill-indigo-400 text-indigo-400" />
                         {top.qty ?? 0}x terjual
                       </span>
                     </>
@@ -847,7 +847,7 @@ export default function DashboardClientPage({
 
       {/* ── 7-day revenue sparkline card ── */}
       {sparkRevenue.length > 1 && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-subtle)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
@@ -857,7 +857,7 @@ export default function DashboardClientPage({
             </div>
             <Link
               href="/dashboard/reports"
-              className="flex items-center gap-1 text-xs text-amber-600 transition-colors hover:text-amber-700"
+              className="flex items-center gap-1 text-xs text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
             >
               Detail <ChevronRight className="h-3 w-3" />
             </Link>
@@ -874,13 +874,13 @@ export default function DashboardClientPage({
                 <div key={i} className="flex flex-1 flex-col items-center gap-1">
                   <div className="flex w-full flex-col justify-end" style={{ height: 44 }}>
                     <div
-                      className={`w-full rounded-t-md transition-all ${isToday ? 'bg-amber-500' : 'bg-amber-200'}`}
+                      className={`w-full rounded-t-md transition-all ${isToday ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-900/50'}`}
                       style={{ height: `${Math.max(pct, 4)}%` }}
                       title={formatCurrency(v, currency)}
                     />
                   </div>
                   <span
-                    className={`text-[9px] font-medium ${isToday ? 'text-amber-600' : 'text-[var(--text-3)]'}`}
+                    className={`text-[9px] font-medium ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-[var(--text-3)]'}`}
                   >
                     {dayNames[d.getDay()]}
                   </span>
@@ -894,7 +894,7 @@ export default function DashboardClientPage({
       {/* ── Analytics row: Hourly Heatmap + Payment Donut + Today vs Yesterday ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Hourly heatmap */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
           <p className="mb-3 text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
             Penjualan per Jam — Hari Ini
           </p>
@@ -908,7 +908,7 @@ export default function DashboardClientPage({
         </div>
 
         {/* Payment method donut */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
           <p className="mb-1 text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
             Metode Pembayaran
           </p>
@@ -916,18 +916,18 @@ export default function DashboardClientPage({
         </div>
 
         {/* Today vs Yesterday sparkline */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
               Hari Ini vs Kemarin
             </p>
             <div className="flex items-center gap-3 text-[10px]">
               <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-4 rounded-sm bg-amber-400" />
+                <span className="inline-block h-2 w-4 rounded-sm bg-indigo-500" />
                 Hari Ini
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block h-px w-4 border border-dashed border-stone-400" />
+                <span className="inline-block h-px w-4 border border-dashed border-slate-400" />
                 Kemarin
               </span>
             </div>
@@ -944,7 +944,7 @@ export default function DashboardClientPage({
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
         <Link
           href="/dashboard/pos"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-center text-xs font-medium text-amber-700 transition-all hover:bg-amber-100 active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+          className="flex flex-col items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-3 text-center text-xs font-medium text-indigo-700 transition-all hover:bg-indigo-100 active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
         >
           <ShoppingBag className="h-4 w-4 shrink-0" />
           <span>Kasir</span>
@@ -989,12 +989,12 @@ export default function DashboardClientPage({
       {/* ── Main content grid ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Recent orders */}
-        <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
             <h2 className="text-sm font-semibold text-[var(--text-1)]">Pesanan Terbaru</h2>
             <Link
               href="/dashboard/orders"
-              className="flex items-center gap-1 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700"
+              className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
             >
               Lihat semua <ArrowRight className="h-3 w-3" />
             </Link>
@@ -1008,17 +1008,17 @@ export default function DashboardClientPage({
             </div>
           ) : (recentOrders as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-              <ShoppingCart className="h-8 w-8 text-stone-200" />
+              <ShoppingCart className="h-8 w-8 text-slate-200" />
               <p className="text-sm text-[var(--text-3)]">Belum ada pesanan hari ini</p>
               <Link
                 href="/dashboard/pos"
-                className="text-xs font-medium text-amber-600 hover:underline"
+                className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
               >
                 Mulai catat penjualan →
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-stone-50">
+            <div className="divide-y divide-[var(--border)]">
               {(recentOrders as any[]).slice(0, 7).map((order: any) => {
                 const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.PENDING
                 return (
@@ -1053,20 +1053,20 @@ export default function DashboardClientPage({
         {/* Low stock + top products stacked */}
         <div className="space-y-4">
           {/* Low stock alerts */}
-          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                 Stok Menipis
                 {(lowStock as any[]).length > 0 && (
-                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">
+                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
                     {(lowStock as any[]).length}
                   </span>
                 )}
               </h2>
               <Link
                 href="/dashboard/inventory"
-                className="flex items-center gap-1 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700"
+                className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
               >
                 Kelola <ArrowRight className="h-3 w-3" />
               </Link>
@@ -1080,20 +1080,20 @@ export default function DashboardClientPage({
               </div>
             ) : (lowStock as any[]).length === 0 ? (
               <div className="flex items-center gap-3 px-4 py-4">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 </div>
                 <p className="text-sm text-[var(--text-2)]">Semua stok aman ✓</p>
               </div>
             ) : (
-              <div className="divide-y divide-stone-50">
+              <div className="divide-y divide-[var(--border)]">
                 {(lowStock as any[]).slice(0, 5).map((p: any) => (
                   <div
                     key={p.id}
                     className="flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/20">
                         <Package className="h-3.5 w-3.5 text-amber-500" />
                       </div>
                       <p className="truncate text-sm text-[var(--text-1)]">{p.name}</p>
@@ -1101,8 +1101,8 @@ export default function DashboardClientPage({
                     <span
                       className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold ${
                         p.stock === 0
-                          ? 'border border-red-100 bg-red-50 text-red-500'
-                          : 'border border-amber-100 bg-amber-50 text-amber-600'
+                          ? 'border border-red-100 bg-red-50 text-red-500 dark:border-red-900/50 dark:bg-red-900/20'
+                          : 'border border-amber-100 bg-amber-50 text-amber-600 dark:border-amber-900/50 dark:bg-amber-900/20'
                       }`}
                     >
                       {p.stock === 0 ? 'Habis' : `${p.stock} sisa`}
@@ -1115,26 +1115,26 @@ export default function DashboardClientPage({
 
           {/* Top products today */}
           {(topProducts as any[]).length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
               <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
-                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                  <Star className="h-3.5 w-3.5 fill-indigo-400 text-indigo-500" />
                   Produk Terlaris Hari Ini
                 </h2>
                 <Link
                   href="/dashboard/reports"
-                  className="flex items-center gap-1 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700"
+                  className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
                 >
                   Laporan <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
-              <div className="divide-y divide-stone-50">
+              <div className="divide-y divide-[var(--border)]">
                 {(topProducts as any[]).slice(0, 5).map((p: any, i: number) => (
                   <div
                     key={p.name}
                     className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]"
                   >
-                    <span className="w-4 shrink-0 text-xs font-bold text-stone-300">{i + 1}</span>
+                    <span className="w-4 shrink-0 text-xs font-bold text-[var(--text-3)]">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-[var(--text-1)]">{p.name}</p>
                       <p className="text-xs text-[var(--text-3)]">{p.qty ?? 0}x terjual</p>

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Store, User, LogOut, Menu, Settings, Bell } from 'lucide-react'
+import { ChevronDown, Store, User, LogOut, Menu, Settings, Bell, Search, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/permissions'
 import { NotificationCenter } from '@/components/ui/NotificationCenter'
@@ -41,12 +41,12 @@ const ROLE_LABELS: Record<UserRole, { label: string; className: string }> = {
     label: 'Super Admin',
     className: 'bg-violet-100 text-violet-700 border border-violet-200',
   },
-  OWNER: { label: 'Pemilik', className: 'bg-amber-100 text-amber-700 border border-amber-200' },
+  OWNER: { label: 'Pemilik', className: 'bg-indigo-100 text-indigo-700 border border-indigo-200' },
   MANAGER: {
     label: 'Manajer',
-    className: 'bg-orange-100 text-orange-700 border border-orange-200',
+    className: 'bg-blue-100 text-blue-700 border border-blue-200',
   },
-  CASHIER: { label: 'Kasir', className: 'bg-stone-100 text-stone-600 border border-stone-200' },
+  CASHIER: { label: 'Kasir', className: 'bg-slate-100 text-slate-600 border border-slate-200' },
 }
 
 const PAGE_TITLES: Record<string, string> = {
@@ -78,6 +78,34 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
     document.addEventListener('mousedown', listener)
     return () => document.removeEventListener('mousedown', listener)
   }, [ref, handler])
+}
+
+function Breadcrumb({ pathname }: { pathname: string }) {
+  const segments = pathname.split('/').filter(Boolean)
+  if (segments.length <= 1) return null
+
+  return (
+    <nav className="hidden items-center gap-1 text-xs text-[var(--text-3)] md:flex" aria-label="Breadcrumb">
+      <Link href="/dashboard" className="flex items-center gap-1 transition-colors hover:text-[var(--text-2)]">
+        <Home className="h-3 w-3" />
+      </Link>
+      {segments.slice(1).map((seg, i) => {
+        const href = '/' + segments.slice(0, i + 2).join('/')
+        const label = PAGE_TITLES[href] ?? seg.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        const isLast = i === segments.length - 2
+        return (
+          <span key={href} className="flex items-center gap-1">
+            <span className="text-[var(--border-mid)]">/</span>
+            {isLast ? (
+              <span className="font-medium text-[var(--text-1)]">{label}</span>
+            ) : (
+              <Link href={href} className="transition-colors hover:text-[var(--text-2)]">{label}</Link>
+            )}
+          </span>
+        )
+      })}
+    </nav>
+  )
 }
 
 export function Header({
@@ -116,7 +144,6 @@ export function Header({
   })
   const alertCount = lowStockItems.length
 
-  // Unread count badge — server count + local storage merged, auto-refresh every 30s
   const { data: serverUnread = 0 } = useQuery<number>({
     queryKey: ['unread-count', storeId],
     queryFn: async () => {
@@ -159,7 +186,8 @@ export function Header({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-card)] px-4">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-white/70 px-4 backdrop-blur-md dark:border-white/5 dark:bg-[#111827]/80">
+      {/* Mobile menu toggle */}
       <button
         onClick={onMenuToggle}
         className="rounded-lg p-2 text-[var(--text-3)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)] lg:hidden"
@@ -168,11 +196,26 @@ export function Header({
         <Menu className="h-5 w-5" />
       </button>
 
+      {/* Page title / breadcrumb */}
       <div className="hidden lg:block">
-        <h1 className="text-sm font-semibold text-[var(--text-1)]">{pageTitle}</h1>
+        <Breadcrumb pathname={pathname} />
+        {pathname === '/dashboard' && (
+          <h1 className="text-sm font-semibold text-[var(--text-1)]">{pageTitle}</h1>
+        )}
       </div>
 
       <div className="flex-1" />
+
+      {/* Search bar */}
+      <div className="hidden items-center sm:flex">
+        <button className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-1.5 text-xs text-[var(--text-3)] transition-all hover:border-indigo-300 hover:bg-[var(--bg-card)] hover:text-[var(--text-2)] dark:hover:border-indigo-700">
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden w-28 text-left md:block">Cari...</span>
+          <kbd className="hidden rounded border border-[var(--border)] bg-[var(--bg-card)] px-1 py-0.5 text-[10px] font-medium text-[var(--text-3)] md:block">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
 
       <div className="flex items-center gap-1">
         {/* Store selector */}
@@ -180,7 +223,7 @@ export function Header({
           <div ref={storeRef} className="relative hidden sm:block">
             <button
               onClick={() => setStoreOpen(v => !v)}
-              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-1.5 text-sm text-[var(--text-2)] transition-all hover:border-[var(--border-mid)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-1)]"
+              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-1.5 text-sm text-[var(--text-2)] transition-all hover:border-indigo-300 hover:bg-[var(--bg-card)] hover:text-[var(--text-1)] dark:hover:border-indigo-700"
             >
               <Store className="h-3.5 w-3.5 shrink-0 text-[var(--text-3)]" />
               <span className="max-w-[120px] truncate text-xs font-medium">
@@ -207,7 +250,7 @@ export function Header({
                     className={cn(
                       'w-full px-4 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-subtle)]',
                       store.id === currentStore?.id
-                        ? 'font-medium text-amber-600'
+                        ? 'font-medium text-indigo-600 dark:text-indigo-400'
                         : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
                     )}
                   >
@@ -227,7 +270,7 @@ export function Header({
           {totalUnread > 0 && (
             <Link
               href="/dashboard/notifications"
-              className="pointer-events-none absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white"
+              className="pointer-events-none absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-indigo-600 px-0.5 text-[9px] leading-none font-bold text-white"
               aria-label={`${totalUnread} notifikasi belum dibaca`}
             >
               {totalUnread > 9 ? '9+' : totalUnread}
@@ -250,10 +293,10 @@ export function Header({
               <img
                 src={userImage}
                 alt={userName}
-                className="h-7 w-7 rounded-full object-cover ring-1 ring-[var(--border-mid)]"
+                className="h-7 w-7 rounded-full object-cover ring-2 ring-indigo-200 dark:ring-indigo-800"
               />
             ) : (
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-xs font-bold text-white">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-sm">
                 {initials}
               </div>
             )}
@@ -304,7 +347,7 @@ export function Header({
               <div className="mt-1 border-t border-[var(--border)] pt-1">
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--text-2)] transition-colors hover:bg-red-50 hover:text-red-600"
+                  className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--text-2)] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                 >
                   <LogOut className="h-4 w-4" /> Keluar
                 </button>
