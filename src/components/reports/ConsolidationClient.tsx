@@ -181,7 +181,7 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
         }),
       })
       if (!res.ok) {
-        const d = await res.json()
+        const d = await res.json() as { error?: string }
         throw new Error(d.error ?? 'Gagal membuat transfer')
       }
       return res.json()

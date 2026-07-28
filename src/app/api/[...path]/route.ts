@@ -10430,9 +10430,9 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const parentStore = (await queryOne(`SELECT id, name FROM Store WHERE id = ?`, [groupId])) as any
       const allStoreIds = [groupId, ...childConfigs.map((c: any) => c.storeId)]
       const minorityMap = new Map(childConfigs.map((c: any) => [c.storeId, Number(c.minorityPct ?? 0)]))
-      const nameMap = new Map([
+      const nameMap = new Map<string, string>([
         [groupId, parentStore?.name ?? groupId],
-        ...childConfigs.map((c: any) => [c.storeId, c.storeName]),
+        ...childConfigs.map((c: any) => [c.storeId, c.storeName] as [string, string]),
       ])
 
       const ph = allStoreIds.map(() => '?').join(',')
@@ -10603,7 +10603,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     // POST /api/intercompany-transfers
     if (segs[0] === 'intercompany-transfers' && !segs[1] && method === 'POST') {
       await ensureICTransferTable()
-      const b = await req.json()
+      const b = await req.json() as Record<string, any>
       validateRequired(b, ['fromStoreId', 'toStoreId', 'type', 'amount'])
       if (!['STOCK', 'CASH'].includes(b.type)) {
         throw new ValidationError("type must be 'STOCK' or 'CASH'", 'INVALID_VALUE')
@@ -10617,7 +10617,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         validatePositive(b.qty, 'qty')
       }
 
-      const id = newId('ict')
+      const id = newId()
       await exec(
         `INSERT INTO InterCompanyTransfer (id, fromStoreId, toStoreId, type, amount, productId, qty, status, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
@@ -10633,7 +10633,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       const id = segs[1]
       const existing = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id]) as any
       if (!existing) return err('Transfer not found', 404, 'NOT_FOUND')
-      const b = await req.json()
+      const b = await req.json() as Record<string, any>
       if (b.status && !['PENDING', 'COMPLETED'].includes(b.status)) {
         throw new ValidationError("status must be 'PENDING' or 'COMPLETED'", 'INVALID_VALUE')
       }
