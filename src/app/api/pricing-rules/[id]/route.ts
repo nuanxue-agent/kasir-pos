@@ -1,10 +1,19 @@
 // PATCH /api/pricing-rules/[id]
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { exec, nowISO } from '@/lib/db'
+import { query, exec, nowISO } from '@/lib/db'
 
-function err(msg: string, status = 400, code = 'ERROR') {
-  return NextResponse.json({ error: msg, code }, { status })
+function err(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status })
+}
+
+function parseRule(r: any) {
+  return {
+    ...r,
+    active: Boolean(r.active),
+    condition: (() => { try { return JSON.parse(r.condition || '{}') } catch { return {} } })(),
+    action: (() => { try { return JSON.parse(r.action || '{}') } catch { return {} } })(),
+  }
 }
 
 export async function PATCH(
@@ -12,32 +21,49 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
+  if (!session?.user) return err('Unauthorized', 401)
 
   const { id } = await params
-  const b = (await req.json()) as any
+  const body = await req.json() as any
 
-  const sets: string[] = []
-  const vals: any[] = []
+  const existing = await query(`SELECT * FROM PricingRule WHERE id = ?`, [id])
+  if (!(existing as any[]).length) return err('Not found', 404)
 
-  if (b.name !== undefined)       { sets.push('name = ?');        vals.push(b.name) }
-  if (b.ruleType !== undefined)   { sets.push('ruleType = ?');    vals.push(b.ruleType) }
-  if (b.conditions !== undefined) { sets.push('conditions = ?');  vals.push(JSON.stringify(b.conditions)) }
-  if (b.adjustment !== undefined) { sets.push('adjustment = ?');  vals.push(b.adjustment) }
-  if (b.value !== undefined)      { sets.push('value = ?');       vals.push(b.value) }
-  if (b.priority !== undefined)   { sets.push('priority = ?');    vals.push(b.priority) }
-  if (b.active !== undefined)     { sets.push('active = ?');      vals.push(b.active ? 1 : 0) }
+  // Support soft-delete via { deleted: true }
+  if (body.deleted) {
+    await exec(`DELETE FROM PricingRule WHERE id = ?`, [id])
+    return NextResponse.json({ deleted: true })
+  }
 
-  if (sets.length === 0) return err('No fields to update', 400, 'MISSING_FIELD')
-
-  sets.push('updatedAt = ?')
-  vals.push(nowISO())
-  vals.push(id)
+  const row = (existing as any[])[0]
+  const now = nowISO()
 
   await exec(
-    `UPDATE PricingRule SET ${sets.join(', ')} WHERE id = ?`,
-    vals,
+    `UPDATE PricingRule SET
+      name      = ?,
+      type      = ?,
+      condition = ?,
+      action    = ?,
+      priority  = ?,
+      active    = ?,
+      validFrom = ?,
+      validTo   = ?,
+      updatedAt = ?
+     WHERE id = ?`,
+    [
+      body.name      ?? row.name,
+      body.type      ?? row.type,
+      body.condition !== undefined ? JSON.stringify(body.condition) : row.condition,
+      body.action    !== undefined ? JSON.stringify(body.action)    : row.action,
+      body.priority  ?? row.priority,
+      body.active !== undefined ? (body.active ? 1 : 0) : row.active,
+      body.validFrom !== undefined ? body.validFrom : row.validFrom,
+      body.validTo   !== undefined ? body.validTo   : row.validTo,
+      now,
+      id,
+    ],
   )
 
-  return NextResponse.json({ ok: true })
+  const updated = await query(`SELECT * FROM PricingRule WHERE id = ?`, [id])
+  return NextResponse.json(parseRule((updated as any[])[0]))
 }

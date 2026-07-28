@@ -1,25 +1,52 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Pencil, Trash2, Clock, TrendingUp, Package, Zap, X, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Clock, TrendingUp, Package, Globe, X, Loader2, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type RuleType = 'TIME_BASED' | 'DEMAND_BASED' | 'STOCK_BASED' | 'SURGE'
-type AdjustmentType = 'PERCENTAGE' | 'FIXED'
+type RuleType = 'TIME_BASED' | 'STOCK_BASED' | 'DEMAND_BASED' | 'COMPETITOR'
+type ConditionOperator = 'GT' | 'GTE' | 'LT' | 'LTE' | 'EQ'
+type ActionType = 'INCREASE' | 'DECREASE' | 'SET'
+type ActionUnit = 'PERCENT' | 'FIXED'
+
+interface RuleCondition {
+  field: string
+  operator: ConditionOperator
+  value: number
+}
+
+interface RuleAction {
+  type: ActionType
+  value: number
+  unit: ActionUnit
+}
 
 interface PricingRule {
   id: string
   storeId: string
   name: string
-  ruleType: RuleType
-  conditions: any
-  adjustment: AdjustmentType
-  value: number
+  type: RuleType
+  condition: RuleCondition
+  action: RuleAction
   priority: number
   active: boolean
+  validFrom: string | null
+  validTo: string | null
+}
+
+interface PriceAdjustmentLog {
+  id: string
+  productId: string
+  ruleId: string
+  oldPrice: number
+  newPrice: number
+  appliedAt: string
+  reason: string
+  productName?: string
+  ruleName?: string
 }
 
 interface Product {
@@ -36,54 +63,47 @@ interface DynamicPricingClientProps {
   products: Product[]
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const RULE_TYPE_LABELS: Record<RuleType, string> = {
+  TIME_BASED: 'Time-based',
+  STOCK_BASED: 'Stock-based',
+  DEMAND_BASED: 'Demand-based',
+  COMPETITOR: 'Competitor',
+}
+
+const RULE_TYPE_ICONS: Record<RuleType, React.ReactNode> = {
+  TIME_BASED: <Clock className="h-4 w-4" />,
+  STOCK_BASED: <Package className="h-4 w-4" />,
+  DEMAND_BASED: <TrendingUp className="h-4 w-4" />,
+  COMPETITOR: <Globe className="h-4 w-4" />,
+}
+
+const FIELD_BY_TYPE: Record<RuleType, string> = {
+  TIME_BASED: 'hour',
+  STOCK_BASED: 'stock',
+  DEMAND_BASED: 'demand_score',
+  COMPETITOR: 'competitor_price',
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function applyAdjustment(price: number, adjustment: AdjustmentType, value: number): number {
-  if (adjustment === 'PERCENTAGE') {
-    return Math.round(price * (1 + value / 100))
-  }
-  return Math.max(0, price + value)
+function formatDateLocal(iso: string | null): string {
+  if (!iso) return ''
+  return iso.slice(0, 16)
 }
 
-function evaluateRule(rule: PricingRule, product: Product, now = new Date()): { applies: boolean; effectivePrice: number } {
-  if (!rule.active) return { applies: false, effectivePrice: product.price }
-
-  const cond = rule.conditions || {}
-  let applies = false
-
-  if (rule.ruleType === 'TIME_BASED') {
-    const hour = now.getHours()
-    const startHour = cond.startHour ?? 0
-    const endHour = cond.endHour ?? 24
-    applies = hour >= startHour && hour < endHour
-  } else if (rule.ruleType === 'STOCK_BASED') {
-    const stock = product.stock ?? 0
-    const threshold = cond.threshold ?? 0
-    const operator = cond.operator || 'GT' // GT | LT
-    applies = operator === 'GT' ? stock > threshold : stock < threshold
-  } else if (rule.ruleType === 'DEMAND_BASED' || rule.ruleType === 'SURGE') {
-    applies = true // Simplified: always active for demo
-  }
-
-  const effectivePrice = applies ? applyAdjustment(product.price, rule.adjustment, rule.value) : product.price
-  return { applies, effectivePrice }
+function describeCondition(c: RuleCondition): string {
+  const opMap: Record<string, string> = { GT: '>', GTE: '>=', LT: '<', LTE: '<=', EQ: '=' }
+  return `${c.field} ${opMap[c.operator] ?? c.operator} ${c.value}`
 }
 
-function calcEffectivePrice(product: Product, rules: PricingRule[], now = new Date()): number {
-  const sorted = [...rules].sort((a, b) => b.priority - a.priority)
-  let price = product.price
-
-  for (const rule of sorted) {
-    const { applies, effectivePrice } = evaluateRule(rule, product, now)
-    if (applies) {
-      price = effectivePrice
-    }
-  }
-
-  return price
+function describeAction(a: RuleAction): string {
+  const sign = a.type === 'INCREASE' ? '+' : a.type === 'DECREASE' ? '-' : '='
+  return `${sign}${a.value}${a.unit === 'PERCENT' ? '%' : ' IDR'}`
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
+// ── Rule Modal ────────────────────────────────────────────────────────────────
 
 interface RuleModalProps {
   isOpen: boolean
@@ -92,104 +112,79 @@ interface RuleModalProps {
   rule?: PricingRule
   products: Product[]
   currency: string
+  storeId: string
 }
 
-function RuleModal({ isOpen, onClose, onSave, rule, products, currency }: RuleModalProps) {
-  const [name, setName] = useState(rule?.name || '')
-  const [ruleType, setRuleType] = useState<RuleType>(rule?.ruleType || 'TIME_BASED')
-  const [adjustment, setAdjustment] = useState<AdjustmentType>(rule?.adjustment || 'PERCENTAGE')
-  const [value, setValue] = useState(rule?.value?.toString() || '0')
-  const [priority, setPriority] = useState(rule?.priority?.toString() || '10')
+function RuleModal({ isOpen, onClose, onSave, rule, products, currency, storeId }: RuleModalProps) {
+  const [name, setName] = useState(rule?.name ?? '')
+  const [type, setType] = useState<RuleType>(rule?.type ?? 'TIME_BASED')
+  const [condOperator, setCondOperator] = useState<ConditionOperator>(rule?.condition?.operator ?? 'LT')
+  const [condValue, setCondValue] = useState(String(rule?.condition?.value ?? 20))
+  const [actionType, setActionType] = useState<ActionType>(rule?.action?.type ?? 'DECREASE')
+  const [actionValue, setActionValue] = useState(String(rule?.action?.value ?? 10))
+  const [actionUnit, setActionUnit] = useState<ActionUnit>(rule?.action?.unit ?? 'PERCENT')
+  const [priority, setPriority] = useState(String(rule?.priority ?? 10))
   const [active, setActive] = useState(rule?.active ?? true)
-
-  const [startHour, setStartHour] = useState(rule?.conditions?.startHour?.toString() || '18')
-  const [endHour, setEndHour] = useState(rule?.conditions?.endHour?.toString() || '21')
-  const [threshold, setThreshold] = useState(rule?.conditions?.threshold?.toString() || '10')
-  const [operator, setOperator] = useState(rule?.conditions?.operator || 'GT')
-
-  const [previewProductId, setPreviewProductId] = useState(products[0]?.id || '')
+  const [validFrom, setValidFrom] = useState(formatDateLocal(rule?.validFrom ?? null))
+  const [validTo, setValidTo] = useState(formatDateLocal(rule?.validTo ?? null))
+  const [previewProductId, setPreviewProductId] = useState(products[0]?.id ?? '')
   const [previewPrice, setPreviewPrice] = useState<number | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
-    if (rule) {
-      setName(rule.name)
-      setRuleType(rule.ruleType)
-      setAdjustment(rule.adjustment)
-      setValue(rule.value.toString())
-      setPriority(rule.priority.toString())
-      setActive(rule.active)
-      setStartHour(rule.conditions?.startHour?.toString() || '18')
-      setEndHour(rule.conditions?.endHour?.toString() || '21')
-      setThreshold(rule.conditions?.threshold?.toString() || '10')
-      setOperator(rule.conditions?.operator || 'GT')
-    }
+    if (!rule) return
+    setName(rule.name)
+    setType(rule.type)
+    setCondOperator(rule.condition?.operator ?? 'LT')
+    setCondValue(String(rule.condition?.value ?? 20))
+    setActionType(rule.action?.type ?? 'DECREASE')
+    setActionValue(String(rule.action?.value ?? 10))
+    setActionUnit(rule.action?.unit ?? 'PERCENT')
+    setPriority(String(rule.priority))
+    setActive(rule.active)
+    setValidFrom(formatDateLocal(rule.validFrom ?? null))
+    setValidTo(formatDateLocal(rule.validTo ?? null))
   }, [rule])
 
-  const handleSave = () => {
-    let conditions: any = {}
-    if (ruleType === 'TIME_BASED') {
-      conditions = { startHour: Number(startHour), endHour: Number(endHour) }
-    } else if (ruleType === 'STOCK_BASED') {
-      conditions = { threshold: Number(threshold), operator }
-    }
-
-    onSave({
-      id: rule?.id,
-      name,
-      ruleType,
-      conditions,
-      adjustment,
-      value: Number(value),
-      priority: Number(priority),
-      active,
-    })
-    onClose()
-  }
+  const buildPayload = useCallback((): Partial<PricingRule> => ({
+    id: rule?.id,
+    name,
+    type,
+    condition: { field: FIELD_BY_TYPE[type], operator: condOperator, value: Number(condValue) },
+    action: { type: actionType, value: Number(actionValue), unit: actionUnit },
+    priority: Number(priority),
+    active,
+    validFrom: validFrom ? new Date(validFrom).toISOString() : null,
+    validTo: validTo ? new Date(validTo).toISOString() : null,
+  }), [rule, name, type, condOperator, condValue, actionType, actionValue, actionUnit, priority, active, validFrom, validTo])
 
   const handlePreview = async () => {
     if (!previewProductId) return
     setPreviewLoading(true)
     try {
-      let conditions: any = {}
-      if (ruleType === 'TIME_BASED') {
-        conditions = { startHour: Number(startHour), endHour: Number(endHour) }
-      } else if (ruleType === 'STOCK_BASED') {
-        conditions = { threshold: Number(threshold), operator }
-      }
-
-      const res = await fetch('/api/pricing-rules/preview', {
+      const product = products.find(p => p.id === previewProductId)
+      const res = await fetch('/api/pricing-rules/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: previewProductId,
-          rule: { ruleType, conditions, adjustment, value: Number(value) },
-        }),
+        body: JSON.stringify({ productId: previewProductId, currentPrice: product?.price ?? 0, storeId }),
       })
       const data = await res.json() as any
-      if (data.error) {
-        toast.error(data.error)
-      } else {
-        setPreviewPrice(data.effectivePrice)
-      }
-    } catch (err: any) {
-      toast.error(err.message)
+      if (data.error) toast.error(data.error)
+      else setPreviewPrice(data.finalPrice)
+    } catch (e: any) {
+      toast.error(e.message)
     } finally {
       setPreviewLoading(false)
     }
   }
 
   if (!isOpen) return null
-
   const selectedProduct = products.find(p => p.id === previewProductId)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative w-full max-w-2xl rounded-xl bg-[var(--bg-card)] p-6 shadow-xl">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 text-[var(--text-2)] hover:text-[var(--text-1)]"
-        >
+      <div className="relative w-full max-w-2xl rounded-xl bg-[var(--bg-card)] p-6 shadow-xl overflow-y-auto max-h-[90vh]">
+        <button onClick={onClose} className="absolute right-4 top-4 text-[var(--text-2)] hover:text-[var(--text-1)]">
           <X className="h-5 w-5" />
         </button>
 
@@ -198,194 +193,226 @@ function RuleModal({ isOpen, onClose, onSave, rule, products, currency }: RuleMo
         </h2>
 
         <div className="space-y-4">
+          {/* Name */}
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Rule Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-              placeholder="Happy Hour Discount"
-            />
+              placeholder="Happy Hour Discount" />
           </div>
 
+          {/* Type + Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Rule Type</label>
-              <select
-                value={ruleType}
-                onChange={e => setRuleType(e.target.value as RuleType)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-              >
+              <select value={type} onChange={e => setType(e.target.value as RuleType)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]">
                 <option value="TIME_BASED">Time-based</option>
                 <option value="STOCK_BASED">Stock-based</option>
                 <option value="DEMAND_BASED">Demand-based</option>
-                <option value="SURGE">Surge Pricing</option>
+                <option value="COMPETITOR">Competitor</option>
               </select>
             </div>
-
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Priority</label>
-              <input
-                type="number"
-                value={priority}
-                onChange={e => setPriority(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-              />
+              <input type="number" value={priority} onChange={e => setPriority(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]" />
             </div>
           </div>
 
-          {ruleType === 'TIME_BASED' && (
+          {/* Condition */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-1)] p-4 space-y-3">
+            <p className="text-sm font-medium text-[var(--text-2)]">Condition — when <span className="text-[var(--text-1)]">{FIELD_BY_TYPE[type]}</span> is:</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Start Hour</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="23"
-                  value={startHour}
-                  onChange={e => setStartHour(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">End Hour</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="24"
-                  value={endHour}
-                  onChange={e => setEndHour(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-                />
-              </div>
-            </div>
-          )}
-
-          {ruleType === 'STOCK_BASED' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Operator</label>
-                <select
-                  value={operator}
-                  onChange={e => setOperator(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-                >
+                <label className="mb-1 block text-xs text-[var(--text-2)]">Operator</label>
+                <select value={condOperator} onChange={e => setCondOperator(e.target.value as ConditionOperator)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[var(--text-1)]">
                   <option value="GT">Greater than (&gt;)</option>
+                  <option value="GTE">Greater or equal (&gt;=)</option>
                   <option value="LT">Less than (&lt;)</option>
+                  <option value="LTE">Less or equal (&lt;=)</option>
+                  <option value="EQ">Equal (=)</option>
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Stock Threshold</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={threshold}
-                  onChange={e => setThreshold(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-                />
+                <label className="mb-1 block text-xs text-[var(--text-2)]">
+                  Value {type === 'TIME_BASED' ? '(0–23 hour)' : type === 'STOCK_BASED' ? '(units)' : ''}
+                </label>
+                <input type="number" value={condValue} onChange={e => setCondValue(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[var(--text-1)]" />
               </div>
             </div>
-          )}
+          </div>
 
+          {/* Action */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-1)] p-4 space-y-3">
+            <p className="text-sm font-medium text-[var(--text-2)]">Action — then:</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="mb-1 block text-xs text-[var(--text-2)]">Type</label>
+                <select value={actionType} onChange={e => setActionType(e.target.value as ActionType)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[var(--text-1)]">
+                  <option value="INCREASE">Increase</option>
+                  <option value="DECREASE">Decrease</option>
+                  <option value="SET">Set to</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[var(--text-2)]">Value</label>
+                <input type="number" value={actionValue} onChange={e => setActionValue(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[var(--text-1)]" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[var(--text-2)]">Unit</label>
+                <select value={actionUnit} onChange={e => setActionUnit(e.target.value as ActionUnit)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[var(--text-1)]">
+                  <option value="PERCENT">Percent (%)</option>
+                  <option value="FIXED">Fixed (IDR)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Validity */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Adjustment Type</label>
-              <select
-                value={adjustment}
-                onChange={e => setAdjustment(e.target.value as AdjustmentType)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-              >
-                <option value="PERCENTAGE">Percentage</option>
-                <option value="FIXED">Fixed Amount</option>
-              </select>
+              <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Valid From</label>
+              <input type="datetime-local" value={validFrom} onChange={e => setValidFrom(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">
-                Value {adjustment === 'PERCENTAGE' ? '(%)' : `(${currency})`}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={value}
-                onChange={e => setValue(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]"
-              />
+              <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Valid To</label>
+              <input type="datetime-local" value={validTo} onChange={e => setValidTo(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-[var(--text-1)]" />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="active"
-              checked={active}
-              onChange={e => setActive(e.target.checked)}
-              className="h-4 w-4 rounded border-[var(--border)]"
-            />
-            <label htmlFor="active" className="text-sm text-[var(--text-2)]">
-              Active
-            </label>
-          </div>
-
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-1)] p-4">
-            <h3 className="mb-3 text-sm font-medium text-[var(--text-1)]">Preview</h3>
-            <div className="grid grid-cols-[1fr,auto] gap-2">
-              <select
-                value={previewProductId}
-                onChange={e => {
-                  setPreviewProductId(e.target.value)
-                  setPreviewPrice(null)
-                }}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-1)]"
-              >
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} - {formatCurrency(p.price, currency)}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handlePreview}
-                disabled={previewLoading}
-                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Calculate'}
-              </button>
+          {/* Active toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div
+              onClick={() => setActive(v => !v)}
+              className={cn('h-6 w-11 rounded-full transition-colors', active ? 'bg-blue-500' : 'bg-[var(--border)]')}
+            >
+              <div className={cn('h-5 w-5 m-0.5 rounded-full bg-white shadow transition-transform', active ? 'translate-x-5' : 'translate-x-0')} />
             </div>
-            {previewPrice !== null && selectedProduct && (
-              <div className="mt-3 flex items-center gap-2 text-sm">
-                <span className="text-[var(--text-2)]">Effective Price:</span>
-                <span className="font-semibold text-[var(--text-1)]">
-                  {formatCurrency(previewPrice, currency)}
-                </span>
-                {previewPrice !== selectedProduct.price && (
-                  <span className={cn(
-                    "text-xs",
-                    previewPrice > selectedProduct.price ? "text-red-500" : "text-green-500"
-                  )}>
-                    ({previewPrice > selectedProduct.price ? '+' : ''}{previewPrice - selectedProduct.price})
-                  </span>
-                )}
+            <span className="text-sm text-[var(--text-2)]">Active</span>
+          </label>
+
+          {/* Preview */}
+          {products.length > 0 && (
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-1)] p-4 space-y-3">
+              <p className="text-sm font-medium text-[var(--text-2)]">Preview</p>
+              <div className="flex gap-2">
+                <select value={previewProductId} onChange={e => setPreviewProductId(e.target.value)}
+                  className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[var(--text-1)]">
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <button onClick={handlePreview} disabled={previewLoading}
+                  className="rounded-lg bg-[var(--bg-card)] border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-1)] hover:bg-[var(--border)] disabled:opacity-50">
+                  {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Preview'}
+                </button>
               </div>
-            )}
-          </div>
+              {previewPrice !== null && selectedProduct && (
+                <p className="text-sm text-[var(--text-2)]">
+                  {selectedProduct.name}: {formatCurrency(selectedProduct.price, currency)} →{' '}
+                  <span className="font-semibold text-[var(--text-1)]">{formatCurrency(previewPrice, currency)}</span>
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text-1)] hover:bg-[var(--bg-2)]"
-          >
+          <button onClick={onClose}
+            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-2)] hover:bg-[var(--bg-1)]">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            {rule ? 'Update' : 'Create'}
+          <button onClick={() => { onSave(buildPayload()); onClose() }}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+            Save Rule
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Logs Panel ────────────────────────────────────────────────────────────────
+
+function LogsPanel({ storeId, currency }: { storeId: string; currency: string }) {
+  const [logs, setLogs] = useState<PriceAdjustmentLog[]>([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/price-adjustment-logs?storeId=${storeId}`)
+      const data = await res.json() as any
+      setLogs(Array.isArray(data) ? data : [])
+    } catch {
+      toast.error('Failed to load logs')
+    } finally {
+      setLoading(false)
+    }
+  }, [storeId])
+
+  useEffect(() => {
+    if (open) fetchLogs()
+  }, [open, fetchLogs])
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex w-full items-center justify-between px-6 py-4 text-left hover:bg-[var(--bg-1)]"
+      >
+        <span className="font-medium text-[var(--text-1)]">Price Adjustment Log</span>
+        {open ? <ChevronUp className="h-4 w-4 text-[var(--text-2)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-2)]" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-[var(--border)]">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--text-2)]" />
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-[var(--text-2)]">
+              <AlertCircle className="h-8 w-8 opacity-40" />
+              <p className="text-sm">No adjustments logged yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--bg-1)]">
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Product</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Rule</th>
+                    <th className="px-4 py-3 text-right font-medium text-[var(--text-2)]">Old Price</th>
+                    <th className="px-4 py-3 text-right font-medium text-[var(--text-2)]">New Price</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Applied At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map(log => (
+                    <tr key={log.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-1)]">
+                      <td className="px-4 py-3 text-[var(--text-1)]">{log.productName ?? log.productId}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{log.ruleName ?? log.ruleId}</td>
+                      <td className="px-4 py-3 text-right text-[var(--text-2)]">{formatCurrency(log.oldPrice, currency)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-[var(--text-1)]">{formatCurrency(log.newPrice, currency)}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{new Date(log.appliedAt).toLocaleString('id-ID')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -399,209 +426,209 @@ export default function DynamicPricingClient({
   products,
 }: DynamicPricingClientProps) {
   const [rules, setRules] = useState<PricingRule[]>(initialRules)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<PricingRule | undefined>()
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const handleSaveRule = async (ruleData: Partial<PricingRule>) => {
-    setLoading(true)
+  const handleSave = async (payload: Partial<PricingRule>) => {
+    setSaving(true)
     try {
-      if (ruleData.id) {
-        const res = await fetch(`/api/pricing-rules/${ruleData.id}?storeId=${storeId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ruleData),
-        })
-        const data = await res.json() as any
-        if (data.error) {
-          toast.error(data.error)
-        } else {
-          setRules(prev => prev.map(r => (r.id === ruleData.id ? { ...r, ...ruleData } : r)))
-          toast.success('Rule updated')
-        }
+      const isEdit = Boolean(payload.id)
+      const url = isEdit ? `/api/pricing-rules/${payload.id}` : '/api/pricing-rules'
+      const method = isEdit ? 'PATCH' : 'POST'
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, storeId }),
+      })
+      const data = await res.json() as any
+      if (!res.ok) { toast.error(data.error ?? 'Failed to save rule'); return }
+
+      if (isEdit) {
+        setRules(prev => prev.map(r => r.id === data.id ? data : r))
+        toast.success('Rule updated')
       } else {
-        const res = await fetch(`/api/pricing-rules?storeId=${storeId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ruleData),
-        })
-        const data = await res.json() as any
-        if (data.error) {
-          toast.error(data.error)
-        } else {
-          const newRule = { ...ruleData, id: data.id, storeId } as PricingRule
-          setRules(prev => [...prev, newRule])
-          toast.success('Rule created')
-        }
+        setRules(prev => [data, ...prev])
+        toast.success('Rule created')
       }
-    } catch (err: any) {
-      toast.error(err.message)
+    } catch (e: any) {
+      toast.error(e.message)
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  const handleToggleActive = async (rule: PricingRule) => {
+  const handleToggle = async (rule: PricingRule) => {
     try {
-      const res = await fetch(`/api/pricing-rules/${rule.id}?storeId=${storeId}`, {
+      const res = await fetch(`/api/pricing-rules/${rule.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: !rule.active }),
       })
       const data = await res.json() as any
-      if (data.error) {
-        toast.error(data.error)
-      } else {
-        setRules(prev => prev.map(r => (r.id === rule.id ? { ...r, active: !r.active } : r)))
-        toast.success(rule.active ? 'Rule deactivated' : 'Rule activated')
-      }
-    } catch (err: any) {
-      toast.error(err.message)
+      if (!res.ok) { toast.error(data.error ?? 'Failed to update'); return }
+      setRules(prev => prev.map(r => r.id === rule.id ? { ...r, active: !r.active } : r))
+    } catch (e: any) {
+      toast.error(e.message)
     }
   }
 
-  const getRuleIcon = (ruleType: RuleType) => {
-    switch (ruleType) {
-      case 'TIME_BASED':
-        return <Clock className="h-5 w-5" />
-      case 'STOCK_BASED':
-        return <Package className="h-5 w-5" />
-      case 'DEMAND_BASED':
-        return <TrendingUp className="h-5 w-5" />
-      case 'SURGE':
-        return <Zap className="h-5 w-5" />
-      default:
-        return <TrendingUp className="h-5 w-5" />
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this pricing rule?')) return
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/pricing-rules/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleted: true }),
+      })
+      if (!res.ok) { toast.error('Failed to delete'); return }
+      setRules(prev => prev.filter(r => r.id !== id))
+      toast.success('Rule deleted')
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setDeletingId(null)
     }
   }
 
-  const getRuleDescription = (rule: PricingRule) => {
-    const cond = rule.conditions || {}
-    const adj = rule.adjustment === 'PERCENTAGE' ? `${rule.value}%` : `${currency}${rule.value}`
-
-    if (rule.ruleType === 'TIME_BASED') {
-      return `${cond.startHour || 0}:00 - ${cond.endHour || 24}:00 • ${adj} ${rule.value >= 0 ? 'surcharge' : 'discount'}`
-    } else if (rule.ruleType === 'STOCK_BASED') {
-      const op = cond.operator === 'GT' ? '>' : '<'
-      return `Stock ${op} ${cond.threshold || 0} • ${adj} ${rule.value >= 0 ? 'increase' : 'decrease'}`
-    } else if (rule.ruleType === 'SURGE') {
-      return `Surge pricing • ${adj} increase`
-    } else {
-      return `Demand-based • ${adj} adjustment`
-    }
-  }
+  const sortedRules = [...rules].sort((a, b) => b.priority - a.priority)
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-1)]">Dynamic Pricing</h1>
-          <p className="text-sm text-[var(--text-2)]">
-            Automatically adjust prices based on time, stock, and demand
+          <p className="mt-1 text-sm text-[var(--text-2)]">
+            Auto-adjust prices based on time, stock, demand, or competitor data.
           </p>
         </div>
         <button
-          onClick={() => {
-            setEditingRule(undefined)
-            setIsModalOpen(true)
-          }}
-          className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          onClick={() => { setEditingRule(undefined); setModalOpen(true) }}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           New Rule
         </button>
       </div>
 
-      <div className="space-y-3">
-        {rules.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[var(--border)] p-12 text-center">
-            <TrendingUp className="mx-auto mb-3 h-12 w-12 text-[var(--text-3)]" />
-            <p className="mb-1 font-medium text-[var(--text-2)]">No pricing rules yet</p>
-            <p className="mb-4 text-sm text-[var(--text-3)]">
-              Create your first dynamic pricing rule to optimize revenue
-            </p>
-            <button
-              onClick={() => {
-                setEditingRule(undefined)
-                setIsModalOpen(true)
-              }}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-            >
-              <Plus className="h-4 w-4" />
-              Create Rule
-            </button>
-          </div>
-        ) : (
-          rules
-            .sort((a, b) => b.priority - a.priority)
-            .map(rule => (
-              <div
-                key={rule.id}
-                className={cn(
-                  "rounded-lg border p-4 transition-all",
-                  rule.active
-                    ? "border-[var(--border)] bg-[var(--bg-card)]"
-                    : "border-[var(--border)] bg-[var(--bg-1)] opacity-60"
-                )}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className={cn(
-                      "rounded-lg p-2",
-                      rule.active ? "bg-[var(--primary)]/10 text-[var(--primary)]" : "bg-[var(--bg-2)] text-[var(--text-3)]"
-                    )}>
-                      {getRuleIcon(rule.ruleType)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-[var(--text-1)]">{rule.name}</h3>
-                        <span className="rounded bg-[var(--bg-2)] px-2 py-0.5 text-xs font-medium text-[var(--text-2)]">
-                          Priority {rule.priority}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-[var(--text-2)]">
-                        {getRuleDescription(rule)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggleActive(rule)}
-                      className={cn(
-                        "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                        rule.active
-                          ? "bg-green-500/10 text-green-600 hover:bg-green-500/20"
-                          : "bg-[var(--bg-2)] text-[var(--text-3)] hover:bg-[var(--bg-3)]"
-                      )}
-                    >
-                      {rule.active ? 'Active' : 'Inactive'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingRule(rule)
-                        setIsModalOpen(true)
-                      }}
-                      className="rounded-lg p-2 text-[var(--text-2)] hover:bg-[var(--bg-2)] hover:text-[var(--text-1)]"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+      {/* Stats bar */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {(['TIME_BASED', 'STOCK_BASED', 'DEMAND_BASED', 'COMPETITOR'] as RuleType[]).map(t => {
+          const count = rules.filter(r => r.type === t).length
+          const active = rules.filter(r => r.type === t && r.active).length
+          return (
+            <div key={t} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3">
+              <div className="flex items-center gap-2 text-[var(--text-2)]">
+                {RULE_TYPE_ICONS[t]}
+                <span className="text-xs">{RULE_TYPE_LABELS[t]}</span>
               </div>
-            ))
-        )}
+              <p className="mt-1 text-xl font-bold text-[var(--text-1)]">{count}</p>
+              <p className="text-xs text-[var(--text-2)]">{active} active</p>
+            </div>
+          )
+        })}
       </div>
 
+      {/* Rules table */}
+      {sortedRules.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--border)] py-16 text-[var(--text-2)]">
+          <TrendingUp className="h-10 w-10 opacity-30" />
+          <p className="text-sm">No pricing rules yet. Create one to get started.</p>
+          <button
+            onClick={() => { setEditingRule(undefined); setModalOpen(true) }}
+            className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--bg-1)]"
+          >
+            <Plus className="h-4 w-4" /> Add First Rule
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--bg-1)]">
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Type</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Condition</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-2)]">Action</th>
+                <th className="px-4 py-3 text-center font-medium text-[var(--text-2)]">Priority</th>
+                <th className="px-4 py-3 text-center font-medium text-[var(--text-2)]">Active</th>
+                <th className="px-4 py-3 text-right font-medium text-[var(--text-2)]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRules.map(rule => (
+                <tr key={rule.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-1)]">
+                  <td className="px-4 py-3 font-medium text-[var(--text-1)]">{rule.name}</td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-[var(--text-2)]">
+                      {RULE_TYPE_ICONS[rule.type]}
+                      {RULE_TYPE_LABELS[rule.type]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-[var(--text-2)]">
+                    {rule.condition ? describeCondition(rule.condition) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--text-2)]">
+                    {rule.action ? describeAction(rule.action) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center text-[var(--text-2)]">{rule.priority}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleToggle(rule)}
+                      className={cn(
+                        'inline-block h-5 w-9 rounded-full transition-colors',
+                        rule.active ? 'bg-blue-500' : 'bg-[var(--border)]',
+                      )}
+                    >
+                      <span className={cn(
+                        'block h-4 w-4 mx-0.5 rounded-full bg-white shadow transition-transform',
+                        rule.active ? 'translate-x-4' : 'translate-x-0',
+                      )} />
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => { setEditingRule(rule); setModalOpen(true) }}
+                        className="rounded p-1 text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--bg-1)]"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(rule.id)}
+                        disabled={deletingId === rule.id}
+                        className="rounded p-1 text-[var(--text-2)] hover:text-red-500 hover:bg-[var(--bg-1)] disabled:opacity-40"
+                      >
+                        {deletingId === rule.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Trash2 className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Logs */}
+      <LogsPanel storeId={storeId} currency={currency} />
+
+      {/* Modal */}
       <RuleModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setEditingRule(undefined)
-        }}
-        onSave={handleSaveRule}
+        isOpen={modalOpen}
+        onClose={() => { setModalOpen(false); setEditingRule(undefined) }}
+        onSave={handleSave}
         rule={editingRule}
         products={products}
         currency={currency}
+        storeId={storeId}
       />
     </div>
   )

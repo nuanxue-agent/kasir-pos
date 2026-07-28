@@ -7,17 +7,28 @@ export const metadata = { title: 'Dynamic Pricing — Products' }
 
 async function ensureTables() {
   await exec(`CREATE TABLE IF NOT EXISTS PricingRule (
-    id         TEXT PRIMARY KEY,
-    storeId    TEXT NOT NULL,
-    name       TEXT NOT NULL,
-    ruleType   TEXT NOT NULL,
-    conditions TEXT NOT NULL,
-    adjustment TEXT NOT NULL,
-    value      REAL NOT NULL,
-    priority   INTEGER NOT NULL DEFAULT 10,
-    active     INTEGER NOT NULL DEFAULT 1,
-    createdAt  TEXT NOT NULL,
-    updatedAt  TEXT NOT NULL
+    id        TEXT PRIMARY KEY,
+    storeId   TEXT NOT NULL,
+    name      TEXT NOT NULL,
+    type      TEXT NOT NULL DEFAULT 'TIME_BASED',
+    condition TEXT NOT NULL DEFAULT '{}',
+    action    TEXT NOT NULL DEFAULT '{}',
+    priority  INTEGER NOT NULL DEFAULT 10,
+    active    INTEGER NOT NULL DEFAULT 1,
+    validFrom TEXT,
+    validTo   TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  )`)
+  await exec(`CREATE TABLE IF NOT EXISTS PriceAdjustmentLog (
+    id        TEXT PRIMARY KEY,
+    storeId   TEXT NOT NULL,
+    productId TEXT NOT NULL,
+    ruleId    TEXT NOT NULL,
+    oldPrice  REAL NOT NULL,
+    newPrice  REAL NOT NULL,
+    appliedAt TEXT NOT NULL,
+    reason    TEXT NOT NULL DEFAULT ''
   )`)
 }
 
@@ -45,10 +56,10 @@ export default async function DynamicPricingPage() {
   const rules = (rulesRaw as any[]).map(r => ({
     ...r,
     active: Boolean(r.active),
-    conditions: JSON.parse(r.conditions || '{}'),
+    condition: (() => { try { return JSON.parse(r.condition || '{}') } catch { return {} } })(),
+    action: (() => { try { return JSON.parse(r.action || '{}') } catch { return {} } })(),
   }))
   const products = productsRaw as any[]
-
   const currency = user.stores?.[0]?.currency ?? 'IDR'
 
   return (

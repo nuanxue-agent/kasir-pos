@@ -1,337 +1,154 @@
 import { describe, it, expect } from 'vitest'
+import {
+  evaluateCondition,
+  evaluateOperator,
+  applyAction,
+  evaluateRule,
+  applyRules,
+  isRuleValid,
+  type PricingRule,
+  type RuleCondition,
+  type RuleAction,
+} from '@/lib/dynamic-pricing'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-type RuleType = 'TIME_BASED' | 'DEMAND_BASED' | 'STOCK_BASED' | 'SURGE'
-type AdjustmentType = 'PERCENTAGE' | 'FIXED'
-
-interface PricingRule {
-  id: string
-  storeId: string
-  name: string
-  ruleType: RuleType
-  conditions: any
-  adjustment: AdjustmentType
-  value: number
-  priority: number
-  active: boolean
-}
-
-interface Product {
-  id: string
-  name: string
-  price: number
-  stock?: number
-}
-
-// ── Business Logic ─────────────────────────────────────────────────────────────
-
-function applyAdjustment(price: number, adjustment: AdjustmentType, value: number): number {
-  if (adjustment === 'PERCENTAGE') {
-    return Math.round(price * (1 + value / 100))
+function makeRule(overrides: Partial<PricingRule> = {}): PricingRule {
+  return {
+    id: 'r1',
+    storeId: 's1',
+    name: 'Test Rule',
+    type: 'STOCK_BASED',
+    condition: { field: 'stock', operator: 'LT', value: 20 },
+    action: { type: 'DECREASE', value: 10, unit: 'PERCENT' },
+    priority: 10,
+    active: true,
+    validFrom: null,
+    validTo: null,
+    ...overrides,
   }
-  return Math.max(0, price + value)
 }
 
-function evaluateRule(rule: PricingRule, product: Product, now = new Date()): { applies: boolean; effectivePrice: number } {
-  if (!rule.active) return { applies: false, effectivePrice: product.price }
+// ── 1. Rule condition evaluation — operator matching ──────────────────────────
 
-  const cond = rule.conditions || {}
-  let applies = false
-
-  if (rule.ruleType === 'TIME_BASED') {
-    const hour = now.getHours()
-    const startHour = cond.startHour ?? 0
-    const endHour = cond.endHour ?? 24
-    applies = hour >= startHour && hour < endHour
-  } else if (rule.ruleType === 'STOCK_BASED') {
-    const stock = product.stock ?? 0
-    const threshold = cond.threshold ?? 0
-    const operator = cond.operator || 'GT'
-    applies = operator === 'GT' ? stock > threshold : stock < threshold
-  } else if (rule.ruleType === 'DEMAND_BASED' || rule.ruleType === 'SURGE') {
-    applies = true
-  }
-
-  const effectivePrice = applies ? applyAdjustment(product.price, rule.adjustment, rule.value) : product.price
-  return { applies, effectivePrice }
-}
-
-function calcEffectivePrice(product: Product, rules: PricingRule[], now = new Date()): number {
-  const sorted = [...rules].sort((a, b) => b.priority - a.priority)
-  let runningProduct = { ...product }
-
-  for (const rule of sorted) {
-    const { applies, effectivePrice } = evaluateRule(rule, runningProduct, now)
-    if (applies) {
-      runningProduct = { ...runningProduct, price: effectivePrice }
-    }
-  }
-
-  return runningProduct.price
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-describe('Dynamic Pricing', () => {
-  const product: Product = {
-    id: 'p1',
-    name: 'Coffee',
-    price: 5000,
-    stock: 15,
-  }
-
-  describe('Time-based rules', () => {
-    it('should apply discount during happy hour', () => {
-      const rule: PricingRule = {
-        id: 'r1',
-        storeId: 's1',
-        name: 'Happy Hour',
-        ruleType: 'TIME_BASED',
-        conditions: { startHour: 17, endHour: 19 },
-        adjustment: 'PERCENTAGE',
-        value: -20,
-        priority: 10,
-        active: true,
-      }
-
-      const now18 = new Date('2024-01-01T18:00:00')
-      const result = evaluateRule(rule, product, now18)
-      expect(result.applies).toBe(true)
-      expect(result.effectivePrice).toBe(4000) // 5000 * 0.8
-    })
-
-    it('should not apply outside happy hour', () => {
-      const rule: PricingRule = {
-        id: 'r1',
-        storeId: 's1',
-        name: 'Happy Hour',
-        ruleType: 'TIME_BASED',
-        conditions: { startHour: 17, endHour: 19 },
-        adjustment: 'PERCENTAGE',
-        value: -20,
-        priority: 10,
-        active: true,
-      }
-
-      const now14 = new Date('2024-01-01T14:00:00')
-      const result = evaluateRule(rule, product, now14)
-      expect(result.applies).toBe(false)
-      expect(result.effectivePrice).toBe(5000)
-    })
-
-    it('should apply peak hour surcharge', () => {
-      const rule: PricingRule = {
-        id: 'r2',
-        storeId: 's1',
-        name: 'Peak Hour',
-        ruleType: 'TIME_BASED',
-        conditions: { startHour: 12, endHour: 14 },
-        adjustment: 'PERCENTAGE',
-        value: 15,
-        priority: 10,
-        active: true,
-      }
-
-      const now13 = new Date('2024-01-01T13:00:00')
-      const result = evaluateRule(rule, product, now13)
-      expect(result.applies).toBe(true)
-      expect(result.effectivePrice).toBe(5750) // 5000 * 1.15
-    })
+describe('evaluateOperator', () => {
+  it('GT returns true when actual > threshold', () => {
+    expect(evaluateOperator(25, 'GT', 20)).toBe(true)
   })
 
-  describe('Stock-based rules', () => {
-    it('should apply discount when stock is high', () => {
-      const rule: PricingRule = {
-        id: 'r3',
-        storeId: 's1',
-        name: 'Overstock Discount',
-        ruleType: 'STOCK_BASED',
-        conditions: { threshold: 10, operator: 'GT' },
-        adjustment: 'PERCENTAGE',
-        value: -10,
-        priority: 10,
-        active: true,
-      }
-
-      const result = evaluateRule(rule, product)
-      expect(result.applies).toBe(true) // stock 15 > 10
-      expect(result.effectivePrice).toBe(4500) // 5000 * 0.9
-    })
-
-    it('should increase price when stock is low', () => {
-      const lowStockProduct = { ...product, stock: 3 }
-      const rule: PricingRule = {
-        id: 'r4',
-        storeId: 's1',
-        name: 'Low Stock Premium',
-        ruleType: 'STOCK_BASED',
-        conditions: { threshold: 5, operator: 'LT' },
-        adjustment: 'PERCENTAGE',
-        value: 25,
-        priority: 10,
-        active: true,
-      }
-
-      const result = evaluateRule(rule, lowStockProduct)
-      expect(result.applies).toBe(true) // stock 3 < 5
-      expect(result.effectivePrice).toBe(6250) // 5000 * 1.25
-    })
-
-    it('should not apply when stock threshold not met', () => {
-      const rule: PricingRule = {
-        id: 'r5',
-        storeId: 's1',
-        name: 'Low Stock Premium',
-        ruleType: 'STOCK_BASED',
-        conditions: { threshold: 5, operator: 'LT' },
-        adjustment: 'PERCENTAGE',
-        value: 25,
-        priority: 10,
-        active: true,
-      }
-
-      const result = evaluateRule(rule, product) // stock 15 >= 5
-      expect(result.applies).toBe(false)
-      expect(result.effectivePrice).toBe(5000)
-    })
+  it('LT returns false when actual >= threshold', () => {
+    expect(evaluateOperator(20, 'LT', 20)).toBe(false)
   })
 
-  describe('Adjustment types', () => {
-    it('should apply percentage adjustment correctly', () => {
-      const rule: PricingRule = {
-        id: 'r6',
-        storeId: 's1',
-        name: 'Percentage Discount',
-        ruleType: 'SURGE',
-        conditions: {},
-        adjustment: 'PERCENTAGE',
-        value: -30,
-        priority: 10,
-        active: true,
-      }
-
-      const result = evaluateRule(rule, product)
-      expect(result.effectivePrice).toBe(3500) // 5000 * 0.7
-    })
-
-    it('should apply fixed adjustment correctly', () => {
-      const rule: PricingRule = {
-        id: 'r7',
-        storeId: 's1',
-        name: 'Fixed Discount',
-        ruleType: 'SURGE',
-        conditions: {},
-        adjustment: 'FIXED',
-        value: -1000,
-        priority: 10,
-        active: true,
-      }
-
-      const result = evaluateRule(rule, product)
-      expect(result.effectivePrice).toBe(4000) // 5000 - 1000
-    })
-
-    it('should not allow negative prices with fixed adjustment', () => {
-      const rule: PricingRule = {
-        id: 'r8',
-        storeId: 's1',
-        name: 'Large Discount',
-        ruleType: 'SURGE',
-        conditions: {},
-        adjustment: 'FIXED',
-        value: -6000,
-        priority: 10,
-        active: true,
-      }
-
-      const result = evaluateRule(rule, product)
-      expect(result.effectivePrice).toBe(0)
-    })
+  it('LTE returns true when actual equals threshold', () => {
+    expect(evaluateOperator(20, 'LTE', 20)).toBe(true)
   })
 
-  describe('Rule priority', () => {
-    it('should apply higher priority rule first', () => {
-      const rules: PricingRule[] = [
-        {
-          id: 'r9',
-          storeId: 's1',
-          name: 'Low Priority',
-          ruleType: 'SURGE',
-          conditions: {},
-          adjustment: 'PERCENTAGE',
-          value: -10,
-          priority: 5,
-          active: true,
-        },
-        {
-          id: 'r10',
-          storeId: 's1',
-          name: 'High Priority',
-          ruleType: 'SURGE',
-          conditions: {},
-          adjustment: 'PERCENTAGE',
-          value: -20,
-          priority: 20,
-          active: true,
-        },
-      ]
+  it('EQ returns false when values differ', () => {
+    expect(evaluateOperator(19, 'EQ', 20)).toBe(false)
+  })
+})
 
-      const effectivePrice = calcEffectivePrice(product, rules)
-      // Descending sort: r10(-20%, p20) first → 4000, then r9(-10%, p5) chains → 3600
-      expect(effectivePrice).toBe(3600)
-    })
+// ── 2. evaluateCondition resolves field from context ─────────────────────────
 
-    it('should stack multiple applicable rules', () => {
-      const rules: PricingRule[] = [
-        {
-          id: 'r11',
-          storeId: 's1',
-          name: 'Base Discount',
-          ruleType: 'SURGE',
-          conditions: {},
-          adjustment: 'PERCENTAGE',
-          value: -10,
-          priority: 10,
-          active: true,
-        },
-        {
-          id: 'r12',
-          storeId: 's1',
-          name: 'Additional Discount',
-          ruleType: 'SURGE',
-          conditions: {},
-          adjustment: 'FIXED',
-          value: -500,
-          priority: 5,
-          active: true,
-        },
-      ]
-
-      const effectivePrice = calcEffectivePrice(product, rules)
-      // Descending priority: r11(10, -10%) first: 5000 * 0.9 = 4500
-      // Then r12(5, -500 fixed): 4500 - 500 = 4000
-      expect(effectivePrice).toBe(4000)
-    })
+describe('evaluateCondition', () => {
+  it('returns false when field is missing from context', () => {
+    const cond: RuleCondition = { field: 'stock', operator: 'LT', value: 10 }
+    expect(evaluateCondition(cond, {})).toBe(false)
   })
 
-  describe('Rule activation', () => {
-    it('should not apply inactive rule', () => {
-      const rule: PricingRule = {
-        id: 'r13',
-        storeId: 's1',
-        name: 'Inactive Discount',
-        ruleType: 'SURGE',
-        conditions: {},
-        adjustment: 'PERCENTAGE',
-        value: -50,
-        priority: 10,
-        active: false,
-      }
+  it('returns true when context satisfies condition', () => {
+    const cond: RuleCondition = { field: 'hour', operator: 'GTE', value: 18 }
+    expect(evaluateCondition(cond, { hour: 19 })).toBe(true)
+  })
+})
 
-      const result = evaluateRule(rule, product)
-      expect(result.applies).toBe(false)
-      expect(result.effectivePrice).toBe(5000)
-    })
+// ── 3. Price adjustment calculation — percent ─────────────────────────────────
+
+describe('applyAction — PERCENT', () => {
+  it('DECREASE by 10% from 100000 gives 90000', () => {
+    const action: RuleAction = { type: 'DECREASE', value: 10, unit: 'PERCENT' }
+    expect(applyAction(100_000, action)).toBe(90_000)
+  })
+
+  it('INCREASE by 20% from 50000 gives 60000', () => {
+    const action: RuleAction = { type: 'INCREASE', value: 20, unit: 'PERCENT' }
+    expect(applyAction(50_000, action)).toBe(60_000)
+  })
+
+  it('DECREASE clamps to 0 on over-discount', () => {
+    const action: RuleAction = { type: 'DECREASE', value: 150, unit: 'PERCENT' }
+    expect(applyAction(10_000, action)).toBe(0)
+  })
+})
+
+// ── 4. Price adjustment calculation — fixed ───────────────────────────────────
+
+describe('applyAction — FIXED', () => {
+  it('DECREASE by fixed 5000 from 20000 gives 15000', () => {
+    const action: RuleAction = { type: 'DECREASE', value: 5_000, unit: 'FIXED' }
+    expect(applyAction(20_000, action)).toBe(15_000)
+  })
+
+  it('SET to fixed value ignores base price', () => {
+    const action: RuleAction = { type: 'SET', value: 25_000, unit: 'FIXED' }
+    expect(applyAction(99_999, action)).toBe(25_000)
+  })
+})
+
+// ── 5. Priority ordering ──────────────────────────────────────────────────────
+
+describe('applyRules — priority ordering', () => {
+  it('applies higher-priority rule first', () => {
+    const rules: PricingRule[] = [
+      makeRule({ id: 'low',  priority: 1,  action: { type: 'INCREASE', value: 10, unit: 'PERCENT' } }),
+      makeRule({ id: 'high', priority: 100, action: { type: 'DECREASE', value: 50, unit: 'PERCENT' } }),
+    ]
+    // high priority DECREASE runs first on 100000 → 50000, then low priority INCREASE → 55000
+    const { finalPrice, applied } = applyRules(rules, 100_000, { stock: 5 })
+    expect(applied[0].ruleId).toBe('high')
+    expect(finalPrice).toBe(55_000)
+  })
+})
+
+// ── 6. Validity date check ────────────────────────────────────────────────────
+
+describe('isRuleValid', () => {
+  it('returns false when validFrom is in the future', () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString()
+    expect(isRuleValid({ validFrom: future, validTo: null })).toBe(false)
+  })
+
+  it('returns false when validTo is in the past', () => {
+    const past = new Date(Date.now() - 86_400_000).toISOString()
+    expect(isRuleValid({ validFrom: null, validTo: past })).toBe(false)
+  })
+
+  it('returns true when both validFrom and validTo are null', () => {
+    expect(isRuleValid({ validFrom: null, validTo: null })).toBe(true)
+  })
+})
+
+// ── 7. Multiple rule application ──────────────────────────────────────────────
+
+describe('applyRules — multiple rules', () => {
+  it('skips inactive rules', () => {
+    const rules: PricingRule[] = [
+      makeRule({ id: 'active', active: true,  action: { type: 'DECREASE', value: 10, unit: 'PERCENT' } }),
+      makeRule({ id: 'off',   active: false, action: { type: 'DECREASE', value: 50, unit: 'PERCENT' } }),
+    ]
+    const { finalPrice, applied } = applyRules(rules, 100_000, { stock: 5 })
+    expect(applied).toHaveLength(1)
+    expect(applied[0].ruleId).toBe('active')
+    expect(finalPrice).toBe(90_000)
+  })
+
+  it('returns base price when no rules match', () => {
+    const rules: PricingRule[] = [
+      makeRule({ condition: { field: 'stock', operator: 'GT', value: 1000 } }),
+    ]
+    const { finalPrice, applied } = applyRules(rules, 50_000, { stock: 5 })
+    expect(applied).toHaveLength(0)
+    expect(finalPrice).toBe(50_000)
   })
 })
