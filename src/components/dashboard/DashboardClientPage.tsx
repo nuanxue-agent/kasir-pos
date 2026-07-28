@@ -49,6 +49,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import ActivityFeedClient from '@/components/dashboard/ActivityFeedClient'
 import { KpiGoalRow } from '@/components/dashboard/KpiGoalRow'
+import AIInsightsClient from '@/components/reports/AIInsightsClient'
 
 interface DashboardClientPageProps {
   storeId: string
@@ -1148,6 +1149,9 @@ export default function DashboardClientPage({
           )}
         </div>
       </div>
+
+      {/* ── Smart Insights ── */}
+      <AIInsightsClient storeId={storeId} compact />
 
       {/* ── Activity Feed ── */}
       <ActivityFeedClient storeId={storeId} />

@@ -7175,6 +7175,20 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     }
 
     // ── REPORTS / SCHEDULED ───────────────────────────────────────────────────
+    // Lazy-init PerformanceAlert table
+    async function ensurePerformanceAlertTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS PerformanceAlert (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          metric TEXT NOT NULL,
+          threshold REAL NOT NULL,
+          actualValue REAL NOT NULL,
+          alertedAt TEXT NOT NULL
+        )
+      `)
+    }
+
     // Lazy-init ScheduledReport table
     async function ensureScheduledReportTable() {
       await exec(`
@@ -7969,6 +7983,111 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── VENDOR INVITES ────────────────────────────────────────────────────────
+    // GET  /api/suppliers/invites         — list all invites for store
+    // POST /api/suppliers/:id/invite      — create invite for supplier
+    if (segs[0] === 'suppliers' && segs[1] === 'invites' && !segs[2] && method === 'GET') {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS VendorInvite (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          supplierId  TEXT NOT NULL,
+          email       TEXT NOT NULL,
+          token       TEXT NOT NULL UNIQUE,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          expiresAt   TEXT NOT NULL,
+          createdAt   TEXT NOT NULL
+        )`,
+        [],
+      )
+      const rows = await query(
+        `SELECT vi.*, s.name as supplierName
+         FROM VendorInvite vi
+         JOIN Supplier s ON vi.supplierId = s.id
+         WHERE vi.storeId = ?
+         ORDER BY vi.createdAt DESC`,
+        [storeId],
+      )
+      return ok(rows)
+    }
+
+    if (segs[0] === 'suppliers' && segs[1] && segs[2] === 'invite' && !segs[3] && method === 'POST') {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS VendorInvite (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          supplierId  TEXT NOT NULL,
+          email       TEXT NOT NULL,
+          token       TEXT NOT NULL UNIQUE,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          expiresAt   TEXT NOT NULL,
+          createdAt   TEXT NOT NULL
+        )`,
+        [],
+      )
+      const b = (await req.json()) as any
+      if (!b.email || !b.email.includes('@')) return err('Email tidak valid')
+      const supplierId = segs[1]
+      const supplier = await queryOne<any>(`SELECT id FROM Supplier WHERE id=? AND storeId=?`, [supplierId, storeId])
+      if (!supplier) return err('Supplier tidak ditemukan', 404)
+      const id = newId()
+      const token = `${newId()}-${newId()}`.replace(/-/g, '')
+      const t = nowISO()
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      await exec(
+        `INSERT INTO VendorInvite (id,storeId,supplierId,email,token,status,expiresAt,createdAt)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [id, storeId, supplierId, b.email, token, 'PENDING', expiresAt, t],
+      )
+      const baseUrl = req.headers.get('origin') ?? 'https://app.kasir.id'
+      return ok({ id, token, inviteLink: `${baseUrl}/vendor/accept?token=${token}`, expiresAt }, 201)
+    }
+
+    // ── VENDOR MESSAGES ───────────────────────────────────────────────────────
+    // GET  /api/suppliers/:id/messages    — list thread
+    // POST /api/suppliers/:id/messages    — send message
+    if (segs[0] === 'suppliers' && segs[1] && segs[2] === 'messages' && !segs[3]) {
+      await exec(
+        `CREATE TABLE IF NOT EXISTS VendorMessage (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          supplierId  TEXT NOT NULL,
+          direction   TEXT NOT NULL CHECK(direction IN ('IN','OUT')),
+          subject     TEXT,
+          body        TEXT NOT NULL,
+          sentAt      TEXT NOT NULL
+        )`,
+        [],
+      )
+      const supplierId = segs[1]
+
+      if (method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM VendorMessage
+           WHERE supplierId=? AND storeId=?
+           ORDER BY sentAt ASC`,
+          [supplierId, storeId],
+        )
+        return ok(rows)
+      }
+
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.body || !b.body.trim()) return err('body pesan tidak boleh kosong')
+        if (!['IN', 'OUT'].includes(b.direction ?? 'OUT')) return err('direction harus IN atau OUT')
+        const supplier = await queryOne<any>(`SELECT id FROM Supplier WHERE id=? AND storeId=?`, [supplierId, storeId])
+        if (!supplier) return err('Supplier tidak ditemukan', 404)
+        const id = newId()
+        const sentAt = nowISO()
+        await exec(
+          `INSERT INTO VendorMessage (id,storeId,supplierId,direction,subject,body,sentAt)
+           VALUES (?,?,?,?,?,?,?)`,
+          [id, storeId, supplierId, b.direction ?? 'OUT', b.subject ?? null, b.body.trim(), sentAt],
+        )
+        return ok({ id, sentAt }, 201)
+      }
+    }
+
     // ── SURVEYS ──────────────────────────────────────────────────────────────
     if (segs[0] === 'surveys') {
       // Lazy-init tables
@@ -8136,6 +8255,189 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           npsBreakdown: { promoters, passives, detractors },
         })
       }
+    }
+
+    // ─── REPORTS / STORE-COMPARISON ─────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'store-comparison' && method === 'GET') {
+      const rawIds = sp.get('storeIds') ?? ''
+      const storeIds = rawIds
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+      if (storeIds.length === 0) return err('storeIds required', 400, 'MISSING_FIELD')
+
+      const from = sp.get('from') ?? new Date(Date.now() - 86400000 * 30).toISOString()
+      const to = sp.get('to') ?? new Date().toISOString()
+
+      // Fetch store names
+      const storePlaceholders = storeIds.map(() => '?').join(',')
+      const storeRows = await query(
+        `SELECT id, name FROM Store WHERE id IN (${storePlaceholders})`,
+        storeIds,
+      )
+      const storeNameMap: Record<string, string> = {}
+      for (const s of storeRows as any[]) storeNameMap[s.id] = s.name ?? s.id
+
+      // Per-store metrics in parallel
+      const metricsResults = await Promise.all(
+        storeIds.map(sid =>
+          Promise.all([
+            // revenue + orders
+            queryOne<any>(
+              `SELECT COALESCE(SUM(total),0) as revenue, COUNT(*) as orders,
+                      COALESCE(AVG(total),0) as avgOrderValue
+               FROM "Order" WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+              [sid, from, to],
+            ),
+            // gross margin: sum(total) vs sum(costTotal)
+            queryOne<any>(
+              `SELECT COALESCE(SUM(o.total),0) as revenue,
+                      COALESCE(SUM(oi.qty * oi.costPrice),0) as cost
+               FROM "Order" o
+               LEFT JOIN OrderItem oi ON oi.orderId = o.id
+               WHERE o.storeId=? AND o.status='PAID' AND o.createdAt BETWEEN ? AND ?`,
+              [sid, from, to],
+            ),
+            // new customers (first order in the window)
+            queryOne<any>(
+              `SELECT COUNT(DISTINCT customerId) as newCustomers
+               FROM "Order" o
+               WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?
+                 AND customerId IS NOT NULL
+                 AND NOT EXISTS (
+                   SELECT 1 FROM "Order" o2
+                   WHERE o2.customerId = o.customerId AND o2.storeId = o.storeId
+                     AND o2.status='PAID' AND o2.createdAt < ?
+                 )`,
+              [sid, from, to, from],
+            ),
+            // returning customers
+            queryOne<any>(
+              `SELECT COUNT(DISTINCT customerId) as returningCustomers
+               FROM "Order" o
+               WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?
+                 AND customerId IS NOT NULL
+                 AND EXISTS (
+                   SELECT 1 FROM "Order" o2
+                   WHERE o2.customerId = o.customerId AND o2.storeId = o.storeId
+                     AND o2.status='PAID' AND o2.createdAt < ?
+                 )`,
+              [sid, from, to, from],
+            ),
+          ]),
+        ),
+      )
+
+      // Build raw metrics array for percentile calculation
+      const rawRevenues = metricsResults.map(([base]) => Number((base as any)?.revenue ?? 0))
+
+      // Fetch all-store revenues for percentile ranking
+      const allRevenueRows = await query(
+        `SELECT storeId, COALESCE(SUM(total),0) as revenue
+         FROM "Order" WHERE status='PAID' AND createdAt BETWEEN ? AND ?
+         GROUP BY storeId`,
+        [from, to],
+      )
+      const allRevenues = (allRevenueRows as any[]).map((r: any) => Number(r.revenue))
+
+      const stores = storeIds.map((sid, idx) => {
+        const [base, gm, newC, retC] = metricsResults[idx]
+        const revenue = Number((base as any)?.revenue ?? 0)
+        const cost = Number((gm as any)?.cost ?? 0)
+        const orders = Number((base as any)?.orders ?? 0)
+        const avgOrderValue = Number((base as any)?.avgOrderValue ?? 0)
+        const grossMarginPct = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0
+        const newCustomers = Number((newC as any)?.newCustomers ?? 0)
+        const returningCustomers = Number((retC as any)?.returningCustomers ?? 0)
+        // Percentile: how many stores have revenue < this store's revenue
+        const below = allRevenues.filter(v => v < revenue).length
+        const percentileRank =
+          allRevenues.length > 0 ? Math.round((below / allRevenues.length) * 100) : 0
+
+        return {
+          storeId: sid,
+          storeName: storeNameMap[sid] ?? sid,
+          revenue,
+          orders,
+          avgOrderValue,
+          grossMarginPct,
+          newCustomers,
+          returningCustomers,
+          percentileRank,
+        }
+      })
+
+      return ok({ stores, generatedAt: nowISO() })
+    }
+
+    // ─── REPORTS / PERFORMANCE-ALERTS (GET list) ─────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'performance-alerts' && method === 'GET') {
+      await ensurePerformanceAlertTable()
+      const rawIds = sp.get('storeIds') ?? storeId
+      const ids = rawIds
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter(Boolean)
+      const placeholders = ids.map(() => '?').join(',')
+      const rows = await query(
+        `SELECT * FROM PerformanceAlert WHERE storeId IN (${placeholders}) ORDER BY alertedAt DESC LIMIT 100`,
+        ids,
+      )
+      return ok(rows)
+    }
+
+    // ─── REPORTS / PERFORMANCE-ALERTS (POST — generate) ──────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'performance-alerts' && method === 'POST') {
+      await ensurePerformanceAlertTable()
+
+      const body = await req.json().catch(() => ({})) as { storeIds?: string[] }
+      const targetStoreIds: string[] = Array.isArray(body.storeIds)
+        ? body.storeIds
+        : [storeId]
+
+      const now = new Date()
+      const periodEnd = now.toISOString()
+      const periodStart = new Date(now.getTime() - 86400000 * 7).toISOString() // last 7 days
+      const avg30Start = new Date(now.getTime() - 86400000 * 30).toISOString()
+
+      const METRICS_TO_CHECK = ['revenue', 'orders'] as const
+      const generated: any[] = []
+
+      for (const sid of targetStoreIds) {
+        for (const metric of METRICS_TO_CHECK) {
+          const field = metric === 'revenue' ? 'SUM(total)' : 'COUNT(*)'
+
+          const [recentRow, avgRow] = await Promise.all([
+            queryOne<any>(
+              `SELECT COALESCE(${field},0) as val FROM "Order"
+               WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+              [sid, periodStart, periodEnd],
+            ),
+            queryOne<any>(
+              `SELECT COALESCE(${field},0) / 30.0 as val FROM "Order"
+               WHERE storeId=? AND status='PAID' AND createdAt BETWEEN ? AND ?`,
+              [sid, avg30Start, periodEnd],
+            ),
+          ])
+
+          const actual = Number((recentRow as any)?.val ?? 0) / 7 // daily average
+          const avg30d = Number((avgRow as any)?.val ?? 0)
+
+          if (avg30d > 0 && actual < avg30d * 0.8) {
+            const id = newId()
+            const alertedAt = nowISO()
+            await exec(
+              `INSERT OR IGNORE INTO PerformanceAlert (id, storeId, metric, threshold, actualValue, alertedAt)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [id, sid, metric, avg30d, actual, alertedAt],
+            )
+            generated.push({ id, storeId: sid, metric, threshold: avg30d, actualValue: actual, alertedAt })
+          }
+        }
+      }
+
+      return ok({ generated, count: generated.length }, 201)
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
