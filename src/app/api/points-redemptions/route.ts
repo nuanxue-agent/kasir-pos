@@ -1,9 +1,7 @@
-// GET /api/points-redemptions?storeId=&customerId=
-// POST /api/points-redemptions?storeId=
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { query, exec, newId, nowISO } from '@/lib/db'
-import { ensureRewardTables } from '../reward-items/route'
+import { query, exec, queryOne, newId, nowISO } from '@/lib/db'
+import { ensureRewardTables } from '../reward-catalog/route'
 
 function err(msg: string, status = 400, code = 'ERROR') {
   return NextResponse.json({ error: msg, code }, { status })
@@ -14,24 +12,30 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
   const user = session.user as any
 
-  const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
-
+  const storeId    = req.nextUrl.searchParams.get('storeId')    ?? user.stores?.[0]?.id
   const customerId = req.nextUrl.searchParams.get('customerId')
+  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
 
   await ensureRewardTables()
 
-  let sql = `
-    SELECT pr.*, ri.name as rewardName, ri.category as rewardCategory, ri.pointsCost
-    FROM PointsRedemption pr
-    LEFT JOIN RewardItem ri ON pr.rewardItemId = ri.id
-    WHERE pr.storeId = ?
-  `
-  const vals: any[] = [storeId]
-  if (customerId) { sql += ' AND pr.customerId = ?'; vals.push(customerId) }
-  sql += ' ORDER BY pr.createdAt DESC'
+  const rows = customerId
+    ? await query(
+        `SELECT pr.*, rc.name as rewardName, rc.type as rewardType
+         FROM PointsRedemption pr
+         LEFT JOIN RewardCatalog rc ON rc.id = pr.rewardId
+         WHERE pr.storeId = ? AND pr.customerId = ?
+         ORDER BY pr.redeemedAt DESC`,
+        [storeId, customerId],
+      )
+    : await query(
+        `SELECT pr.*, rc.name as rewardName, rc.type as rewardType
+         FROM PointsRedemption pr
+         LEFT JOIN RewardCatalog rc ON rc.id = pr.rewardId
+         WHERE pr.storeId = ?
+         ORDER BY pr.redeemedAt DESC`,
+        [storeId],
+      )
 
-  const rows = await query(sql, vals)
   return NextResponse.json(rows)
 }
 
@@ -46,57 +50,53 @@ export async function POST(req: NextRequest) {
   await ensureRewardTables()
 
   const b = (await req.json()) as any
-  if (!b.customerId) return err("Field 'customerId' is required", 400, 'MISSING_FIELD')
-  if (!b.rewardItemId) return err("Field 'rewardItemId' is required", 400, 'MISSING_FIELD')
+  if (!b.customerId) return err('customerId required', 400, 'MISSING_FIELD')
+  if (!b.rewardId)   return err('rewardId required',   400, 'MISSING_FIELD')
 
-  // Fetch reward item
-  const rewardRows = await query(
-    `SELECT * FROM RewardItem WHERE id = ? AND storeId = ?`,
-    [b.rewardItemId, storeId],
-  )
-  if (rewardRows.length === 0) return err('Reward item not found', 404, 'NOT_FOUND')
-  const reward = rewardRows[0] as any
+  // Load reward
+  const reward = (await queryOne(`SELECT * FROM RewardCatalog WHERE id = ?`, [b.rewardId])) as any
+  if (!reward) return err('Reward not found', 404, 'NOT_FOUND')
+  if (!reward.active) return err('Reward is not active', 400, 'REWARD_INACTIVE')
 
-  if (!Boolean(reward.active)) return err('Reward item is not active', 400, 'INACTIVE')
-  if (reward.stock !== null && reward.stock <= 0) return err('Reward item is out of stock', 400, 'OUT_OF_STOCK')
-
-  // Fetch customer points balance
-  const customerRows = await query(
-    `SELECT loyaltyPoints FROM Customer WHERE id = ? AND storeId = ?`,
-    [b.customerId, storeId],
-  )
-  if (customerRows.length === 0) return err('Customer not found', 404, 'NOT_FOUND')
-  const customer = customerRows[0] as any
-  const points = customer.loyaltyPoints ?? 0
-
-  if (points < reward.pointsCost) {
-    return err(
-      `Insufficient points. Required: ${reward.pointsCost}, Available: ${points}`,
-      400,
-      'INSUFFICIENT_POINTS',
-    )
+  // Check expiry
+  if (reward.expiresAt && reward.expiresAt < nowISO()) {
+    return err('Reward has expired', 400, 'REWARD_EXPIRED')
   }
 
-  const t = nowISO()
+  // Check stock (-1 = unlimited)
+  if (reward.stock !== -1 && reward.stock <= 0) {
+    return err('Reward out of stock', 400, 'OUT_OF_STOCK')
+  }
+
+  // Load customer points — depends on LoyaltyPoints table from earlier sprints
+  const pointsRow = (await queryOne(
+    `SELECT balance FROM LoyaltyPoints WHERE storeId = ? AND customerId = ?`,
+    [storeId, b.customerId],
+  )) as any
+
+  const balance = Number(pointsRow?.balance ?? 0)
+  if (balance < reward.pointsCost) {
+    return err('Insufficient points', 400, 'INSUFFICIENT_POINTS')
+  }
+
   const id = newId()
+  const t  = nowISO()
 
-  // Deduct points from customer
+  // Deduct points
   await exec(
-    `UPDATE Customer SET loyaltyPoints = loyaltyPoints - ? WHERE id = ? AND storeId = ?`,
-    [reward.pointsCost, b.customerId, storeId],
+    `UPDATE LoyaltyPoints SET balance = balance - ?, updatedAt = ? WHERE storeId = ? AND customerId = ?`,
+    [reward.pointsCost, t, storeId, b.customerId],
   )
 
-  // Decrement stock
-  await exec(
-    `UPDATE RewardItem SET stock = stock - 1, updatedAt = ? WHERE id = ?`,
-    [t, b.rewardItemId],
-  )
+  // Decrement stock if finite
+  if (reward.stock !== -1) {
+    await exec(`UPDATE RewardCatalog SET stock = stock - 1, updatedAt = ? WHERE id = ?`, [t, reward.id])
+  }
 
-  // Create redemption record
   await exec(
-    `INSERT INTO PointsRedemption (id, customerId, storeId, rewardItemId, pointsSpent, status, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
-    [id, b.customerId, storeId, b.rewardItemId, reward.pointsCost, t, t],
+    `INSERT INTO PointsRedemption (id, storeId, customerId, rewardId, pointsSpent, status, redeemedAt, fulfilledAt, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, 'PENDING', ?, NULL, ?, ?)`,
+    [id, storeId, b.customerId, b.rewardId, reward.pointsCost, t, t, t],
   )
 
   return NextResponse.json({ id, pointsSpent: reward.pointsCost }, { status: 201 })
