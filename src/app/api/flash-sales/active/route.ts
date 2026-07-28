@@ -1,10 +1,12 @@
-// GET /api/flash-sales/active?storeId= — returns currently active sales for POS
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, exec } from '@/lib/db'
 
-function err(msg: string, status = 400, code = 'ERROR') {
-  return NextResponse.json({ error: msg, code }, { status })
+function ok(data: unknown, status = 200) {
+  return NextResponse.json(data, { status })
+}
+function err(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status })
 }
 
 async function ensureTables() {
@@ -14,68 +16,68 @@ async function ensureTables() {
     name      TEXT NOT NULL,
     startAt   TEXT NOT NULL,
     endAt     TEXT NOT NULL,
-    active    INTEGER NOT NULL DEFAULT 1,
+    status    TEXT NOT NULL DEFAULT 'SCHEDULED',
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   )`)
   await exec(`CREATE TABLE IF NOT EXISTS FlashSaleItem (
     id            TEXT PRIMARY KEY,
     saleId        TEXT NOT NULL,
+    storeId       TEXT NOT NULL,
     productId     TEXT NOT NULL,
-    discountType  TEXT NOT NULL DEFAULT 'PERCENTAGE',
-    discountValue REAL NOT NULL DEFAULT 0,
-    maxQty        INTEGER NOT NULL DEFAULT 0,
+    originalPrice REAL NOT NULL DEFAULT 0,
+    salePrice     REAL NOT NULL DEFAULT 0,
+    discountPct   REAL NOT NULL DEFAULT 0,
+    stockLimit    INTEGER NOT NULL DEFAULT 0,
     soldQty       INTEGER NOT NULL DEFAULT 0,
-    createdAt     TEXT NOT NULL
+    active        INTEGER NOT NULL DEFAULT 1,
+    createdAt     TEXT NOT NULL,
+    updatedAt     TEXT NOT NULL
   )`)
 }
 
+// GET /api/flash-sales/active?storeId=xxx
+// Returns sales that are ACTIVE or SCHEDULED (with their items)
 export async function GET(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
-  const user = session.user as any
+  try {
+    const session = await auth()
+    if (!session?.user) return err('Unauthorized', 401)
 
-  const sp = req.nextUrl.searchParams
-  const storeId = sp.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
+    const user = session.user as any
+    const urlStoreId = new URL(req.url).searchParams.get('storeId')
+    const storeId: string =
+      (urlStoreId && user.stores?.some((s: any) => s.id === urlStoreId) ? urlStoreId : null) ??
+      user.stores?.[0]?.id ?? ''
+    if (!storeId) return err('Forbidden', 403)
 
-  await ensureTables()
+    await ensureTables()
 
-  const now = new Date().toISOString()
+    const now = new Date().toISOString()
 
-  // Active: active=1, startAt <= now <= endAt, stock not exhausted (maxQty=0 means unlimited)
-  const rows = await query(
-    `SELECT fs.id AS saleId, fs.name AS saleName,
-            fsi.id AS itemId, fsi.productId, fsi.discountType,
-            fsi.discountValue, fsi.maxQty, fsi.soldQty,
-            p.name AS productName, p.price AS originalPrice
-     FROM FlashSale fs
-     JOIN FlashSaleItem fsi ON fsi.saleId = fs.id
-     JOIN Product p ON p.id = fsi.productId
-     WHERE fs.storeId = ?
-       AND fs.active = 1
-       AND fs.startAt <= ?
-       AND fs.endAt > ?
-       AND (fsi.maxQty = 0 OR fsi.soldQty < fsi.maxQty)`,
-    [storeId, now, now],
-  )
+    // Return sales currently within their time window (status != CANCELLED/ENDED)
+    const sales = await query(
+      `SELECT * FROM FlashSale
+       WHERE storeId = ?
+         AND status NOT IN ('CANCELLED', 'ENDED')
+         AND startAt <= ?
+         AND endAt   >= ?
+       ORDER BY endAt ASC`,
+      [storeId, now, now],
+    )
 
-  // Group by product so POS can quickly look up flash price by productId
-  const byProduct: Record<string, any> = {}
-  for (const row of rows as any[]) {
-    byProduct[row.productId] = {
-      saleId: row.saleId,
-      saleName: row.saleName,
-      itemId: row.itemId,
-      productId: row.productId,
-      productName: row.productName,
-      originalPrice: row.originalPrice,
-      discountType: row.discountType,
-      discountValue: row.discountValue,
-      maxQty: row.maxQty,
-      soldQty: row.soldQty,
-    }
+    // Enrich each sale with its active items
+    const result = await Promise.all(
+      (sales as any[]).map(async (sale) => {
+        const items = await query(
+          `SELECT * FROM FlashSaleItem WHERE saleId = ? AND active = 1 ORDER BY createdAt ASC`,
+          [sale.id],
+        )
+        return { ...sale, items }
+      }),
+    )
+
+    return ok(result)
+  } catch (e: unknown) {
+    return err(e instanceof Error ? e.message : 'Internal error', 500)
   }
-
-  return NextResponse.json(Object.values(byProduct))
 }
