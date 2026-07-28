@@ -1,62 +1,42 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import toast from 'react-hot-toast'
+import { Plus, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Pure logic exports (used by unit tests) ──────────────────────────────────
 
-export interface QCInspection {
-  id: string
-  storeId: string
-  productId: string
-  referenceId?: string
-  referenceType?: 'PURCHASE_ORDER' | 'PRODUCTION' | 'RETURN'
-  inspectedBy?: string
-  inspectedAt?: string
-  status: 'PENDING' | 'PASSED' | 'FAILED' | 'PARTIAL'
-  passQty: number
-  failQty: number
-  notes?: string
-  productName?: string
-}
-
-export interface QCCheckpoint {
-  id: string
-  inspectionId: string
-  criterion: string
-  result: 'PASS' | 'FAIL' | 'NA'
-  value?: string
-  threshold?: string
-  notes?: string
-}
-
-// ── Pure helpers ──────────────────────────────────────────────────────────────
+export type QCStatus = 'PENDING' | 'PASSED' | 'FAILED' | 'PARTIAL'
+export type CheckpointResult = 'PASS' | 'FAIL' | 'NA'
+export type ReferenceType = 'PURCHASE_ORDER' | 'PRODUCTION' | 'RETURN'
 
 export function calcPassRate(passQty: number, totalQty: number): number {
   if (totalQty <= 0) return 0
   return Math.round((passQty / totalQty) * 100)
 }
 
-export function calcDefectRate(failQty: number, totalQty: number): number {
+export function calcFailRate(failQty: number, totalQty: number): number {
   if (totalQty <= 0) return 0
   return Math.round((failQty / totalQty) * 100)
 }
 
-export function deriveInspectionStatus(
-  checkpoints: QCCheckpoint[],
-  passQty: number,
-  failQty: number,
-): 'PENDING' | 'PASSED' | 'FAILED' | 'PARTIAL' {
-  if (checkpoints.length === 0 && passQty === 0 && failQty === 0) return 'PENDING'
+export function calcDefectRate(failQty: number, passQty: number): number {
+  const total = passQty + failQty
+  if (total <= 0) return 0
+  return Math.round((failQty / total) * 100)
+}
+
+export function deriveInspectionStatus(passQty: number, failQty: number): QCStatus {
+  if (passQty === 0 && failQty === 0) return 'PENDING'
   if (failQty === 0 && passQty > 0) return 'PASSED'
   if (passQty === 0 && failQty > 0) return 'FAILED'
   return 'PARTIAL'
 }
 
-export function calcCheckpointScore(checkpoints: QCCheckpoint[]): number {
-  if (checkpoints.length === 0) return 0
+export function calcCheckpointScore(checkpoints: Array<{ result: CheckpointResult }>): number {
   const applicable = checkpoints.filter(c => c.result !== 'NA')
-  if (applicable.length === 0) return 0
+  if (applicable.length === 0) return 100
   const passed = applicable.filter(c => c.result === 'PASS').length
   return Math.round((passed / applicable.length) * 100)
 }
@@ -65,247 +45,592 @@ export function isPartialPass(passQty: number, failQty: number): boolean {
   return passQty > 0 && failQty > 0
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+export function validateInspection(data: {
+  productId: string
+  inspectedBy: string
+  passQty: number
+  failQty: number
+}): string | null {
+  if (!data.productId) return 'productId diperlukan'
+  if (!data.inspectedBy.trim()) return 'inspectedBy diperlukan'
+  if (data.passQty < 0) return 'passQty tidak boleh negatif'
+  if (data.failQty < 0) return 'failQty tidak boleh negatif'
+  if (data.passQty === 0 && data.failQty === 0) return 'passQty atau failQty harus > 0'
+  return null
+}
 
-interface Props {
+// ─── Inspection templates per product category ────────────────────────────────
+
+export const INSPECTION_TEMPLATES: Record<string, string[]> = {
+  'Makanan': ['Kebersihan', 'Tanggal kadaluarsa', 'Kemasan utuh', 'Bau normal', 'Warna sesuai'],
+  'Elektronik': ['Fungsi dasar', 'Layar/display', 'Koneksi port', 'Kemasan utuh', 'Aksesori lengkap'],
+  'Pakaian': ['Jahitan rapi', 'Ukuran sesuai', 'Warna tidak luntur', 'Tidak cacat', 'Label tersedia'],
+  'Minuman': ['Kemasan kedap', 'Tanggal kadaluarsa', 'Volume sesuai', 'Tidak bocor', 'Warna normal'],
+  'Default': ['Kondisi fisik', 'Kemasan utuh', 'Kesesuaian spesifikasi', 'Kelengkapan dokumen'],
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface QCInspection {
+  id: string
   storeId: string
+  productId: string
+  productName?: string
+  referenceId?: string
+  referenceType: ReferenceType
+  inspectedBy: string
+  inspectedAt: string
+  status: QCStatus
+  passQty: number
+  failQty: number
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  checkpointTotal?: number
+  checkpointPassed?: number
+  checkpointFailed?: number
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  PASSED: 'bg-green-100 text-green-700',
-  FAILED: 'bg-red-100 text-red-700',
-  PARTIAL: 'bg-orange-100 text-orange-700',
+interface QCCheckpoint {
+  id: string
+  inspectionId: string
+  storeId: string
+  criterion: string
+  result: CheckpointResult
+  value?: string
+  threshold?: string
+  notes?: string
+  createdAt: string
 }
 
-const REF_TYPES = ['PURCHASE_ORDER', 'PRODUCTION', 'RETURN'] as const
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
-export default function QualityControlClient({ storeId }: Props) {
-  const [inspections, setInspections] = useState<QCInspection[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [checkpoints, setCheckpoints] = useState<QCCheckpoint[]>([])
-  const [filter, setFilter] = useState<string>('ALL')
+function StatusBadge({ status }: { status: QCStatus }) {
+  const map: Record<QCStatus, { label: string; className: string }> = {
+    PENDING:  { label: 'Menunggu',  className: 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' },
+    PASSED:   { label: 'Lulus',     className: 'bg-[var(--color-success)]/15 text-[var(--color-success)]' },
+    FAILED:   { label: 'Gagal',     className: 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]' },
+    PARTIAL:  { label: 'Sebagian',  className: 'bg-[var(--color-info)]/15 text-[var(--color-info)]' },
+  }
+  const { label, className } = map[status] ?? map.PENDING
+  return (
+    <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', className)}>
+      {label}
+    </span>
+  )
+}
 
-  const [form, setForm] = useState({
-    productId: '',
-    referenceType: 'PURCHASE_ORDER' as typeof REF_TYPES[number],
-    referenceId: '',
-    passQty: '',
-    failQty: '',
-    notes: '',
-  })
+function ResultBadge({ result }: { result: CheckpointResult }) {
+  const map: Record<CheckpointResult, { label: string; className: string }> = {
+    PASS: { label: 'Lulus', className: 'bg-[var(--color-success)]/15 text-[var(--color-success)]' },
+    FAIL: { label: 'Gagal', className: 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]' },
+    NA:   { label: 'N/A',   className: 'bg-[var(--color-muted)]/15 text-[var(--color-muted)]' },
+  }
+  const { label, className } = map[result] ?? map.NA
+  return (
+    <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', className)}>
+      {label}
+    </span>
+  )
+}
 
-  const loadInspections = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/qc-inspections?storeId=${storeId}`)
-      const data = await res.json() as any
-      setInspections(data.inspections ?? [])
-    } catch {
-      toast.error('Gagal memuat data inspeksi')
-    } finally {
-      setLoading(false)
-    }
-  }, [storeId])
+function StatusIcon({ status }: { status: QCStatus }) {
+  if (status === 'PASSED')  return <CheckCircle className="w-4 h-4 text-[var(--color-success)]" />
+  if (status === 'FAILED')  return <XCircle className="w-4 h-4 text-[var(--color-danger)]" />
+  if (status === 'PARTIAL') return <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />
+  return <Clock className="w-4 h-4 text-[var(--color-muted)]" />
+}
 
-  const loadCheckpoints = useCallback(async (inspectionId: string) => {
-    try {
-      const res = await fetch(`/api/qc-inspections/${inspectionId}/checkpoints?storeId=${storeId}`)
-      const data = await res.json() as any
-      setCheckpoints(data.checkpoints ?? [])
-    } catch {
-      toast.error('Gagal memuat checkpoint')
-    }
-  }, [storeId])
+const REF_TYPE_LABELS: Record<ReferenceType, string> = {
+  PURCHASE_ORDER: 'Purchase Order',
+  PRODUCTION: 'Produksi',
+  RETURN: 'Retur',
+}
 
-  useEffect(() => { loadInspections() }, [loadInspections])
+// ─── New Inspection Form ──────────────────────────────────────────────────────
 
-  const handleSelect = (id: string) => {
-    setSelectedId(id)
-    loadCheckpoints(id)
+interface NewInspectionFormProps {
+  storeId: string
+  onCreated: () => void
+  onCancel: () => void
+}
+
+function NewInspectionForm({ storeId, onCreated, onCancel }: NewInspectionFormProps) {
+  const [productId, setProductId] = useState('')
+  const [productName, setProductName] = useState('')
+  const [referenceId, setReferenceId] = useState('')
+  const [referenceType, setReferenceType] = useState<ReferenceType>('PURCHASE_ORDER')
+  const [inspectedBy, setInspectedBy] = useState('')
+  const [passQty, setPassQty] = useState(0)
+  const [failQty, setFailQty] = useState(0)
+  const [notes, setNotes] = useState('')
+  const [category, setCategory] = useState('Default')
+  const [checkpoints, setCheckpoints] = useState<Array<{ criterion: string; result: CheckpointResult; value: string; threshold: string; notes: string }>>([])
+  const [saving, setSaving] = useState(false)
+
+  const loadTemplate = (cat: string) => {
+    setCategory(cat)
+    const criteria = INSPECTION_TEMPLATES[cat] ?? INSPECTION_TEMPLATES['Default']
+    setCheckpoints(criteria.map(c => ({ criterion: c, result: 'NA', value: '', threshold: '', notes: '' })))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const err = validateInspection({ productId, inspectedBy, passQty, failQty })
+    if (err) { toast.error(err); return }
+
+    setSaving(true)
     try {
-      const res = await fetch('/api/qc-inspections', {
+      const res = await fetch(`/api/qc-inspections?storeId=${storeId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          storeId,
-          productId: form.productId,
-          referenceType: form.referenceType,
-          referenceId: form.referenceId || undefined,
-          passQty: Number(form.passQty),
-          failQty: Number(form.failQty),
-          notes: form.notes,
+          productId,
+          referenceId: referenceId || undefined,
+          referenceType,
+          inspectedBy,
+          passQty,
+          failQty,
+          notes: notes || undefined,
+          checkpoints: checkpoints.filter(c => c.result !== 'NA' || c.value || c.notes),
         }),
       })
-      if (!res.ok) throw new Error()
-      toast.success('Inspeksi dibuat')
-      setShowForm(false)
-      setForm({ productId: '', referenceType: 'PURCHASE_ORDER', referenceId: '', passQty: '', failQty: '', notes: '' })
-      loadInspections()
-    } catch {
-      toast.error('Gagal membuat inspeksi')
+      const data = await res.json() as any
+      if (!res.ok) { toast.error(data.error ?? 'Gagal membuat inspeksi'); return }
+      toast.success('Inspeksi berhasil dibuat')
+      onCreated()
+    } finally {
+      setSaving(false)
     }
   }
-
-  const handleUpdateStatus = async (id: string, status: string) => {
-    try {
-      const res = await fetch(`/api/qc-inspections/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, status }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success('Status diperbarui')
-      loadInspections()
-    } catch {
-      toast.error('Gagal memperbarui status')
-    }
-  }
-
-  const filtered = filter === 'ALL' ? inspections : inspections.filter(i => i.status === filter)
-  const selected = inspections.find(i => i.id === selectedId)
-
-  const totalPass = inspections.reduce((s, i) => s + i.passQty, 0)
-  const totalFail = inspections.reduce((s, i) => s + i.failQty, 0)
-  const overallRate = calcPassRate(totalPass, totalPass + totalFail)
 
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">ID Produk *</label>
+          <input
+            value={productId}
+            onChange={e => setProductId(e.target.value)}
+            placeholder="prod-xxx"
+            required
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">Nama Produk</label>
+          <input
+            value={productName}
+            onChange={e => setProductName(e.target.value)}
+            placeholder="Opsional"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">Tipe Referensi</label>
+          <select
+            value={referenceType}
+            onChange={e => setReferenceType(e.target.value as ReferenceType)}
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          >
+            <option value="PURCHASE_ORDER">Purchase Order</option>
+            <option value="PRODUCTION">Produksi</option>
+            <option value="RETURN">Retur</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">ID Referensi</label>
+          <input
+            value={referenceId}
+            onChange={e => setReferenceId(e.target.value)}
+            placeholder="po-xxx / prod-xxx"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">Diperiksa Oleh *</label>
+          <input
+            value={inspectedBy}
+            onChange={e => setInspectedBy(e.target.value)}
+            placeholder="Nama inspektor"
+            required
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">Kategori Template</label>
+          <select
+            value={category}
+            onChange={e => loadTemplate(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          >
+            {Object.keys(INSPECTION_TEMPLATES).map(k => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">Qty Lulus</label>
+          <input
+            type="number" min="0"
+            value={passQty}
+            onChange={e => setPassQty(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--color-muted)] mb-1">Qty Gagal</label>
+          <input
+            type="number" min="0"
+            value={failQty}
+            onChange={e => setFailQty(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
+      </div>
+
+      {passQty + failQty > 0 && (
+        <div className="flex gap-4 text-xs text-[var(--color-muted)] bg-[var(--color-surface-2)] rounded-lg px-3 py-2">
+          <span>Lulus: <strong className="text-[var(--color-success)]">{calcPassRate(passQty, passQty + failQty)}%</strong></span>
+          <span>Gagal: <strong className="text-[var(--color-danger)]">{calcFailRate(failQty, passQty + failQty)}%</strong></span>
+          <span>Status: <strong>{deriveInspectionStatus(passQty, failQty)}</strong></span>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs text-[var(--color-muted)] mb-1">Catatan</label>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          rows={2}
+          className="w-full px-3 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+        />
+      </div>
+
+      {checkpoints.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-[var(--color-muted)] mb-2">Checkpoint ({checkpoints.length})</p>
+          <div className="space-y-2">
+            {checkpoints.map((cp, i) => (
+              <div key={i} className="flex items-center gap-2 bg-[var(--color-surface-2)] rounded-lg px-3 py-2">
+                <span className="flex-1 text-sm">{cp.criterion}</span>
+                <select
+                  value={cp.result}
+                  onChange={e => {
+                    const updated = [...checkpoints]
+                    updated[i] = { ...updated[i], result: e.target.value as CheckpointResult }
+                    setCheckpoints(updated)
+                  }}
+                  className="px-2 py-1 rounded bg-[var(--color-surface)] border border-[var(--color-border)] text-xs"
+                >
+                  <option value="NA">N/A</option>
+                  <option value="PASS">Lulus</option>
+                  <option value="FAIL">Gagal</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 rounded-lg text-sm border border-[var(--color-border)] hover:bg-[var(--color-surface-2)] transition-colors">
+          Batal
+        </button>
+        <button type="submit" disabled={saving}
+          className="px-4 py-2 rounded-lg text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50 transition-colors">
+          {saving ? 'Menyimpan...' : 'Simpan Inspeksi'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Inspection Detail Row ────────────────────────────────────────────────────
+
+function InspectionRow({ insp, storeId, onUpdated }: {
+  insp: QCInspection
+  storeId: string
+  onUpdated: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [checkpoints, setCheckpoints] = useState<QCCheckpoint[]>([])
+  const [loadingCps, setLoadingCps] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+
+  const loadCheckpoints = useCallback(async () => {
+    setLoadingCps(true)
+    try {
+      const res = await fetch(`/api/qc-inspections/${insp.id}/checkpoints?storeId=${storeId}`)
+      const data = await res.json() as any
+      if (res.ok) setCheckpoints(data.data ?? [])
+    } finally {
+      setLoadingCps(false)
+    }
+  }, [insp.id, storeId])
+
+  const handleToggle = () => {
+    if (!expanded && checkpoints.length === 0) loadCheckpoints()
+    setExpanded(v => !v)
+  }
+
+  const handleUpdateStatus = async (status: QCStatus) => {
+    setUpdatingStatus(true)
+    try {
+      const res = await fetch(`/api/qc-inspections/${insp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const data = await res.json() as any
+      if (!res.ok) { toast.error(data.error ?? 'Gagal update status'); return }
+      toast.success('Status diperbarui')
+      onUpdated()
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const totalQty = insp.passQty + insp.failQty
+  const score = calcCheckpointScore(checkpoints)
+
+  return (
+    <div className="border border-[var(--color-border)] rounded-lg overflow-hidden">
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors"
+        onClick={handleToggle}
+      >
+        <StatusIcon status={insp.status} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{insp.productId}</p>
+          <p className="text-xs text-[var(--color-muted)]">
+            {REF_TYPE_LABELS[insp.referenceType]} {insp.referenceId ? `· ${insp.referenceId}` : ''} · {insp.inspectedBy}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {totalQty > 0 && (
+            <div className="text-xs text-right hidden sm:block">
+              <span className="text-[var(--color-success)]">{insp.passQty} lulus</span>
+              <span className="text-[var(--color-muted)] mx-1">/</span>
+              <span className="text-[var(--color-danger)]">{insp.failQty} gagal</span>
+            </div>
+          )}
+          <StatusBadge status={insp.status} />
+          {expanded ? <ChevronUp className="w-4 h-4 text-[var(--color-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--color-muted)]" />}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-[var(--color-border)] px-4 py-3 bg-[var(--color-surface-2)] space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <p className="text-[var(--color-muted)]">Pass Rate</p>
+              <p className="font-semibold text-[var(--color-success)]">{calcPassRate(insp.passQty, totalQty)}%</p>
+            </div>
+            <div>
+              <p className="text-[var(--color-muted)]">Defect Rate</p>
+              <p className="font-semibold text-[var(--color-danger)]">{calcDefectRate(insp.failQty, insp.passQty)}%</p>
+            </div>
+            <div>
+              <p className="text-[var(--color-muted)]">Checkpoint Score</p>
+              <p className="font-semibold">{checkpoints.length > 0 ? `${score}%` : '-'}</p>
+            </div>
+            <div>
+              <p className="text-[var(--color-muted)]">Waktu Inspeksi</p>
+              <p className="font-semibold">{new Date(insp.inspectedAt).toLocaleDateString('id-ID')}</p>
+            </div>
+          </div>
+
+          {insp.notes && (
+            <p className="text-xs text-[var(--color-muted)] italic">{insp.notes}</p>
+          )}
+
+          {loadingCps ? (
+            <p className="text-xs text-[var(--color-muted)]">Memuat checkpoint...</p>
+          ) : checkpoints.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-[var(--color-muted)]">Checkpoint ({checkpoints.length})</p>
+              {checkpoints.map(cp => (
+                <div key={cp.id} className="flex items-center gap-2 text-xs">
+                  <ResultBadge result={cp.result} />
+                  <span className="flex-1">{cp.criterion}</span>
+                  {cp.value && <span className="text-[var(--color-muted)]">Nilai: {cp.value}</span>}
+                  {cp.threshold && <span className="text-[var(--color-muted)]">Batas: {cp.threshold}</span>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--color-muted)]">Tidak ada checkpoint</p>
+          )}
+
+          {insp.status === 'PENDING' && (
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => handleUpdateStatus('PASSED')}
+                disabled={updatingStatus}
+                className="px-3 py-1 rounded text-xs bg-[var(--color-success)]/15 text-[var(--color-success)] hover:bg-[var(--color-success)]/25 disabled:opacity-50 transition-colors"
+              >
+                Tandai Lulus
+              </button>
+              <button
+                onClick={() => handleUpdateStatus('FAILED')}
+                disabled={updatingStatus}
+                className="px-3 py-1 rounded text-xs bg-[var(--color-danger)]/15 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/25 disabled:opacity-50 transition-colors"
+              >
+                Tandai Gagal
+              </button>
+              <button
+                onClick={() => handleUpdateStatus('PARTIAL')}
+                disabled={updatingStatus}
+                className="px-3 py-1 rounded text-xs bg-[var(--color-warning)]/15 text-[var(--color-warning)] hover:bg-[var(--color-warning)]/25 disabled:opacity-50 transition-colors"
+              >
+                Sebagian Lulus
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function QualityControlClient({ storeId }: { storeId: string }) {
+  const [inspections, setInspections] = useState<QCInspection[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<string>('')
+  const [filterRefType, setFilterRefType] = useState<string>('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      let url = `/api/qc-inspections?storeId=${storeId}`
+      if (filterStatus) url += `&status=${filterStatus}`
+      if (filterRefType) url += `&referenceType=${filterRefType}`
+      const res = await fetch(url)
+      const data = await res.json() as any
+      if (res.ok) setInspections(Array.isArray(data) ? data : [])
+      else toast.error(data.error ?? 'Gagal memuat data')
+    } finally {
+      setLoading(false)
+    }
+  }, [storeId, filterStatus, filterRefType])
+
+  useEffect(() => { load() }, [load])
+
+  const summary = {
+    total: inspections.length,
+    passed: inspections.filter(i => i.status === 'PASSED').length,
+    failed: inspections.filter(i => i.status === 'FAILED').length,
+    partial: inspections.filter(i => i.status === 'PARTIAL').length,
+    pending: inspections.filter(i => i.status === 'PENDING').length,
+  }
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <ClipboardList className="w-6 h-6 text-[var(--color-primary)]" />
+          <div>
+            <h1 className="text-xl font-semibold">Kontrol Kualitas</h1>
+            <p className="text-xs text-[var(--color-muted)]">Inspeksi barang masuk, produksi, dan retur</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            disabled={loading}
+            className="p-2 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 transition-colors"
+            aria-label="Refresh"
+          >
+            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+          </button>
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Inspeksi Baru
+          </button>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Inspeksi', value: inspections.length },
-          { label: 'Lulus', value: inspections.filter(i => i.status === 'PASSED').length },
-          { label: 'Gagal', value: inspections.filter(i => i.status === 'FAILED').length },
-          { label: 'Pass Rate', value: `${overallRate}%` },
-        ].map(s => (
-          <div key={s.label} className="rounded-2xl p-4 bg-[var(--bg-card)] border border-[var(--border)]">
-            <div className="text-2xl font-bold text-[var(--text-1)]">{s.value}</div>
-            <div className="text-xs text-[var(--text-2)] mt-1">{s.label}</div>
+          { label: 'Total', value: summary.total, color: 'text-[var(--color-text)]' },
+          { label: 'Lulus', value: summary.passed, color: 'text-[var(--color-success)]' },
+          { label: 'Gagal', value: summary.failed, color: 'text-[var(--color-danger)]' },
+          { label: 'Sebagian', value: summary.partial, color: 'text-[var(--color-warning)]' },
+        ].map(card => (
+          <div key={card.label} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+            <p className="text-xs text-[var(--color-muted)] mb-1">{card.label}</p>
+            <p className={cn('text-2xl font-bold', card.color)}>{card.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          {['ALL', 'PENDING', 'PASSED', 'FAILED', 'PARTIAL'].map(s => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${filter === s ? 'bg-stone-800 text-white border-stone-800' : 'border-[var(--border)] text-[var(--text-2)] hover:bg-stone-100'}`}
-            >
-              {s === 'ALL' ? 'Semua' : s}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="text-sm px-4 py-2 rounded-xl bg-stone-800 text-white hover:bg-stone-700 transition-colors"
-        >
-          + Inspeksi Baru
-        </button>
-      </div>
-
-      {/* List + Detail */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* List */}
-        <div className="col-span-2 space-y-2">
-          {loading ? (
-            <div className="text-sm text-[var(--text-2)] py-4 text-center">Memuat...</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-sm text-[var(--text-2)] py-4 text-center">Belum ada inspeksi</div>
-          ) : filtered.map(insp => (
-            <div
-              key={insp.id}
-              onClick={() => handleSelect(insp.id)}
-              className={`rounded-2xl p-4 border cursor-pointer transition-colors bg-[var(--bg-card)] ${selectedId === insp.id ? 'border-stone-800' : 'border-[var(--border)] hover:border-stone-400'}`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-[var(--text-1)]">{insp.productName ?? insp.productId}</div>
-                  <div className="text-xs text-[var(--text-2)] mt-0.5">{insp.referenceType} · Lulus: {insp.passQty} · Gagal: {insp.failQty}</div>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[insp.status]}`}>{insp.status}</span>
-              </div>
-              {insp.notes && <div className="text-xs text-[var(--text-2)] mt-2 italic">{insp.notes}</div>}
-              {insp.status === 'PENDING' && (
-                <div className="flex gap-2 mt-3">
-                  <button onClick={e => { e.stopPropagation(); handleUpdateStatus(insp.id, 'PASSED') }} className="text-xs px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">Lulus</button>
-                  <button onClick={e => { e.stopPropagation(); handleUpdateStatus(insp.id, 'FAILED') }} className="text-xs px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">Gagal</button>
-                  <button onClick={e => { e.stopPropagation(); handleUpdateStatus(insp.id, 'PARTIAL') }} className="text-xs px-3 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600">Parsial</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Detail */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-          {selected ? (
-            <div className="space-y-3">
-              <div className="text-sm font-semibold text-[var(--text-1)]">Checkpoint ({checkpoints.length})</div>
-              {checkpoints.length === 0 ? (
-                <div className="text-xs text-[var(--text-2)]">Belum ada checkpoint</div>
-              ) : checkpoints.map(cp => (
-                <div key={cp.id} className="text-xs border-b border-[var(--border)] pb-2">
-                  <div className="font-medium text-[var(--text-1)]">{cp.criterion}</div>
-                  <div className="flex justify-between mt-0.5">
-                    <span className="text-[var(--text-2)]">{cp.value ?? '-'} / {cp.threshold ?? '-'}</span>
-                    <span className={cp.result === 'PASS' ? 'text-green-600' : cp.result === 'FAIL' ? 'text-red-600' : 'text-stone-400'}>{cp.result}</span>
-                  </div>
-                </div>
-              ))}
-              <div className="text-xs text-[var(--text-2)] pt-1">Score: {calcCheckpointScore(checkpoints)}%</div>
-            </div>
-          ) : (
-            <div className="text-xs text-[var(--text-2)] text-center py-8">Pilih inspeksi untuk melihat checkpoint</div>
-          )}
-        </div>
-      </div>
-
-      {/* Form Modal */}
+      {/* New inspection form */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
-            <div className="text-base font-semibold text-[var(--text-1)]">Inspeksi Baru</div>
-            <div>
-              <label className="text-xs text-[var(--text-2)]">Produk ID</label>
-              <input required value={form.productId} onChange={e => setForm(f => ({ ...f, productId: e.target.value }))} className="w-full mt-1 text-sm border border-[var(--border)] rounded-xl px-3 py-2 bg-transparent text-[var(--text-1)]" />
-            </div>
-            <div>
-              <label className="text-xs text-[var(--text-2)]">Tipe Referensi</label>
-              <select value={form.referenceType} onChange={e => setForm(f => ({ ...f, referenceType: e.target.value as typeof REF_TYPES[number] }))} className="w-full mt-1 text-sm border border-[var(--border)] rounded-xl px-3 py-2 bg-transparent text-[var(--text-1)]">
-                {REF_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-[var(--text-2)]">Qty Lulus</label>
-                <input required type="number" min="0" value={form.passQty} onChange={e => setForm(f => ({ ...f, passQty: e.target.value }))} className="w-full mt-1 text-sm border border-[var(--border)] rounded-xl px-3 py-2 bg-transparent text-[var(--text-1)]" />
-              </div>
-              <div>
-                <label className="text-xs text-[var(--text-2)]">Qty Gagal</label>
-                <input required type="number" min="0" value={form.failQty} onChange={e => setForm(f => ({ ...f, failQty: e.target.value }))} className="w-full mt-1 text-sm border border-[var(--border)] rounded-xl px-3 py-2 bg-transparent text-[var(--text-1)]" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[var(--text-2)]">Catatan</label>
-              <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="w-full mt-1 text-sm border border-[var(--border)] rounded-xl px-3 py-2 bg-transparent text-[var(--text-1)]" />
-            </div>
-            <div className="flex gap-3 justify-end pt-2">
-              <button type="button" onClick={() => setShowForm(false)} className="text-sm px-4 py-2 rounded-xl border border-[var(--border)] text-[var(--text-2)] hover:bg-stone-100">Batal</button>
-              <button type="submit" className="text-sm px-4 py-2 rounded-xl bg-stone-800 text-white hover:bg-stone-700">Simpan</button>
-            </div>
-          </form>
+        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5">
+          <h2 className="text-base font-semibold mb-4">Inspeksi Baru</h2>
+          <NewInspectionForm
+            storeId={storeId}
+            onCreated={() => { setShowForm(false); load() }}
+            onCancel={() => setShowForm(false)}
+          />
         </div>
       )}
+
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap">
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value)}
+          className="px-3 py-1.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <option value="">Semua Status</option>
+          <option value="PENDING">Menunggu</option>
+          <option value="PASSED">Lulus</option>
+          <option value="FAILED">Gagal</option>
+          <option value="PARTIAL">Sebagian</option>
+        </select>
+        <select
+          value={filterRefType}
+          onChange={e => setFilterRefType(e.target.value)}
+          className="px-3 py-1.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <option value="">Semua Tipe</option>
+          <option value="PURCHASE_ORDER">Purchase Order</option>
+          <option value="PRODUCTION">Produksi</option>
+          <option value="RETURN">Retur</option>
+        </select>
+      </div>
+
+      {/* Inspection list */}
+      <div className="space-y-2">
+        {loading ? (
+          <div className="text-center py-12 text-[var(--color-muted)] text-sm">Memuat...</div>
+        ) : inspections.length === 0 ? (
+          <div className="text-center py-12 text-[var(--color-muted)] text-sm">
+            <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p>Belum ada inspeksi</p>
+          </div>
+        ) : (
+          inspections.map(insp => (
+            <InspectionRow
+              key={insp.id}
+              insp={insp}
+              storeId={storeId}
+              onUpdated={load}
+            />
+          ))
+        )}
+      </div>
     </div>
   )
 }
