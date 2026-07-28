@@ -141,9 +141,9 @@ describe('generateSKU', () => {
 describe('bulkUpdatePrice', () => {
   const variants: ProductVariant[] = [
     makeVariant({ Size: 'S', Color: 'Red' }, 50000),
-    makeVariant({ Size: 'M', Color: 'Red' }, 55000),
+    makeVariant({ Size: 'M', Color: 'Red' }, 50000),
     makeVariant({ Size: 'S', Color: 'Blue' }, 50000),
-    makeVariant({ Size: 'M', Color: 'Blue' }, 55000),
+    makeVariant({ Size: 'M', Color: 'Blue' }, 50000),
   ]
 
   it('updates all variants matching the attribute value', () => {
