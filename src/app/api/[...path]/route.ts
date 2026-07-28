@@ -5637,40 +5637,251 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── TAX RATES CRUD ───────────────────────────────────────────────────────
+    if (segs[0] === 'tax-rates') {
+      // Lazy-init TaxRate table
+      await exec(`CREATE TABLE IF NOT EXISTS TaxRate (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        rate REAL NOT NULL,
+        type TEXT NOT NULL DEFAULT 'PERCENTAGE',
+        appliesTo TEXT NOT NULL DEFAULT 'ALL',
+        active INTEGER NOT NULL DEFAULT 1,
+        isDefault INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`, [])
+
+      // GET /api/tax-rates?storeId=
+      if (method === 'GET' && !segs[1]) {
+        const rows = await query<any>(
+          `SELECT * FROM TaxRate WHERE storeId = ? ORDER BY isDefault DESC, name ASC`,
+          [storeId],
+        )
+        return ok(rows.map((r: any) => ({
+          ...r,
+          rate: Number(r.rate),
+          active: Boolean(r.active),
+          isDefault: Boolean(r.isDefault),
+        })))
+      }
+
+      // POST /api/tax-rates
+      if (method === 'POST' && !segs[1]) {
+        const b = await req.json() as any
+        if (!b.name || b.rate === undefined) return err('name and rate required', 400)
+        const validTypes = ['PERCENTAGE', 'FIXED']
+        const validApplies = ['ALL', 'FOOD', 'BEVERAGE', 'SERVICE']
+        if (b.type && !validTypes.includes(b.type)) return err('Invalid type', 400)
+        if (b.appliesTo && !validApplies.includes(b.appliesTo)) return err('Invalid appliesTo', 400)
+        const t = nowISO()
+        const id = newId()
+        // If this is marked as default, clear existing defaults
+        if (b.isDefault) {
+          await exec(`UPDATE TaxRate SET isDefault = 0 WHERE storeId = ?`, [storeId])
+        }
+        await exec(
+          `INSERT INTO TaxRate (id,storeId,name,rate,type,appliesTo,active,isDefault,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, storeId, b.name, Number(b.rate),
+            b.type ?? 'PERCENTAGE', b.appliesTo ?? 'ALL',
+            b.active !== false ? 1 : 0,
+            b.isDefault ? 1 : 0,
+            t, t,
+          ],
+        )
+        return ok({ id, success: true }, 201)
+      }
+
+      // PATCH /api/tax-rates/:id
+      if (method === 'PATCH' && segs[1]) {
+        const rateId = segs[1]
+        const b = await req.json() as any
+        const existing = await queryOne<any>(
+          `SELECT id FROM TaxRate WHERE id = ? AND storeId = ?`,
+          [rateId, storeId],
+        )
+        if (!existing) return err('Tax rate not found', 404)
+        const allowed = ['name', 'rate', 'type', 'appliesTo', 'active', 'isDefault'] as const
+        const updates: Record<string, any> = {}
+        for (const k of allowed) if (k in b) updates[k] = b[k]
+        if ('active' in updates) updates.active = updates.active ? 1 : 0
+        if ('isDefault' in updates) {
+          updates.isDefault = updates.isDefault ? 1 : 0
+          if (updates.isDefault) {
+            await exec(`UPDATE TaxRate SET isDefault = 0 WHERE storeId = ?`, [storeId])
+          }
+        }
+        if (Object.keys(updates).length === 0) return err('No fields to update', 400)
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE TaxRate SET ${setClauses}, updatedAt = ? WHERE id = ? AND storeId = ?`,
+          [...values, nowISO(), rateId, storeId],
+        )
+        return ok({ success: true })
+      }
+    }
+
+    // ─── SETTINGS / TAX-CONFIG ────────────────────────────────────────────────
+    if (segs[0] === 'settings' && segs[1] === 'tax-config') {
+      await exec(`CREATE TABLE IF NOT EXISTS TaxConfig (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL UNIQUE,
+        ppnRate REAL NOT NULL DEFAULT 0.11,
+        ppnEnabled INTEGER NOT NULL DEFAULT 0,
+        ppnIncluded INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`, [])
+
+      if (method === 'GET') {
+        const cfg = await queryOne<any>(
+          `SELECT * FROM TaxConfig WHERE storeId = ?`, [storeId],
+        )
+        if (!cfg) {
+          return ok({ id: null, storeId, ppnRate: 0.11, ppnEnabled: false, ppnIncluded: false })
+        }
+        return ok({
+          id: cfg.id,
+          storeId: cfg.storeId,
+          ppnRate: Number(cfg.ppnRate),
+          ppnEnabled: Boolean(cfg.ppnEnabled),
+          ppnIncluded: Boolean(cfg.ppnIncluded),
+        })
+      }
+
+      if (method === 'POST') {
+        const b = await req.json() as any
+        const t = nowISO()
+        const existing = await queryOne<any>(
+          `SELECT id FROM TaxConfig WHERE storeId = ?`, [storeId],
+        )
+        if (existing) {
+          await exec(
+            `UPDATE TaxConfig SET ppnRate=?,ppnEnabled=?,ppnIncluded=?,updatedAt=? WHERE storeId=?`,
+            [
+              Number(b.ppnRate ?? 0.11),
+              b.ppnEnabled ? 1 : 0,
+              b.ppnIncluded ? 1 : 0,
+              t, storeId,
+            ],
+          )
+        } else {
+          await exec(
+            `INSERT INTO TaxConfig (id,storeId,ppnRate,ppnEnabled,ppnIncluded,createdAt,updatedAt)
+             VALUES (?,?,?,?,?,?,?)`,
+            [newId(), storeId, Number(b.ppnRate ?? 0.11), b.ppnEnabled ? 1 : 0, b.ppnIncluded ? 1 : 0, t, t],
+          )
+        }
+        return ok({ success: true })
+      }
+    }
+
     // ─── REPORTS / TAX ────────────────────────────────────────────────────────
     if (segs[0] === 'reports' && segs[1] === 'tax' && method === 'GET') {
-      const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
-      if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
-      const fromStr = `${year}-01-01T00:00:00.000Z`
-      const toStr = `${year}-12-31T23:59:59.999Z`
-      const monthRows = await query<any>(
+      // Support both legacy ?year= and new ?from=&to=&groupBy= params
+      const fromParam = sp.get('from')
+      const toParam = sp.get('to')
+      const groupBy = (sp.get('groupBy') ?? 'month') as 'month' | 'quarter' | 'year'
+
+      let fromStr: string
+      let toStr: string
+
+      if (fromParam && toParam) {
+        fromStr = `${fromParam}T00:00:00.000Z`
+        toStr = `${toParam}T23:59:59.999Z`
+      } else {
+        const year = parseInt(sp.get('year') ?? String(new Date().getFullYear()))
+        if (isNaN(year) || year < 2000 || year > 2100) return err('Invalid year', 400)
+        fromStr = `${year}-01-01T00:00:00.000Z`
+        toStr = `${year}-12-31T23:59:59.999Z`
+      }
+
+      // Fetch tax config for this store
+      const taxCfg = await queryOne<any>(
+        `SELECT ppnRate, ppnEnabled, ppnIncluded FROM TaxConfig WHERE storeId = ?`,
+        [storeId],
+      ).catch(() => null)
+      const ppnRate = Number(taxCfg?.ppnRate ?? 0.11)
+      const ppnEnabled = Boolean(taxCfg?.ppnEnabled ?? false)
+      const ppnIncluded = Boolean(taxCfg?.ppnIncluded ?? false)
+
+      // Group expression based on groupBy
+      let periodExpr: string
+      if (groupBy === 'year') {
+        periodExpr = `strftime('%Y', datetime(createdAt))`
+      } else if (groupBy === 'quarter') {
+        periodExpr = `strftime('%Y', datetime(createdAt)) || '-Q' || CAST((CAST(strftime('%m', datetime(createdAt)) AS INTEGER) + 2) / 3 AS TEXT)`
+      } else {
+        periodExpr = `strftime('%Y-%m', datetime(createdAt))`
+      }
+
+      const periodRows = await query<any>(
         `SELECT
-           CAST(strftime('%m', datetime(createdAt)) AS INTEGER) AS month,
-           SUM(total)   AS grossRevenue,
-           SUM(taxAmt)  AS taxCollected,
-           COUNT(*)     AS orderCount
+           ${periodExpr} AS period,
+           SUM(total)    AS grossRevenue,
+           SUM(taxAmt)   AS taxCollected,
+           COUNT(*)      AS orderCount
          FROM "Order"
          WHERE storeId = ?
-           AND status  = 'PAID'
+           AND status   = 'PAID'
            AND createdAt BETWEEN ? AND ?
-         GROUP BY month
-         ORDER BY month`,
+         GROUP BY period
+         ORDER BY period`,
         [storeId, fromStr, toStr],
       )
-      const result = monthRows.map((r: any) => {
+
+      // Fetch per-category breakdown
+      const catRows = await query<any>(
+        `SELECT
+           ${periodExpr} AS period,
+           COALESCE(p.category, 'Lainnya') AS category,
+           SUM(oi.subtotal) AS taxable,
+           SUM(oi.subtotal * COALESCE(p.taxRate, 0) / 100) AS tax
+         FROM OrderItem oi
+         JOIN "Order" o ON o.id = oi.orderId
+         LEFT JOIN Product p ON p.id = oi.productId
+         WHERE o.storeId = ?
+           AND o.status  = 'PAID'
+           AND o.createdAt BETWEEN ? AND ?
+         GROUP BY period, category
+         ORDER BY period, category`,
+        [storeId, fromStr, toStr],
+      ).catch(() => [] as any[])
+
+      // Build a map of period → categoryBreakdown
+      const catMap = new Map<string, Array<{ category: string; taxable: number; tax: number }>>()
+      for (const c of catRows) {
+        const arr = catMap.get(c.period) ?? []
+        arr.push({ category: c.category, taxable: Number(c.taxable ?? 0), tax: Number(c.tax ?? 0) })
+        catMap.set(c.period, arr)
+      }
+
+      const data = periodRows.map((r: any) => {
         const gross = Number(r.grossRevenue ?? 0)
         const tax = Number(r.taxCollected ?? 0)
-        // taxableRevenue = DPP = gross × 100/111
-        const taxable = Math.round((gross * 100) / 111)
+        const taxable = ppnIncluded
+          ? Math.round((gross * 100) / (100 + ppnRate * 100))
+          : Math.round(gross / (1 + ppnRate))
+        // PPh 23 — 2% on B2B transactions above Rp 500k (approx via taxable)
+        const pphBase = taxable >= 500_000 ? taxable : 0
+        const pphCollected = pphBase > 0 ? Math.round(pphBase * 0.02) : 0
         return {
-          month: Number(r.month),
+          period: r.period,
           grossRevenue: gross,
           taxableRevenue: taxable,
           taxCollected: tax,
+          pphBase,
+          pphCollected,
           orderCount: Number(r.orderCount ?? 0),
+          ppnRate,
+          categoryBreakdown: catMap.get(r.period) ?? [],
         }
       })
-      return okCached(result, 'private, max-age=60')
+
+      return okCached({ data, ppnRate, ppnEnabled, ppnIncluded }, 'private, max-age=60')
     }
 
     // ─── REPORTS / ANNUAL ─────────────────────────────────────────────────────
