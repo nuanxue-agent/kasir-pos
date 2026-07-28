@@ -50,8 +50,8 @@ function sortByOrder<T extends { displayOrder: number }>(arr: T[]): T[] {
 function QRSection({ storeSlug }: { storeSlug: string }) {
   const menuUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/menu/${storeSlug}`
-      : `/menu/${storeSlug}`
+      ? `${window.location.origin}/menu/dm/${storeSlug}`
+      : `/menu/dm/${storeSlug}`
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
