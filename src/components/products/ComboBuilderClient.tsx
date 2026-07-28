@@ -104,7 +104,7 @@ export default function ComboBuilderClient({
   // ── Enriched combos with per-item prices ──────────────────────────────────
   const enrichedCombos = combos.map(c => ({
     ...c,
-    items: c.items.map(i => ({
+    items: (c as any).items.map((i: any) => (({
       ...i,
       productName: productMap[i.productId]?.name ?? i.productId,
       productPrice: productMap[i.productId]?.price ?? 0,
@@ -360,9 +360,9 @@ export default function ComboBuilderClient({
         <div className="space-y-3">
           {displayed.map(combo => {
             const comboPrice = calcComboPrice(combo.basePrice, combo.discountType, combo.discountValue)
-            const individualTotal = calcIndividualTotal(combo.items, false)
-            const savings = calcSavings(combo, combo.items, false)
-            const savingsPct = calcSavingsPct(combo, combo.items, false)
+            const individualTotal = calcIndividualTotal((combo as any).items, false)
+            const savings = calcSavings(combo, (combo as any).items, false)
+            const savingsPct = calcSavingsPct(combo, (combo as any).items, false)
             const isOpen = expanded === combo.id
 
             return (
@@ -393,14 +393,14 @@ export default function ComboBuilderClient({
                           Harga satuan: <span className="line-through">{formatCurrency(individualTotal, currency)}</span>
                         </span>
                       )}
-                      <span style={{ color: 'var(--text-3)' }}>{combo.items.length} produk</span>
+                      <span style={{ color: 'var(--text-3)' }}>{(combo as any).items.length} produk</span>
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex shrink-0 items-center gap-2">
                     <button
-                      onClick={() => handleToggleActive(combo)}
+                      onClick={() => handleToggleActive(combo as any)}
                       className={cn(
                         'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                         combo.active
@@ -438,7 +438,7 @@ export default function ComboBuilderClient({
                     <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>
                       Produk dalam combo
                     </h4>
-                    {combo.items.length === 0 ? (
+                    {(combo as any).items.length === 0 ? (
                       <p className="text-sm" style={{ color: 'var(--text-3)' }}>Belum ada produk. Tambahkan di bawah.</p>
                     ) : (
                       <div className="rounded-lg border border-[var(--border)] overflow-hidden mb-3">
@@ -453,7 +453,7 @@ export default function ComboBuilderClient({
                             </tr>
                           </thead>
                           <tbody>
-                            {combo.items.map(item => (
+                            {(combo as any).items.map((item: any) => (
                               <tr key={item.id} className="border-b border-[var(--border)] last:border-0">
                                 <td className="px-3 py-2" style={{ color: 'var(--text-1)' }}>
                                   {item.productName ?? item.productId}
