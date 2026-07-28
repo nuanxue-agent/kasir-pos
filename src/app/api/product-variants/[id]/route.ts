@@ -1,63 +1,61 @@
+// PATCH /api/product-variants/[id]
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { query, exec, nowISO } from '@/lib/db'
+import { exec, queryOne, nowISO } from '@/lib/db'
+import { ensureVariantTables } from '../route'
 
-function ok(data: unknown, status = 200) {
-  return NextResponse.json(data, { status })
-}
-function err(msg: string, status = 400) {
-  return NextResponse.json({ error: msg }, { status })
-}
+function ok(data: unknown, status = 200) { return NextResponse.json(data, { status }) }
+function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
 
-// PATCH /api/product-variants/[id]
-// Body: { price?, stock?, sku?, active?, attributes? }
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+// PATCH /api/product-variants/[id]?storeId=
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth()
     if (!session?.user) return err('Unauthorized', 401)
+    const user = session.user as any
 
     const { id } = await params
-    const body = (await req.json()) as any
-    const user = session.user as { stores?: { id: string }[] }
+    const url = new URL(req.url)
+    const storeId = url.searchParams.get('storeId')
+    if (!storeId) return err('storeId required')
 
-    const rows = await query(`SELECT * FROM ProductVariant WHERE id = ?`, [id])
-    const existing = (rows as any[])[0]
-    if (!existing) return err('Not found', 404)
-
-    const hasAccess = user.stores?.some((s: any) => s.id === existing.storeId) ?? false
+    const hasAccess = user.stores?.some((s: { id: string }) => s.id === storeId) ?? false
     if (!hasAccess) return err('Forbidden', 403)
 
-    const updates: string[] = []
-    const vals: any[] = []
+    await ensureVariantTables()
 
-    if (body.price !== undefined) { updates.push('price = ?'); vals.push(Number(body.price)) }
-    if (body.stock !== undefined) { updates.push('stock = ?'); vals.push(Number(body.stock)) }
-    if (body.sku !== undefined) { updates.push('sku = ?'); vals.push(body.sku ?? null) }
-    if (body.active !== undefined) { updates.push('active = ?'); vals.push(body.active ? 1 : 0) }
-    if (body.attributes !== undefined) {
-      updates.push('attributes = ?')
-      vals.push(JSON.stringify(body.attributes))
-    }
+    const existing = await queryOne(`SELECT * FROM ProductVariant WHERE id = ? AND storeId = ?`, [id, storeId]) as any
+    if (!existing) return err('Variant not found', 404)
 
-    if (updates.length === 0) return err('No fields to update')
+    const b = (await req.json()) as any
 
-    updates.push('updatedAt = ?')
-    vals.push(nowISO())
-    vals.push(id)
+    if (b.price !== undefined && b.price < 0) return err('price cannot be negative')
+    if (b.stock !== undefined && b.stock < 0) return err('stock cannot be negative')
+
+    const t = nowISO()
+    const newPrice = b.price !== undefined ? b.price : existing.price
+    const newStock = b.stock !== undefined ? b.stock : existing.stock
+    const newActive = b.active !== undefined ? (b.active ? 1 : 0) : existing.active
+    const newSku = b.sku !== undefined ? b.sku : existing.sku
+    const newAttributes = b.attributes !== undefined
+      ? JSON.stringify(b.attributes)
+      : existing.attributes
 
     await exec(
-      `UPDATE ProductVariant SET ${updates.join(', ')} WHERE id = ?`,
-      vals,
+      `UPDATE ProductVariant SET sku = ?, attributes = ?, price = ?, stock = ?, active = ?, updatedAt = ? WHERE id = ?`,
+      [newSku, newAttributes, newPrice, newStock, newActive, t, id]
     )
 
-    return ok({ id, updated: true })
+    return ok({
+      id, storeId,
+      productId: existing.productId,
+      sku: newSku,
+      attributes: JSON.parse(newAttributes),
+      price: newPrice,
+      stock: newStock,
+      active: Boolean(newActive),
+    })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Internal error' },
-      { status: 500 },
-    )
+    return err(e instanceof Error ? e.message : 'Internal error', 500)
   }
 }

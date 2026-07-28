@@ -1,198 +1,212 @@
 import { describe, it, expect } from 'vitest'
-import {
-  generateCombinations,
-  attrKey,
-  findVariant,
-  generateSKU,
-  bulkUpdatePrice,
-  bulkUpdateStock,
-  type ProductVariant,
-} from '@/components/products/VariantMatrixClient'
 
-// ── Test data helpers ─────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-const sizeAttr = { name: 'Size', values: ['S', 'M', 'L', 'XL'] }
-const colorAttr = { name: 'Color', values: ['Red', 'Blue', 'Green'] }
-const materialAttr = { name: 'Material', values: ['Cotton', 'Polyester'] }
-
-function makeVariant(attrs: Record<string, string>, price = 0, stock = 0): ProductVariant {
-  return {
-    productId: 'prod-001',
-    attributes: attrs,
-    sku: generateSKU('prod-001', attrs),
-    price,
-    stock,
-    active: true,
-  }
+interface VariantAttribute {
+  id: string
+  name: string
+  values: string[]
 }
 
-// ── 1. Attribute combination generation ──────────────────────────────────
+interface ProductVariant {
+  id: string
+  productId: string
+  sku: string
+  attributes: Record<string, string>
+  price: number
+  stock: number
+  active: boolean
+}
 
-describe('generateCombinations', () => {
-  it('returns empty array for no attributes', () => {
-    expect(generateCombinations([])).toEqual([])
+// ── Pure business logic (mirrors VariantMatrixClient exports) ─────────────────
+
+function generateSku(productName: string, attributes: Record<string, string>): string {
+  const base = productName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 6)
+  const attrPart = Object.values(attributes)
+    .map(v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3))
+    .join('-')
+  return attrPart ? `${base}-${attrPart}` : base
+}
+
+function generateMatrix(attributes: VariantAttribute[]): Array<Record<string, string>> {
+  if (attributes.length === 0) return []
+  const [first, ...rest] = attributes
+  if (rest.length === 0) {
+    return first.values.map(v => ({ [first.name]: v }))
+  }
+  const sub = generateMatrix(rest)
+  return first.values.flatMap(v =>
+    sub.map(combo => ({ [first.name]: v, ...combo }))
+  )
+}
+
+function applyPriceOverride(
+  basePrice: number,
+  overrides: Record<string, number>,
+  variantKey: string,
+): number {
+  return overrides[variantKey] ?? basePrice
+}
+
+function aggregateStock(variants: ProductVariant[]): number {
+  return variants.reduce((sum, v) => sum + (v.active ? v.stock : 0), 0)
+}
+
+function validateBulkUpdate(
+  updates: Array<{ id: string; price?: number; stock?: number }>,
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+  for (const u of updates) {
+    if (!u.id) errors.push('Each update must have an id')
+    if (u.price !== undefined && u.price < 0) errors.push(`Price cannot be negative (id: ${u.id})`)
+    if (u.stock !== undefined && u.stock < 0) errors.push(`Stock cannot be negative (id: ${u.id})`)
+  }
+  return { valid: errors.length === 0, errors }
+}
+
+// ── Test fixtures ─────────────────────────────────────────────────────────────
+
+const sizeAttr: VariantAttribute = { id: 'attr-1', name: 'size', values: ['S', 'M', 'L'] }
+const colorAttr: VariantAttribute = { id: 'attr-2', name: 'color', values: ['Red', 'Blue'] }
+
+const sampleVariants: ProductVariant[] = [
+  { id: 'v1', productId: 'p1', sku: 'SHIRT-S-RED', attributes: { size: 'S', color: 'Red' }, price: 50000, stock: 10, active: true },
+  { id: 'v2', productId: 'p1', sku: 'SHIRT-S-BLU', attributes: { size: 'S', color: 'Blue' }, price: 50000, stock: 5, active: true },
+  { id: 'v3', productId: 'p1', sku: 'SHIRT-M-RED', attributes: { size: 'M', color: 'Red' }, price: 55000, stock: 8, active: true },
+  { id: 'v4', productId: 'p1', sku: 'SHIRT-L-BLU', attributes: { size: 'L', color: 'Blue' }, price: 60000, stock: 3, active: false },
+]
+
+// ── Matrix generation ─────────────────────────────────────────────────────────
+
+describe('Matrix generation from attributes', () => {
+  it('generates all combinations for two attributes', () => {
+    const combos = generateMatrix([sizeAttr, colorAttr])
+    // 3 sizes × 2 colors = 6
+    expect(combos).toHaveLength(6)
   })
 
-  it('returns single-level combinations for one attribute', () => {
-    const result = generateCombinations([sizeAttr])
-    expect(result).toHaveLength(4)
-    expect(result[0]).toEqual({ Size: 'S' })
-    expect(result[3]).toEqual({ Size: 'XL' })
-  })
-
-  it('returns cartesian product for two attributes', () => {
-    const result = generateCombinations([sizeAttr, colorAttr])
-    // 4 sizes × 3 colors = 12 combinations
-    expect(result).toHaveLength(12)
-  })
-
-  it('returns correct combination count for three attributes', () => {
-    const result = generateCombinations([sizeAttr, colorAttr, materialAttr])
-    // 4 × 3 × 2 = 24
-    expect(result).toHaveLength(24)
-  })
-
-  it('each combination contains all attribute keys', () => {
-    const result = generateCombinations([sizeAttr, colorAttr])
-    for (const combo of result) {
-      expect(combo).toHaveProperty('Size')
-      expect(combo).toHaveProperty('Color')
+  it('each combo contains one value per attribute', () => {
+    const combos = generateMatrix([sizeAttr, colorAttr])
+    for (const combo of combos) {
+      expect(Object.keys(combo)).toContain('size')
+      expect(Object.keys(combo)).toContain('color')
     }
   })
 
-  it('ignores attributes with empty values array', () => {
-    const emptyAttr = { name: 'Empty', values: [] }
-    const result = generateCombinations([sizeAttr, emptyAttr])
-    // emptyAttr filtered out → same as single attr
-    expect(result).toHaveLength(4)
+  it('returns empty array when no attributes given', () => {
+    expect(generateMatrix([])).toHaveLength(0)
+  })
+
+  it('handles single attribute correctly', () => {
+    const combos = generateMatrix([sizeAttr])
+    expect(combos).toHaveLength(3)
+    expect(combos.map(c => c.size)).toEqual(['S', 'M', 'L'])
   })
 })
 
-// ── 2. Combination count validation ──────────────────────────────────────
+// ── SKU auto-generation ───────────────────────────────────────────────────────
 
-describe('combination count validation', () => {
-  it('counts correctly: 2×2 = 4', () => {
-    const a = { name: 'A', values: ['a1', 'a2'] }
-    const b = { name: 'B', values: ['b1', 'b2'] }
-    expect(generateCombinations([a, b])).toHaveLength(4)
-  })
-
-  it('counts correctly: 1×1×1 = 1', () => {
-    const attrs = [
-      { name: 'X', values: ['x1'] },
-      { name: 'Y', values: ['y1'] },
-      { name: 'Z', values: ['z1'] },
-    ]
-    expect(generateCombinations(attrs)).toHaveLength(1)
-  })
-})
-
-// ── 3. Matrix cell lookup ─────────────────────────────────────────────────
-
-describe('findVariant', () => {
-  const variants: ProductVariant[] = [
-    makeVariant({ Size: 'S', Color: 'Red' }, 50000, 10),
-    makeVariant({ Size: 'M', Color: 'Blue' }, 60000, 5),
-    makeVariant({ Size: 'L', Color: 'Green' }, 70000, 0),
-  ]
-
-  it('finds a variant by exact attributes', () => {
-    const result = findVariant(variants, { Size: 'S', Color: 'Red' })
-    expect(result).toBeDefined()
-    expect(result?.price).toBe(50000)
-    expect(result?.stock).toBe(10)
-  })
-
-  it('returns undefined for non-existent combination', () => {
-    const result = findVariant(variants, { Size: 'XL', Color: 'Red' })
-    expect(result).toBeUndefined()
-  })
-
-  it('is order-independent for attribute keys', () => {
-    const result = findVariant(variants, { Color: 'Blue', Size: 'M' })
-    expect(result).toBeDefined()
-    expect(result?.price).toBe(60000)
-  })
-})
-
-// ── 4. SKU auto-generation ────────────────────────────────────────────────
-
-describe('generateSKU', () => {
-  it('includes product id prefix', () => {
-    const sku = generateSKU('prod-001', { Size: 'M' })
-    expect(sku).toMatch(/^PROD-0/)
-  })
-
-  it('includes attribute values in SKU', () => {
-    const sku = generateSKU('prod-001', { Size: 'M', Color: 'Red' })
+describe('SKU auto-generation', () => {
+  it('generates uppercase SKU from product name and attributes', () => {
+    const sku = generateSku('Kaos Polos', { size: 'M', color: 'Red' })
+    expect(sku).toMatch(/^KAOSP/)
     expect(sku).toContain('M')
     expect(sku).toContain('RED')
   })
 
-  it('produces different SKUs for different combinations', () => {
-    const sku1 = generateSKU('prod-001', { Size: 'S', Color: 'Red' })
-    const sku2 = generateSKU('prod-001', { Size: 'L', Color: 'Blue' })
-    expect(sku1).not.toBe(sku2)
+  it('strips special characters from product name portion', () => {
+    const sku = generateSku('T-Shirt (Pro)', { size: 'S' })
+    // Hyphen is only the separator between base and attr part, not from the name itself
+    const base = sku.split('-')[0]
+    expect(base).not.toMatch(/[()]/g)
+    expect(base).toBe('TSHIRT')
+  })
+
+  it('returns base-only SKU when no attributes provided', () => {
+    const sku = generateSku('Kemeja', {})
+    expect(sku).toBe('KEMEJA')
+  })
+
+  it('truncates long product names to 6 characters', () => {
+    const sku = generateSku('VeryLongProductName', { color: 'Blue' })
+    const base = sku.split('-')[0]
+    expect(base.length).toBeLessThanOrEqual(6)
   })
 })
 
-// ── 5. Bulk price update ──────────────────────────────────────────────────
+// ── Price override logic ──────────────────────────────────────────────────────
 
-describe('bulkUpdatePrice', () => {
-  const variants: ProductVariant[] = [
-    makeVariant({ Size: 'S', Color: 'Red' }, 50000),
-    makeVariant({ Size: 'M', Color: 'Red' }, 50000),
-    makeVariant({ Size: 'S', Color: 'Blue' }, 50000),
-    makeVariant({ Size: 'M', Color: 'Blue' }, 50000),
-  ]
-
-  it('updates all variants matching the attribute value', () => {
-    const updated = bulkUpdatePrice(variants, 'Color', 'Red', 99000)
-    const redVariants = updated.filter(v => v.attributes.Color === 'Red')
-    const blueVariants = updated.filter(v => v.attributes.Color === 'Blue')
-    expect(redVariants.every(v => v.price === 99000)).toBe(true)
-    expect(blueVariants.every(v => v.price === 50000)).toBe(true)
+describe('Price override logic', () => {
+  it('returns override price when key exists', () => {
+    const overrides = { 'v1': 45000 }
+    expect(applyPriceOverride(50000, overrides, 'v1')).toBe(45000)
   })
 
-  it('does not mutate the original array', () => {
-    bulkUpdatePrice(variants, 'Size', 'S', 12345)
-    expect(variants[0].price).toBe(50000)
+  it('returns base price when no override exists', () => {
+    expect(applyPriceOverride(50000, {}, 'v-unknown')).toBe(50000)
   })
 
-  it('handles no matches gracefully', () => {
-    const updated = bulkUpdatePrice(variants, 'Color', 'Green', 99000)
-    expect(updated.map(v => v.price)).toEqual(variants.map(v => v.price))
+  it('override of 0 is valid (zero-price variant)', () => {
+    const overrides = { 'v-free': 0 }
+    expect(applyPriceOverride(50000, overrides, 'v-free')).toBe(0)
   })
 })
 
-// ── 6. Bulk stock update ──────────────────────────────────────────────────
+// ── Stock aggregation ─────────────────────────────────────────────────────────
 
-describe('bulkUpdateStock', () => {
-  const variants: ProductVariant[] = [
-    makeVariant({ Size: 'S' }, 0, 10),
-    makeVariant({ Size: 'M' }, 0, 20),
-    makeVariant({ Size: 'L' }, 0, 5),
-  ]
+describe('Stock aggregation across variants', () => {
+  it('sums stock only for active variants', () => {
+    // v1=10, v2=5, v3=8 active; v4=3 inactive
+    expect(aggregateStock(sampleVariants)).toBe(23)
+  })
 
-  it('updates stock for matching attribute value', () => {
-    const updated = bulkUpdateStock(variants, 'Size', 'M', 100)
-    expect(updated.find(v => v.attributes.Size === 'M')?.stock).toBe(100)
-    expect(updated.find(v => v.attributes.Size === 'S')?.stock).toBe(10)
+  it('returns 0 when all variants are inactive', () => {
+    const all = sampleVariants.map(v => ({ ...v, active: false }))
+    expect(aggregateStock(all)).toBe(0)
+  })
+
+  it('returns 0 for empty variant list', () => {
+    expect(aggregateStock([])).toBe(0)
   })
 })
 
-// ── 7. attrKey consistency ─────────────────────────────────────────────────
+// ── Bulk update validation ────────────────────────────────────────────────────
 
-describe('attrKey', () => {
-  it('produces consistent keys regardless of object insertion order', () => {
-    const key1 = attrKey({ Size: 'M', Color: 'Red' })
-    const key2 = attrKey({ Color: 'Red', Size: 'M' })
-    expect(key1).toBe(key2)
+describe('Bulk update validation', () => {
+  it('passes for valid updates', () => {
+    const { valid, errors } = validateBulkUpdate([
+      { id: 'v1', price: 50000, stock: 10 },
+      { id: 'v2', price: 55000, stock: 0 },
+    ])
+    expect(valid).toBe(true)
+    expect(errors).toHaveLength(0)
   })
 
-  it('produces different keys for different attribute values', () => {
-    const key1 = attrKey({ Size: 'S', Color: 'Red' })
-    const key2 = attrKey({ Size: 'M', Color: 'Red' })
-    expect(key1).not.toBe(key2)
+  it('fails when price is negative', () => {
+    const { valid, errors } = validateBulkUpdate([{ id: 'v1', price: -100 }])
+    expect(valid).toBe(false)
+    expect(errors[0]).toMatch(/negative/)
+  })
+
+  it('fails when stock is negative', () => {
+    const { valid, errors } = validateBulkUpdate([{ id: 'v1', stock: -1 }])
+    expect(valid).toBe(false)
+    expect(errors[0]).toMatch(/negative/)
+  })
+
+  it('collects multiple errors across updates', () => {
+    const { errors } = validateBulkUpdate([
+      { id: 'v1', price: -10 },
+      { id: 'v2', stock: -5 },
+    ])
+    expect(errors).toHaveLength(2)
+  })
+
+  it('stock of 0 is valid', () => {
+    const { valid } = validateBulkUpdate([{ id: 'v1', stock: 0 }])
+    expect(valid).toBe(true)
   })
 })

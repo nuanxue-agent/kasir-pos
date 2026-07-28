@@ -10,7 +10,7 @@ interface FixedAssetClientProps {
   currency: string
 }
 
-type AssetCategory = 'EQUIPMENT' | 'FURNITURE' | 'VEHICLE' | 'BUILDING' | 'OTHER'
+type AssetCategory = 'EQUIPMENT' | 'FURNITURE' | 'VEHICLE' | 'BUILDING' | 'IT' | 'OTHER'
 type DepreciationMethod = 'STRAIGHT_LINE' | 'DECLINING_BALANCE'
 type AssetStatus = 'ACTIVE' | 'DISPOSED' | 'FULLY_DEPRECIATED'
 
@@ -53,6 +53,7 @@ const CATEGORY_LABELS: Record<AssetCategory, string> = {
   FURNITURE: 'Furnitur',
   VEHICLE: 'Kendaraan',
   BUILDING: 'Bangunan',
+  IT: 'Teknologi Informasi',
   OTHER: 'Lainnya',
 }
 

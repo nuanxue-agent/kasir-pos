@@ -6,7 +6,7 @@ import { query, exec, newId, nowISO } from '@/lib/db'
 function ok(data: unknown, status = 200) { return NextResponse.json(data, { status }) }
 function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
 
-export type AssetCategory = 'EQUIPMENT' | 'FURNITURE' | 'VEHICLE' | 'BUILDING' | 'OTHER'
+export type AssetCategory = 'EQUIPMENT' | 'FURNITURE' | 'VEHICLE' | 'BUILDING' | 'IT' | 'OTHER'
 export type DepreciationMethod = 'STRAIGHT_LINE' | 'DECLINING_BALANCE'
 export type AssetStatus = 'ACTIVE' | 'DISPOSED' | 'FULLY_DEPRECIATED'
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     if (!body.purchasePrice || body.purchasePrice <= 0) return err('purchasePrice must be positive')
     if (!body.usefulLifeYears || body.usefulLifeYears <= 0) return err('usefulLifeYears must be positive')
 
-    const VALID_CATEGORIES: AssetCategory[] = ['EQUIPMENT', 'FURNITURE', 'VEHICLE', 'BUILDING', 'OTHER']
+    const VALID_CATEGORIES: AssetCategory[] = ['EQUIPMENT', 'FURNITURE', 'VEHICLE', 'BUILDING', 'IT', 'OTHER']
     const category: AssetCategory = body.category && VALID_CATEGORIES.includes(body.category) ? body.category : 'EQUIPMENT'
     const VALID_METHODS: DepreciationMethod[] = ['STRAIGHT_LINE', 'DECLINING_BALANCE']
     const depreciationMethod: DepreciationMethod = body.depreciationMethod && VALID_METHODS.includes(body.depreciationMethod) ? body.depreciationMethod : 'STRAIGHT_LINE'
