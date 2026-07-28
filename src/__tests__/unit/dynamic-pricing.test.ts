@@ -58,7 +58,7 @@ function evaluateRule(rule: PricingRule, product: Product, now = new Date()): { 
 }
 
 function calcEffectivePrice(product: Product, rules: PricingRule[], now = new Date()): number {
-  const sorted = [...rules].sort((a, b) => a.priority - b.priority)
+  const sorted = [...rules].sort((a, b) => b.priority - a.priority)
   let runningProduct = { ...product }
 
   for (const rule of sorted) {
@@ -278,7 +278,8 @@ describe('Dynamic Pricing', () => {
       ]
 
       const effectivePrice = calcEffectivePrice(product, rules)
-      expect(effectivePrice).toBe(4000) // High priority -20% applied
+      // Descending sort: r10(-20%, p20) first → 4000, then r9(-10%, p5) chains → 3600
+      expect(effectivePrice).toBe(3600)
     })
 
     it('should stack multiple applicable rules', () => {
@@ -308,9 +309,9 @@ describe('Dynamic Pricing', () => {
       ]
 
       const effectivePrice = calcEffectivePrice(product, rules)
-      // Ascending priority: r12(5) first: 5000 - 500 = 4500
-      // Then r11(10): 4500 * 0.9 = 4050
-      expect(effectivePrice).toBe(4050)
+      // Descending priority: r11(10, -10%) first: 5000 * 0.9 = 4500
+      // Then r12(5, -500 fixed): 4500 - 500 = 4000
+      expect(effectivePrice).toBe(4000)
     })
   })
 
