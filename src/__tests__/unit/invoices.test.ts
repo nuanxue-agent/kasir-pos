@@ -1,212 +1,169 @@
 import { describe, it, expect } from 'vitest'
+import {
+  calcItemTotal,
+  calcSubtotal,
+  calcTaxAmount,
+  calcTotal,
+  isOverdue,
+  daysOverdue,
+  generateInvoiceNumber,
+  parseInvoiceSeq,
+  isValidStatusTransition,
+  statusAfterPayment,
+  validatePaymentAmount,
+} from '@/lib/invoices'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+describe('Invoice Module', () => {
 
-type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE'
-type PaymentTerms = 'NET7' | 'NET14' | 'NET30' | 'NET60'
-
-interface InvoiceItem {
-  description: string
-  qty: number
-  unitPrice: number
-  taxRate: number // percentage, e.g. 11 = 11%
-}
-
-interface Invoice {
-  id: string
-  number: string
-  status: InvoiceStatus
-  issueDate: string
-  dueDate: string
-  terms: PaymentTerms
-  items: InvoiceItem[]
-  subtotal: number
-  taxAmount: number
-  total: number
-}
-
-// ── Pure business logic functions (mirrored from InvoiceClient + API) ─────────
-
-const TERMS_DAYS: Record<PaymentTerms, number> = {
-  NET7: 7,
-  NET14: 14,
-  NET30: 30,
-  NET60: 60,
-}
-
-/** Generate invoice number: INV-YYYYMMDD-XXXX */
-function generateInvoiceNumber(date: string, seq: number): string {
-  const d = date.replace(/-/g, '')
-  return `INV-${d}-${String(seq).padStart(4, '0')}`
-}
-
-/** Calculate due date by adding terms days to issue date */
-function calcDueDate(issueDate: string, terms: PaymentTerms): string {
-  const d = new Date(issueDate)
-  d.setDate(d.getDate() + TERMS_DAYS[terms])
-  return d.toISOString().slice(0, 10)
-}
-
-/** Detect if an invoice is overdue (past due date and not yet paid) */
-function isOverdue(dueDate: string, status: InvoiceStatus, today: string): boolean {
-  if (status === 'PAID') return false
-  return dueDate < today
-}
-
-/** Calculate line item subtotal (qty * unitPrice, before tax) */
-function calcLineSubtotal(qty: number, unitPrice: number): number {
-  return qty * unitPrice
-}
-
-/** Calculate tax amount for a single line item */
-function calcLineTax(qty: number, unitPrice: number, taxRate: number): number {
-  return Math.round(calcLineSubtotal(qty, unitPrice) * (taxRate / 100))
-}
-
-/** Calculate invoice-level totals from line items */
-function calcInvoiceTotals(items: InvoiceItem[]): {
-  subtotal: number
-  taxAmount: number
-  total: number
-} {
-  const subtotal = items.reduce((s, i) => s + calcLineSubtotal(i.qty, i.unitPrice), 0)
-  const taxAmount = items.reduce((s, i) => s + calcLineTax(i.qty, i.unitPrice, i.taxRate), 0)
-  return { subtotal, taxAmount, total: subtotal + taxAmount }
-}
-
-/** Validate that an invoice can transition to PAID */
-function canMarkPaid(status: InvoiceStatus): boolean {
-  return status === 'SENT' || status === 'OVERDUE'
-}
-
-/** Validate that an invoice can be sent */
-function canSend(status: InvoiceStatus): boolean {
-  return status === 'DRAFT'
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-describe('Invoice number generation', () => {
-  it('generates correct format INV-YYYYMMDD-XXXX', () => {
-    expect(generateInvoiceNumber('2024-01-15', 1)).toBe('INV-20240115-0001')
+  describe('calcItemTotal', () => {
+    it('multiplies qty by unitPrice', () => {
+      expect(calcItemTotal(3, 50000)).toBe(150000)
+    })
+    it('handles fractional quantities', () => {
+      expect(calcItemTotal(2.5, 10000)).toBe(25000)
+    })
   })
 
-  it('pads sequence number to 4 digits', () => {
-    expect(generateInvoiceNumber('2024-06-01', 42)).toBe('INV-20240601-0042')
+  describe('calcSubtotal', () => {
+    it('sums all item totals', () => {
+      const items = [
+        { qty: 2, unitPrice: 50000 },
+        { qty: 1, unitPrice: 30000 },
+      ]
+      expect(calcSubtotal(items)).toBe(130000)
+    })
+    it('returns 0 for empty items', () => {
+      expect(calcSubtotal([])).toBe(0)
+    })
   })
 
-  it('handles sequence number at 1000', () => {
-    expect(generateInvoiceNumber('2024-12-31', 1000)).toBe('INV-20241231-1000')
-  })
-})
-
-describe('Due date calculation by payment terms', () => {
-  it('NET7 adds 7 days', () => {
-    expect(calcDueDate('2024-01-01', 'NET7')).toBe('2024-01-08')
-  })
-
-  it('NET14 adds 14 days', () => {
-    expect(calcDueDate('2024-01-01', 'NET14')).toBe('2024-01-15')
+  describe('calcTaxAmount', () => {
+    it('calculates 11% PPN correctly', () => {
+      expect(calcTaxAmount(100000, 0.11)).toBe(11000)
+    })
+    it('returns 0 for zero tax rate', () => {
+      expect(calcTaxAmount(100000, 0)).toBe(0)
+    })
   })
 
-  it('NET30 adds 30 days', () => {
-    expect(calcDueDate('2024-01-01', 'NET30')).toBe('2024-01-31')
+  describe('calcTotal', () => {
+    it('adds subtotal and taxAmount', () => {
+      expect(calcTotal(100000, 11000)).toBe(111000)
+    })
+    it('returns subtotal when tax is 0', () => {
+      expect(calcTotal(50000, 0)).toBe(50000)
+    })
   })
 
-  it('NET60 adds 60 days', () => {
-    expect(calcDueDate('2024-01-01', 'NET60')).toBe('2024-03-01')
+  describe('isOverdue', () => {
+    it('returns true for SENT invoice past due date', () => {
+      expect(isOverdue('2020-01-01', 'SENT', new Date('2026-07-28'))).toBe(true)
+    })
+    it('returns false for PAID invoice even if past due', () => {
+      expect(isOverdue('2020-01-01', 'PAID', new Date('2026-07-28'))).toBe(false)
+    })
+    it('returns false for CANCELLED invoice', () => {
+      expect(isOverdue('2020-01-01', 'CANCELLED', new Date('2026-07-28'))).toBe(false)
+    })
+    it('returns false when due date is today', () => {
+      const today = new Date()
+      const todayStr = today.toISOString().split('T')[0]
+      expect(isOverdue(todayStr, 'SENT', today)).toBe(false)
+    })
+    it('returns false for future due date', () => {
+      expect(isOverdue('2099-12-31', 'SENT', new Date('2026-07-28'))).toBe(false)
+    })
   })
 
-  it('handles month boundary correctly', () => {
-    expect(calcDueDate('2024-01-31', 'NET7')).toBe('2024-02-07')
-  })
-})
-
-describe('Overdue detection', () => {
-  it('marks overdue when past due date and not paid', () => {
-    expect(isOverdue('2024-01-01', 'SENT', '2024-01-15')).toBe(true)
-  })
-
-  it('does not mark overdue when paid', () => {
-    expect(isOverdue('2024-01-01', 'PAID', '2024-01-15')).toBe(false)
-  })
-
-  it('does not mark overdue when due date is today', () => {
-    expect(isOverdue('2024-01-15', 'SENT', '2024-01-15')).toBe(false)
+  describe('daysOverdue', () => {
+    it('returns positive number when past due', () => {
+      expect(daysOverdue('2026-07-01', new Date('2026-07-28'))).toBe(27)
+    })
+    it('returns negative number when not yet due', () => {
+      expect(daysOverdue('2026-08-28', new Date('2026-07-28'))).toBe(-31)
+    })
+    it('returns 0 when due today', () => {
+      const today = new Date()
+      const todayStr = today.toISOString().split('T')[0]
+      expect(daysOverdue(todayStr, today)).toBe(0)
+    })
   })
 
-  it('does not mark overdue when due date is in the future', () => {
-    expect(isOverdue('2024-02-01', 'SENT', '2024-01-15')).toBe(false)
-  })
-})
-
-describe('Line item total calculation', () => {
-  it('calculates subtotal as qty * unitPrice', () => {
-    expect(calcLineSubtotal(3, 50000)).toBe(150000)
-  })
-
-  it('calculates zero subtotal for zero qty', () => {
-    expect(calcLineSubtotal(0, 50000)).toBe(0)
+  describe('generateInvoiceNumber', () => {
+    it('pads sequence to 4 digits', () => {
+      expect(generateInvoiceNumber(2026, 1)).toBe('INV-2026-0001')
+    })
+    it('handles large sequence numbers', () => {
+      expect(generateInvoiceNumber(2026, 1000)).toBe('INV-2026-1000')
+    })
   })
 
-  it('calculates invoice subtotal across multiple items', () => {
-    const items: InvoiceItem[] = [
-      { description: 'A', qty: 2, unitPrice: 100000, taxRate: 11 },
-      { description: 'B', qty: 5, unitPrice: 20000, taxRate: 0 },
-    ]
-    expect(calcInvoiceTotals(items).subtotal).toBe(300000)
+  describe('parseInvoiceSeq', () => {
+    it('extracts sequence from valid invoice number', () => {
+      expect(parseInvoiceSeq('INV-2026-0042')).toBe(42)
+    })
+    it('returns 0 for invalid format', () => {
+      expect(parseInvoiceSeq('INVALID')).toBe(0)
+    })
   })
 
-  it('sums items into correct total including tax', () => {
-    const items: InvoiceItem[] = [{ description: 'X', qty: 1, unitPrice: 100000, taxRate: 11 }]
-    const { subtotal, taxAmount, total } = calcInvoiceTotals(items)
-    expect(subtotal).toBe(100000)
-    expect(taxAmount).toBe(11000)
-    expect(total).toBe(111000)
-  })
-})
-
-describe('Tax amount computation', () => {
-  it('computes 11% PPN correctly', () => {
-    expect(calcLineTax(1, 100000, 11)).toBe(11000)
-  })
-
-  it('computes 0% tax as zero', () => {
-    expect(calcLineTax(10, 50000, 0)).toBe(0)
-  })
-
-  it('rounds fractional tax amounts', () => {
-    // 3 * 33333 = 99999, tax 11% = 10999.89 → Math.round = 11000
-    expect(calcLineTax(3, 33333, 11)).toBe(11000)
+  describe('isValidStatusTransition', () => {
+    it('allows DRAFT to SENT', () => {
+      expect(isValidStatusTransition('DRAFT', 'SENT')).toBe(true)
+    })
+    it('allows SENT to PAID', () => {
+      expect(isValidStatusTransition('SENT', 'PAID')).toBe(true)
+    })
+    it('allows OVERDUE to PAID', () => {
+      expect(isValidStatusTransition('OVERDUE', 'PAID')).toBe(true)
+    })
+    it('disallows PAID to DRAFT', () => {
+      expect(isValidStatusTransition('PAID', 'DRAFT')).toBe(false)
+    })
+    it('disallows DRAFT to PAID directly', () => {
+      expect(isValidStatusTransition('DRAFT', 'PAID')).toBe(false)
+    })
+    it('disallows CANCELLED to SENT', () => {
+      expect(isValidStatusTransition('CANCELLED', 'SENT')).toBe(false)
+    })
   })
 
-  it('calculates total tax across mixed-rate items', () => {
-    const items: InvoiceItem[] = [
-      { description: 'Taxed', qty: 1, unitPrice: 100000, taxRate: 11 },
-      { description: 'Exempt', qty: 2, unitPrice: 50000, taxRate: 0 },
-    ]
-    expect(calcInvoiceTotals(items).taxAmount).toBe(11000)
-  })
-})
-
-describe('Invoice status transitions', () => {
-  it('DRAFT invoice can be sent', () => {
-    expect(canSend('DRAFT')).toBe(true)
-  })
-
-  it('SENT invoice cannot be sent again', () => {
-    expect(canSend('SENT')).toBe(false)
+  describe('statusAfterPayment', () => {
+    it('returns PAID when amount covers full total', () => {
+      expect(statusAfterPayment(100000, 100000, 'SENT')).toBe('PAID')
+    })
+    it('returns PAID when amount exceeds total', () => {
+      expect(statusAfterPayment(100000, 110000, 'SENT')).toBe('PAID')
+    })
+    it('returns original status for partial payment', () => {
+      expect(statusAfterPayment(100000, 50000, 'SENT')).toBe('SENT')
+    })
+    it('returns CANCELLED for cancelled invoice regardless of payment', () => {
+      expect(statusAfterPayment(100000, 100000, 'CANCELLED')).toBe('CANCELLED')
+    })
   })
 
-  it('SENT invoice can be marked paid', () => {
-    expect(canMarkPaid('SENT')).toBe(true)
+  describe('validatePaymentAmount', () => {
+    it('accepts valid payment amount', () => {
+      const result = validatePaymentAmount(50000, 100000, 0)
+      expect(result.valid).toBe(true)
+    })
+    it('rejects zero payment', () => {
+      const result = validatePaymentAmount(0, 100000, 0)
+      expect(result.valid).toBe(false)
+    })
+    it('rejects negative payment', () => {
+      const result = validatePaymentAmount(-1000, 100000, 0)
+      expect(result.valid).toBe(false)
+    })
+    it('rejects payment exceeding remaining balance', () => {
+      const result = validatePaymentAmount(80000, 100000, 50000)
+      expect(result.valid).toBe(false)
+    })
+    it('accepts payment equal to remaining balance', () => {
+      const result = validatePaymentAmount(50000, 100000, 50000)
+      expect(result.valid).toBe(true)
+    })
   })
 
-  it('OVERDUE invoice can be marked paid', () => {
-    expect(canMarkPaid('OVERDUE')).toBe(true)
-  })
-
-  it('PAID invoice cannot be marked paid again', () => {
-    expect(canMarkPaid('PAID')).toBe(false)
-  })
 })
