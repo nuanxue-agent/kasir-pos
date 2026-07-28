@@ -188,7 +188,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
         body: JSON.stringify({ storeId, openingFloat: float }),
       })
       if (!res.ok) {
-        const d = await res.json()
+        const d = await res.json() as { error?: string }
         alert(d.error ?? 'Gagal membuka kasir')
         return
       }
@@ -211,7 +211,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
         body: JSON.stringify({ registerId: register.id, closingActual: actual }),
       })
       if (!res.ok) {
-        const d = await res.json()
+        const d = await res.json() as { error?: string }
         alert(d.error ?? 'Gagal menutup kasir')
         return
       }
@@ -236,7 +236,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
         body: JSON.stringify({ registerId: register.id, type: movType, amount, reason: movReason }),
       })
       if (!res.ok) {
-        const d = await res.json()
+        const d = await res.json() as { error?: string }
         alert(d.error ?? 'Gagal menyimpan mutasi')
         return
       }

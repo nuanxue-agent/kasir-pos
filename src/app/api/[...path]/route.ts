@@ -7343,6 +7343,163 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok({ period, since, leaderboard: entries })
     }
 
+    // ── DOCUMENTS ─────────────────────────────────────────────────────────────
+
+    async function ensureDocumentTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS Document (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          name        TEXT NOT NULL,
+          type        TEXT NOT NULL DEFAULT 'OTHER',
+          url         TEXT NOT NULL DEFAULT '',
+          size        INTEGER NOT NULL DEFAULT 0,
+          uploadedBy  TEXT NOT NULL DEFAULT '',
+          createdAt   TEXT NOT NULL,
+          expiresAt   TEXT,
+          tags        TEXT NOT NULL DEFAULT '[]'
+        )
+      `)
+    }
+
+    // GET /api/documents?storeId=
+    if (segs[0] === 'documents' && !segs[1] && method === 'GET') {
+      await ensureDocumentTable()
+      const rows = (await query(
+        `SELECT * FROM Document WHERE storeId = ? ORDER BY createdAt DESC`,
+        [storeId],
+      )) as any[]
+      const items = rows.map((r: any) => ({
+        ...r,
+        size: Number(r.size),
+        tags: (() => { try { return JSON.parse(r.tags) } catch { return [] } })(),
+      }))
+      return ok({ items })
+    }
+
+    // POST /api/documents?storeId= — upload (multipart or JSON)
+    if (segs[0] === 'documents' && !segs[1] && method === 'POST') {
+      await ensureDocumentTable()
+      let name = '', type = 'OTHER', url = '', size = 0, expiresAt: string | null = null, tags: string[] = []
+
+      const contentType = req.headers.get('content-type') ?? ''
+      if (contentType.includes('multipart/form-data')) {
+        const form = await req.formData()
+        const file = form.get('file') as File | null
+        name = file?.name ?? (form.get('name') as string | null) ?? 'untitled'
+        size = file?.size ?? 0
+        type = (form.get('type') as string | null) ?? 'OTHER'
+        expiresAt = (form.get('expiresAt') as string | null) || null
+        const rawTags = form.get('tags') as string | null
+        tags = rawTags ? (() => { try { return JSON.parse(rawTags) } catch { return rawTags.split(',').map((t: string) => t.trim()).filter(Boolean) } })() : []
+        // In production, upload `file` to object storage and store the URL.
+        // For now we store a placeholder URL.
+        url = `/uploads/${newId()}-${name}`
+      } else {
+        const body = await req.json() as any
+        name = body.name ?? 'untitled'
+        type = body.type ?? 'OTHER'
+        url = body.url ?? ''
+        size = Number(body.size ?? 0)
+        expiresAt = body.expiresAt ?? null
+        tags = Array.isArray(body.tags) ? body.tags : []
+      }
+
+      if (!['CONTRACT', 'INVOICE', 'RECEIPT', 'REPORT', 'OTHER'].includes(type)) {
+        return err('Invalid document type', 400, 'VALIDATION_ERROR')
+      }
+
+      const session2 = await auth()
+      const uploadedBy = (session2?.user as any)?.id ?? 'unknown'
+      const id = newId()
+      const now = nowISO()
+      await exec(
+        `INSERT INTO Document (id, storeId, name, type, url, size, uploadedBy, createdAt, expiresAt, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, storeId, name, type, url, size, uploadedBy, now, expiresAt, JSON.stringify(tags)],
+      )
+      return ok({ id, storeId, name, type, url, size, uploadedBy, createdAt: now, expiresAt, tags }, 201)
+    }
+
+    // PATCH /api/documents/:id?storeId=
+    if (segs[0] === 'documents' && segs[1] && segs[1] !== 'generate' && method === 'PATCH') {
+      await ensureDocumentTable()
+      const docId = segs[1]
+      const existing = await queryOne<any>(`SELECT * FROM Document WHERE id = ? AND storeId = ?`, [docId, storeId])
+      if (!existing) return err('Document not found', 404, 'NOT_FOUND')
+      const body = await req.json() as any
+      const name = body.name ?? existing.name
+      const type = body.type ?? existing.type
+      const expiresAt = body.expiresAt !== undefined ? body.expiresAt : existing.expiresAt
+      const tags = body.tags !== undefined ? JSON.stringify(Array.isArray(body.tags) ? body.tags : []) : existing.tags
+      await exec(
+        `UPDATE Document SET name = ?, type = ?, expiresAt = ?, tags = ? WHERE id = ? AND storeId = ?`,
+        [name, type, expiresAt, tags, docId, storeId],
+      )
+      return ok({ id: docId, storeId, name, type, expiresAt, tags: (() => { try { return JSON.parse(tags) } catch { return [] } })() })
+    }
+
+    // DELETE /api/documents/:id?storeId=
+    if (segs[0] === 'documents' && segs[1] && segs[1] !== 'generate' && method === 'DELETE') {
+      await ensureDocumentTable()
+      const docId = segs[1]
+      const existing = await queryOne<any>(`SELECT id FROM Document WHERE id = ? AND storeId = ?`, [docId, storeId])
+      if (!existing) return err('Document not found', 404, 'NOT_FOUND')
+      await exec(`DELETE FROM Document WHERE id = ? AND storeId = ?`, [docId, storeId])
+      return ok({ success: true })
+    }
+
+    // POST /api/documents/generate?storeId= — generate from template
+    if (segs[0] === 'documents' && segs[1] === 'generate' && method === 'POST') {
+      await ensureDocumentTable()
+      const body = await req.json() as { type: string }
+      const genType = body.type as string
+      if (!['INVOICE', 'RECEIPT', 'REPORT'].includes(genType)) {
+        return err("type must be INVOICE, RECEIPT, or REPORT", 400, 'VALIDATION_ERROR')
+      }
+
+      const now = nowISO()
+      const monthLabel = now.slice(0, 7) // YYYY-MM
+      let name = ''
+      let extraMeta: Record<string, any> = {}
+
+      if (genType === 'RECEIPT') {
+        // Pre-populate with last order data
+        const lastOrder = await queryOne<any>(
+          `SELECT id, total, createdAt FROM "Order" WHERE storeId = ? ORDER BY createdAt DESC LIMIT 1`,
+          [storeId],
+        )
+        name = `Kwitansi-${lastOrder?.id?.slice(-6) ?? 'LAST'}-${now.slice(0, 10)}.pdf`
+        extraMeta = { orderId: lastOrder?.id, total: lastOrder?.total }
+      } else if (genType === 'REPORT') {
+        // Pre-populate with current month summary
+        const summaryRow = await queryOne<any>(
+          `SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev
+           FROM "Order" WHERE storeId = ? AND strftime('%Y-%m', createdAt) = ?`,
+          [storeId, monthLabel],
+        )
+        name = `Laporan-${monthLabel}.pdf`
+        extraMeta = { month: monthLabel, orderCount: summaryRow?.cnt ?? 0, revenue: summaryRow?.rev ?? 0 }
+      } else {
+        name = `Invoice-${now.slice(0, 10)}.pdf`
+      }
+
+      const session2 = await auth()
+      const uploadedBy = (session2?.user as any)?.id ?? 'system'
+      const id = newId()
+      // In production, render the template to PDF and upload to storage.
+      const url = `/generated/${id}-${name}`
+      const tags = ['generated', genType.toLowerCase()]
+
+      await exec(
+        `INSERT INTO Document (id, storeId, name, type, url, size, uploadedBy, createdAt, expiresAt, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, storeId, name, genType, url, 0, uploadedBy, now, null, JSON.stringify(tags)],
+      )
+
+      return ok({ id, storeId, name, type: genType, url, size: 0, uploadedBy, createdAt: now, expiresAt: null, tags, meta: extraMeta }, 201)
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)

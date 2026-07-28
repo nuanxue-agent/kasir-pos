@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   X,
   FileImage,
-  FilePdf,
   Tag,
   Calendar,
   ChevronDown,
@@ -109,7 +108,7 @@ export function validateDocumentType(type: string): type is DocumentType {
 async function fetchDocuments(storeId: string): Promise<Document[]> {
   const res = await fetch(`/api/documents?storeId=${storeId}`)
   if (!res.ok) throw new Error('Gagal memuat dokumen')
-  const data = await res.json()
+  const data = await res.json() as { items?: any[] }
   return data.items ?? []
 }
 
@@ -172,7 +171,8 @@ function UploadModal({
 
       const res = await fetch('/api/documents', { method: 'POST', body: form })
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(d.error ?? 'Upload gagal')
         throw new Error(d.error ?? 'Upload gagal')
       }
       onUploaded()

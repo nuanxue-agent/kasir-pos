@@ -117,14 +117,14 @@ function getLowStockItems(items: StockItem[]): StockItem[] {
  * Mirrors the logic in the API route handler.
  */
 function aggregateStockHistory(logs: StockLog[], days: number): HistoryDay[] {
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - (days - 1))
-  cutoff.setHours(0, 0, 0, 0)
+  // Use UTC dates throughout to avoid timezone mismatch
+  const nowUtc = new Date()
+  const todayUtc = nowUtc.toISOString().slice(0, 10)
 
   const map = new Map<string, HistoryDay>()
-  for (let i = 0; i < days; i++) {
-    const d = new Date(cutoff)
-    d.setDate(d.getDate() + i)
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(nowUtc)
+    d.setUTCDate(d.getUTCDate() - i)
     const key = d.toISOString().slice(0, 10)
     map.set(key, { date: key, in: 0, out: 0 })
   }
@@ -291,7 +291,7 @@ describe('Stock history aggregation by date', () => {
 
   it('aggregates SALE log into out bucket for the correct date', () => {
     const today = new Date().toISOString().slice(0, 10)
-    const logs: StockLog[] = [{ type: 'SALE', qty: -5, createdAt: `${today}T10:00:00.000Z` }]
+    const logs: StockLog[] = [{ type: 'SALE', qty: -5, createdAt: `${today}T00:00:00.000Z` }]
     const result = aggregateStockHistory(logs, 30)
     const todayEntry = result.find(r => r.date === today)
     expect(todayEntry).toBeDefined()
@@ -301,7 +301,7 @@ describe('Stock history aggregation by date', () => {
 
   it('aggregates IN/RESTOCK log into in bucket', () => {
     const today = new Date().toISOString().slice(0, 10)
-    const logs: StockLog[] = [{ type: 'IN', qty: 20, createdAt: `${today}T08:00:00.000Z` }]
+    const logs: StockLog[] = [{ type: 'IN', qty: 20, createdAt: `${today}T00:00:00.000Z` }]
     const result = aggregateStockHistory(logs, 30)
     const todayEntry = result.find(r => r.date === today)
     expect(todayEntry!.in).toBe(20)
