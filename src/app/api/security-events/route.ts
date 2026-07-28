@@ -1,4 +1,4 @@
-// GET/POST /api/audit-logs
+// GET/POST /api/security-events
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, exec, newId, nowISO } from '@/lib/db'
@@ -6,23 +6,37 @@ import { query, exec, newId, nowISO } from '@/lib/db'
 function ok(data: unknown, status = 200) { return NextResponse.json(data, { status }) }
 function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
 
-export async function ensureAuditLogTables() {
-  await exec(`CREATE TABLE IF NOT EXISTS AuditLog (
+export type SecurityEventType =
+  | 'LOGIN'
+  | 'LOGOUT'
+  | 'FAILED_LOGIN'
+  | 'PERMISSION_DENIED'
+  | 'VOID_TRANSACTION'
+  | 'DISCOUNT_OVERRIDE'
+  | 'PRICE_OVERRIDE'
+
+export type SecurityEventSeverity = 'LOW' | 'MEDIUM' | 'HIGH'
+
+const VALID_TYPES = new Set<string>([
+  'LOGIN', 'LOGOUT', 'FAILED_LOGIN', 'PERMISSION_DENIED',
+  'VOID_TRANSACTION', 'DISCOUNT_OVERRIDE', 'PRICE_OVERRIDE',
+])
+
+const VALID_SEVERITIES = new Set<string>(['LOW', 'MEDIUM', 'HIGH'])
+
+export async function ensureSecurityEventTables() {
+  await exec(`CREATE TABLE IF NOT EXISTS SecurityEvent (
     id          TEXT PRIMARY KEY,
     storeId     TEXT NOT NULL,
-    userId      TEXT NOT NULL,
-    action      TEXT NOT NULL,
-    entityType  TEXT,
-    entityId    TEXT,
-    oldValue    TEXT,
-    newValue    TEXT,
-    ipAddress   TEXT,
-    userAgent   TEXT,
+    userId      TEXT,
+    type        TEXT NOT NULL,
+    severity    TEXT NOT NULL DEFAULT 'LOW',
+    description TEXT,
     createdAt   TEXT NOT NULL
   )`)
 }
 
-// GET /api/audit-logs?storeId=&userId=&action=&entityType=&from=&to=&page=&pageSize=
+// GET /api/security-events?storeId=&userId=&type=&severity=&from=&to=&page=&pageSize=
 export async function GET(req: NextRequest) {
   try {
     const session = await auth()
@@ -39,7 +53,7 @@ export async function GET(req: NextRequest) {
     const role = (user.stores as any[])?.find((s: { id: string }) => s.id === storeId)?.role ?? ''
     if (!['OWNER', 'SUPERADMIN'].includes(role)) return err('Forbidden', 403)
 
-    await ensureAuditLogTables()
+    await ensureSecurityEventTables()
 
     const conditions: string[] = ['storeId = ?']
     const vals: any[] = [storeId]
@@ -47,11 +61,11 @@ export async function GET(req: NextRequest) {
     const userId = sp.get('userId')
     if (userId) { conditions.push('userId = ?'); vals.push(userId) }
 
-    const action = sp.get('action')
-    if (action) { conditions.push('action = ?'); vals.push(action) }
+    const type = sp.get('type')
+    if (type) { conditions.push('type = ?'); vals.push(type) }
 
-    const entityType = sp.get('entityType')
-    if (entityType) { conditions.push('entityType = ?'); vals.push(entityType) }
+    const severity = sp.get('severity')
+    if (severity) { conditions.push('severity = ?'); vals.push(severity) }
 
     const from = sp.get('from')
     if (from) { conditions.push('createdAt >= ?'); vals.push(from) }
@@ -66,24 +80,18 @@ export async function GET(req: NextRequest) {
     const where = `WHERE ${conditions.join(' AND ')}`
 
     const countRows = await query(
-      `SELECT COUNT(*) as total FROM AuditLog ${where}`,
+      `SELECT COUNT(*) as total FROM SecurityEvent ${where}`,
       vals,
     )
     const total = Number((countRows as any[])[0]?.total ?? 0)
 
     const rows = await query(
-      `SELECT * FROM AuditLog ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM SecurityEvent ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
       [...vals, pageSize, offset],
     )
 
-    const items = (rows as any[]).map(r => ({
-      ...r,
-      oldValue: r.oldValue ? JSON.parse(r.oldValue) : null,
-      newValue: r.newValue ? JSON.parse(r.newValue) : null,
-    }))
-
     return ok({
-      items,
+      items: rows as any[],
       total,
       page,
       pages: Math.ceil(total / pageSize),
@@ -94,8 +102,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/audit-logs
-// Body: { storeId, userId, action, entityType?, entityId?, oldValue?, newValue?, ipAddress?, userAgent? }
+// POST /api/security-events
+// Body: { storeId, userId?, type, severity?, description? }
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
@@ -109,31 +117,21 @@ export async function POST(req: NextRequest) {
     const hasAccess = (user.stores as any[])?.some((s: { id: string }) => s.id === storeId) ?? false
     if (!hasAccess) return err('Forbidden', 403)
 
-    if (!b.action) return err("Field 'action' is required")
-    const userId = b.userId ?? (user.id as string)
-    if (!userId) return err("Field 'userId' is required")
+    if (!b.type) return err("Field 'type' is required")
+    if (!VALID_TYPES.has(b.type)) return err(`Invalid type: ${b.type}`)
 
-    await ensureAuditLogTables()
+    const severity: string = b.severity ?? 'LOW'
+    if (!VALID_SEVERITIES.has(severity)) return err(`Invalid severity: ${severity}`)
+
+    await ensureSecurityEventTables()
 
     const id = newId()
     const now = nowISO()
 
     await exec(
-      `INSERT INTO AuditLog (id, storeId, userId, action, entityType, entityId, oldValue, newValue, ipAddress, userAgent, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        storeId,
-        userId,
-        b.action,
-        b.entityType ?? null,
-        b.entityId ?? null,
-        b.oldValue != null ? JSON.stringify(b.oldValue) : null,
-        b.newValue != null ? JSON.stringify(b.newValue) : null,
-        b.ipAddress ?? req.headers.get('x-forwarded-for') ?? null,
-        b.userAgent ?? req.headers.get('user-agent') ?? null,
-        now,
-      ],
+      `INSERT INTO SecurityEvent (id, storeId, userId, type, severity, description, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, storeId, b.userId ?? null, b.type, severity, b.description ?? null, now],
     )
 
     return ok({ id }, 201)
