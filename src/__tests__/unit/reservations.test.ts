@@ -1,203 +1,156 @@
 import { describe, it, expect } from 'vitest'
+import {
+  isValidTransition,
+  partySizeFitsTable,
+  reservationsConflict,
+  findAvailableTables,
+  isNoShow,
+  type ReservationRow,
+  type TableLayout,
+  type ReservationStatus,
+} from '@/lib/reservations'
 
-// ─── Pure logic (mirrors what ReservationClient + API use) ───────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'SEATED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
-type WaitStatus = 'WAITING' | 'SEATED' | 'CANCELLED'
-
-interface Reservation {
-  id: string
-  tableId: string
-  datetime: string // ISO
-  durationMinutes: number
-  partySize: number
-  status: ReservationStatus
+function makeRes(overrides: Partial<ReservationRow> = {}): ReservationRow {
+  return {
+    id: 'res-1',
+    storeId: 'store-1',
+    customerName: 'Budi',
+    customerPhone: '0812',
+    tableId: 'table-1',
+    partySize: 2,
+    date: '2025-08-01',
+    timeSlot: '19:00',
+    status: 'PENDING',
+    createdAt: '2025-08-01T10:00:00.000Z',
+    ...overrides,
+  }
 }
 
-interface WaitEntry {
-  id: string
-  partySize: number
-  joinedAt: string
-  status: WaitStatus
+function makeTable(overrides: Partial<TableLayout> = {}): TableLayout {
+  return {
+    id: 'table-1',
+    storeId: 'store-1',
+    number: 'T1',
+    capacity: 4,
+    section: 'Main',
+    active: true,
+    ...overrides,
+  }
 }
 
-// ─── Estimated wait calculation ───────────────────────────────────────────────
+// ── 1. Availability check logic ───────────────────────────────────────────────
 
-const AVG_MINUTES_PER_PARTY = 20
-
-function calcEstimatedWait(queue: WaitEntry[], position: number): number {
-  // position is 0-based index in queue
-  return position * AVG_MINUTES_PER_PARTY
-}
-
-function getQueuePosition(queue: WaitEntry[], entryId: string): number {
-  const waiting = queue.filter(e => e.status === 'WAITING')
-  return waiting.findIndex(e => e.id === entryId)
-}
-
-// ─── Reservation status transitions ──────────────────────────────────────────
-
-const VALID_TRANSITIONS: Record<ReservationStatus, ReservationStatus[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['SEATED', 'CANCELLED', 'NO_SHOW'],
-  SEATED: ['COMPLETED', 'CANCELLED'],
-  COMPLETED: [],
-  CANCELLED: [],
-  NO_SHOW: [],
-}
-
-function canTransition(from: ReservationStatus, to: ReservationStatus): boolean {
-  return VALID_TRANSITIONS[from].includes(to)
-}
-
-// ─── Conflict detection ───────────────────────────────────────────────────────
-
-function hasConflict(
-  existing: Reservation[],
-  tableId: string,
-  datetime: string,
-  durationMinutes: number,
-  excludeId?: string,
-): boolean {
-  const start = new Date(datetime).getTime()
-  const end = start + durationMinutes * 60_000
-
-  return existing
-    .filter(r => r.id !== excludeId)
-    .filter(r => r.tableId === tableId)
-    .filter(r => r.status !== 'CANCELLED' && r.status !== 'NO_SHOW')
-    .some(r => {
-      const rStart = new Date(r.datetime).getTime()
-      const rEnd = rStart + r.durationMinutes * 60_000
-      return start < rEnd && end > rStart
-    })
-}
-
-// ─── Party size validation ────────────────────────────────────────────────────
-
-function validatePartySize(size: number, tableCapacity: number): string | null {
-  if (!Number.isInteger(size) || size < 1) return 'Party size must be at least 1'
-  if (size > tableCapacity) return `Party size exceeds table capacity of ${tableCapacity}`
-  return null
-}
-
-function validatePartySizeNoTable(size: number): string | null {
-  if (!Number.isInteger(size) || size < 1) return 'Party size must be at least 1'
-  if (size > 99) return 'Party size too large'
-  return null
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Tests
-// ═════════════════════════════════════════════════════════════════════════════
-
-describe('Estimated wait calculation', () => {
-  it('returns 0 minutes for first in queue (position 0)', () => {
-    const queue: WaitEntry[] = [
-      { id: 'w1', partySize: 2, joinedAt: new Date().toISOString(), status: 'WAITING' },
-    ]
-    expect(calcEstimatedWait(queue, 0)).toBe(0)
+describe('findAvailableTables', () => {
+  it('returns all active tables when no reservations exist', () => {
+    const tables = [makeTable(), makeTable({ id: 'table-2', number: 'T2' })]
+    const result = findAvailableTables(tables, [], '2025-08-01', '19:00', 2)
+    expect(result).toHaveLength(2)
   })
 
-  it('returns 20 min for second in queue (position 1)', () => {
-    const queue: WaitEntry[] = [
-      { id: 'w1', partySize: 2, joinedAt: new Date().toISOString(), status: 'WAITING' },
-      { id: 'w2', partySize: 3, joinedAt: new Date().toISOString(), status: 'WAITING' },
-    ]
-    expect(calcEstimatedWait(queue, 1)).toBe(20)
+  it('excludes tables already reserved for that date/timeSlot', () => {
+    const tables = [makeTable(), makeTable({ id: 'table-2', number: 'T2' })]
+    const reservations = [makeRes({ tableId: 'table-1', status: 'CONFIRMED' })]
+    const result = findAvailableTables(tables, reservations, '2025-08-01', '19:00', 2)
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('table-2')
   })
 
-  it('returns 60 min for fourth in queue (position 3)', () => {
-    expect(calcEstimatedWait([], 3)).toBe(60)
-  })
-
-  it('getQueuePosition skips SEATED/CANCELLED entries', () => {
-    const queue: WaitEntry[] = [
-      { id: 'w1', partySize: 2, joinedAt: new Date().toISOString(), status: 'SEATED' },
-      { id: 'w2', partySize: 2, joinedAt: new Date().toISOString(), status: 'WAITING' },
-      { id: 'w3', partySize: 2, joinedAt: new Date().toISOString(), status: 'WAITING' },
-    ]
-    // w2 is first WAITING => position 0, w3 is position 1
-    expect(getQueuePosition(queue, 'w2')).toBe(0)
-    expect(getQueuePosition(queue, 'w3')).toBe(1)
+  it('does not exclude tables whose reservations are CANCELLED', () => {
+    const tables = [makeTable()]
+    const reservations = [makeRes({ status: 'CANCELLED' })]
+    const result = findAvailableTables(tables, reservations, '2025-08-01', '19:00', 2)
+    expect(result).toHaveLength(1)
   })
 })
 
-describe('Reservation status transitions', () => {
+// ── 2. Status transition validation ──────────────────────────────────────────
+
+describe('isValidTransition', () => {
   it('allows PENDING → CONFIRMED', () => {
-    expect(canTransition('PENDING', 'CONFIRMED')).toBe(true)
+    expect(isValidTransition('PENDING', 'CONFIRMED')).toBe(true)
   })
 
   it('allows CONFIRMED → SEATED', () => {
-    expect(canTransition('CONFIRMED', 'SEATED')).toBe(true)
+    expect(isValidTransition('CONFIRMED', 'SEATED')).toBe(true)
   })
 
-  it('allows SEATED → COMPLETED', () => {
-    expect(canTransition('SEATED', 'COMPLETED')).toBe(true)
+  it('rejects COMPLETED → PENDING (terminal state)', () => {
+    expect(isValidTransition('COMPLETED', 'PENDING')).toBe(false)
   })
 
-  it('denies COMPLETED → any state (terminal)', () => {
-    expect(canTransition('COMPLETED', 'CANCELLED')).toBe(false)
-    expect(canTransition('COMPLETED', 'PENDING')).toBe(false)
-  })
-
-  it('allows CONFIRMED → NO_SHOW', () => {
-    expect(canTransition('CONFIRMED', 'NO_SHOW')).toBe(true)
+  it('rejects SEATED → CONFIRMED (backward transition)', () => {
+    expect(isValidTransition('SEATED', 'CONFIRMED')).toBe(false)
   })
 })
 
-describe('Conflict detection (same table, overlapping time)', () => {
-  const base = '2025-01-15T18:00:00.000Z'
-  const existing: Reservation[] = [
-    {
-      id: 'r1',
-      tableId: 'tbl-1',
-      datetime: base,
-      durationMinutes: 90,
-      partySize: 4,
-      status: 'CONFIRMED',
-    },
-  ]
+// ── 3. Party size vs capacity check ──────────────────────────────────────────
 
-  it('detects overlap for same table at same time', () => {
-    expect(hasConflict(existing, 'tbl-1', base, 90)).toBe(true)
+describe('partySizeFitsTable', () => {
+  it('returns true when party size equals capacity', () => {
+    expect(partySizeFitsTable(4, 4)).toBe(true)
   })
 
-  it('detects overlap when new booking starts during existing', () => {
-    const midway = new Date(new Date(base).getTime() + 30 * 60_000).toISOString()
-    expect(hasConflict(existing, 'tbl-1', midway, 60)).toBe(true)
+  it('returns true when party size is less than capacity', () => {
+    expect(partySizeFitsTable(2, 4)).toBe(true)
   })
 
-  it('no conflict for different table', () => {
-    expect(hasConflict(existing, 'tbl-2', base, 90)).toBe(false)
+  it('returns false when party size exceeds capacity', () => {
+    expect(partySizeFitsTable(6, 4)).toBe(false)
   })
 
-  it('no conflict when booking is after existing ends', () => {
-    const after = new Date(new Date(base).getTime() + 120 * 60_000).toISOString()
-    expect(hasConflict(existing, 'tbl-1', after, 60)).toBe(false)
-  })
-
-  it('ignores CANCELLED reservations when checking conflicts', () => {
-    const cancelledExisting: Reservation[] = [{ ...existing[0], status: 'CANCELLED' }]
-    expect(hasConflict(cancelledExisting, 'tbl-1', base, 90)).toBe(false)
+  it('returns false for zero party size', () => {
+    expect(partySizeFitsTable(0, 4)).toBe(false)
   })
 })
 
-describe('Party size validation', () => {
-  it('accepts valid party size within capacity', () => {
-    expect(validatePartySize(4, 6)).toBeNull()
+// ── 4. Time slot conflict detection ──────────────────────────────────────────
+
+describe('reservationsConflict', () => {
+  it('detects conflict when same table, date, and timeSlot with active statuses', () => {
+    const a = makeRes({ id: 'res-1', status: 'CONFIRMED' })
+    const b = makeRes({ id: 'res-2', status: 'PENDING' })
+    expect(reservationsConflict(a, b)).toBe(true)
   })
 
-  it('rejects party size exceeding table capacity', () => {
-    expect(validatePartySize(7, 6)).toBe('Party size exceeds table capacity of 6')
+  it('no conflict when different time slots', () => {
+    const a = makeRes({ id: 'res-1', timeSlot: '19:00', status: 'CONFIRMED' })
+    const b = makeRes({ id: 'res-2', timeSlot: '20:00', status: 'PENDING' })
+    expect(reservationsConflict(a, b)).toBe(false)
   })
 
-  it('rejects zero or negative party size', () => {
-    expect(validatePartySize(0, 4)).toBe('Party size must be at least 1')
-    expect(validatePartySize(-1, 4)).toBe('Party size must be at least 1')
+  it('no conflict when one reservation is CANCELLED', () => {
+    const a = makeRes({ id: 'res-1', status: 'CANCELLED' })
+    const b = makeRes({ id: 'res-2', status: 'CONFIRMED' })
+    expect(reservationsConflict(a, b)).toBe(false)
   })
 
-  it('rejects non-integer party size', () => {
-    expect(validatePartySizeNoTable(2.5)).toBe('Party size must be at least 1')
+  it('no conflict when different tables at same date/time', () => {
+    const a = makeRes({ id: 'res-1', tableId: 'table-1', status: 'CONFIRMED' })
+    const b = makeRes({ id: 'res-2', tableId: 'table-2', status: 'CONFIRMED' })
+    expect(reservationsConflict(a, b)).toBe(false)
+  })
+})
+
+// ── 5. No-show detection ──────────────────────────────────────────────────────
+
+describe('isNoShow', () => {
+  it('returns true when CONFIRMED reservation is 30+ min past its slot', () => {
+    const res = makeRes({ status: 'CONFIRMED', date: '2025-08-01', timeSlot: '19:00' })
+    const now = '2025-08-01T19:31:00.000Z' // 31 min after slot
+    expect(isNoShow(res, now, 30)).toBe(true)
+  })
+
+  it('returns false when CONFIRMED reservation is within threshold', () => {
+    const res = makeRes({ status: 'CONFIRMED', date: '2025-08-01', timeSlot: '19:00' })
+    const now = '2025-08-01T19:20:00.000Z' // 20 min after
+    expect(isNoShow(res, now, 30)).toBe(false)
+  })
+
+  it('returns false for non-CONFIRMED statuses', () => {
+    const res = makeRes({ status: 'SEATED', date: '2025-08-01', timeSlot: '19:00' })
+    const now = '2025-08-01T20:00:00.000Z'
+    expect(isNoShow(res, now, 30)).toBe(false)
   })
 })

@@ -1,21 +1,11 @@
-// PATCH /api/reservations/:id
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { queryOne, exec, nowISO } from '@/lib/db'
+import { query, exec, nowISO } from '@/lib/db'
+import { ensureReservationTables } from '../route'
+import { isValidTransition, type ReservationStatus } from '@/lib/reservations'
 
 function err(msg: string, status = 400, code = 'ERROR') {
   return NextResponse.json({ error: msg, code }, { status })
-}
-
-type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'SEATED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
-
-const VALID_TRANSITIONS: Record<ReservationStatus, ReservationStatus[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['SEATED', 'CANCELLED', 'NO_SHOW'],
-  SEATED: ['COMPLETED', 'CANCELLED'],
-  COMPLETED: [],
-  CANCELLED: [],
-  NO_SHOW: [],
 }
 
 export async function PATCH(
@@ -25,56 +15,43 @@ export async function PATCH(
   const session = await auth()
   if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
   const user = session.user as any
-
   const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
   if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
 
   const { id } = await params
+  const body = await req.json() as any
 
-  const existing = await queryOne<any>(
-    `SELECT * FROM Reservation WHERE id=? AND storeId=?`,
-    [id, storeId],
-  )
-  if (!existing) return err('Reservation not found', 404, 'NOT_FOUND')
+  await ensureReservationTables()
 
-  const b = (await req.json()) as any
-  const updates: Record<string, any> = {}
+  const existing = await query(`SELECT * FROM Reservation WHERE id = ? AND storeId = ?`, [id, storeId])
+  if (!(existing as any[]).length) return err('Reservation not found', 404, 'NOT_FOUND')
 
-  if (b.status !== undefined) {
-    const from = existing.status as ReservationStatus
-    const to = b.status as ReservationStatus
-    if (!VALID_TRANSITIONS[from]?.includes(to)) {
-      return err(`Invalid status transition: ${from} → ${to}`, 400, 'INVALID_TRANSITION')
+  const current = (existing as any[])[0]
+
+  // Status transition validation
+  if (body.status && body.status !== current.status) {
+    if (!isValidTransition(current.status as ReservationStatus, body.status as ReservationStatus)) {
+      return err(`Cannot transition from ${current.status} to ${body.status}`, 400, 'INVALID_TRANSITION')
     }
-    updates.status = to
-
-    // SMS/notification stub on status change
-    console.log(`[NOTIFICATION] Reservation ${id} status changed ${from} → ${to} for ${existing.customerName} (${existing.customerPhone})`)
   }
 
-  if (b.customerName !== undefined) updates.customerName = b.customerName
-  if (b.customerPhone !== undefined) updates.customerPhone = b.customerPhone
-  if (b.partySize !== undefined) {
-    const ps = Number(b.partySize)
-    if (!Number.isInteger(ps) || ps < 1) return err('partySize must be a positive integer', 400, 'INVALID_VALUE')
-    updates.partySize = ps
-  }
-  if (b.notes !== undefined) updates.notes = b.notes
-  if (b.tableId !== undefined) updates.tableId = b.tableId
-  if (b.date !== undefined) updates.date = b.date
-  if (b.time !== undefined) updates.time = b.time
-  if (b.duration !== undefined) updates.duration = Number(b.duration)
+  const fields: string[] = []
+  const values: any[] = []
 
-  if (Object.keys(updates).length === 0) return err('Nothing to update', 400, 'VALIDATION_ERROR')
+  if (body.status !== undefined)        { fields.push('status = ?');        values.push(body.status) }
+  if (body.customerName !== undefined)  { fields.push('customerName = ?');  values.push(body.customerName) }
+  if (body.customerPhone !== undefined) { fields.push('customerPhone = ?'); values.push(body.customerPhone) }
+  if (body.tableId !== undefined)       { fields.push('tableId = ?');       values.push(body.tableId) }
+  if (body.partySize !== undefined)     { fields.push('partySize = ?');     values.push(body.partySize) }
+  if (body.date !== undefined)          { fields.push('date = ?');          values.push(body.date) }
+  if (body.timeSlot !== undefined)      { fields.push('timeSlot = ?');      values.push(body.timeSlot) }
+  if (body.notes !== undefined)         { fields.push('notes = ?');         values.push(body.notes) }
 
-  updates.updatedAt = nowISO()
+  if (!fields.length) return err('No fields to update', 400, 'MISSING_FIELD')
 
-  const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ')
-  await exec(
-    `UPDATE Reservation SET ${setClauses} WHERE id=? AND storeId=?`,
-    [...Object.values(updates), id, storeId],
-  )
+  values.push(id)
+  await exec(`UPDATE Reservation SET ${fields.join(', ')} WHERE id = ?`, values)
 
-  const updated = await queryOne(`SELECT * FROM Reservation WHERE id=?`, [id])
-  return NextResponse.json(updated)
+  const updated = await query(`SELECT * FROM Reservation WHERE id = ?`, [id])
+  return NextResponse.json((updated as any[])[0])
 }
