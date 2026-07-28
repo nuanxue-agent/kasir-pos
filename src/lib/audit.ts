@@ -1,3 +1,10 @@
+/**
+ * @module audit
+ * Immutable audit log for compliance and activity history.
+ *
+ * Writes are append-only — records are never updated or deleted.
+ * The `AuditLog` table is created on first write (lazy schema init).
+ */
 import { exec, query, newId, nowISO } from '@/lib/db'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -53,6 +60,16 @@ export interface LogAuditParams {
   meta?: Record<string, unknown>
 }
 
+/**
+ * Append one audit event to the log.
+ *
+ * @param params.storeId      The store this event belongs to.
+ * @param params.userId       ID of the user who triggered the action.
+ * @param params.action       Semantic action label (see `AuditAction`).
+ * @param params.resourceType Optional resource category (e.g. `'Order'`).
+ * @param params.resourceId   Optional ID of the affected resource.
+ * @param params.meta         Optional free-form metadata (serialised to JSON).
+ */
 export async function logAudit(params: LogAuditParams): Promise<void> {
   await ensureTable()
   const id = newId()

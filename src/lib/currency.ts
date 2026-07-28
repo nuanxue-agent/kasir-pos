@@ -1,3 +1,11 @@
+/**
+ * @module currency
+ * Multi-currency support utilities.
+ *
+ * Provides exchange-rate lookups, amount conversion, and locale-aware
+ * formatting for the five supported currencies (IDR, USD, SGD, MYR, EUR).
+ * All functions are pure — no I/O, safe to use in tests and edge runtimes.
+ */
 // ─── Multi-currency support utilities ────────────────────────────────────────
 
 export const SUPPORTED_CURRENCIES = ['IDR', 'USD', 'SGD', 'MYR', 'EUR'] as const
@@ -26,11 +34,7 @@ const CURRENCY_LOCALE: Record<string, string> = {
  * Returns 1 when from === to.
  * Throws when no rate is found (explicit "missing rate" rather than silent wrong result).
  */
-export function getRateForPair(
-  rates: ExchangeRate[],
-  from: string,
-  to: string,
-): number {
+export function getRateForPair(rates: ExchangeRate[], from: string, to: string): number {
   if (from === to) return 1
 
   const direct = rates.find(r => r.fromCurrency === from && r.toCurrency === to)
