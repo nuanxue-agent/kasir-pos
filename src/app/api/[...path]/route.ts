@@ -10381,6 +10381,268 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
+
+    // ─── CONSOLIDATED P&L ────────────────────────────────────────────────────
+    // GET /api/reports/consolidated-pnl?groupId=&from=&to=
+    if (segs[0] === 'reports' && segs[1] === 'consolidated-pnl' && method === 'GET') {
+      const groupId = sp.get('groupId') ?? storeId
+      const from = sp.get('from') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+      const to = sp.get('to') ?? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10)
+
+      // Lazy init InterCompanyTransfer table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS InterCompanyTransfer (
+          id          TEXT PRIMARY KEY,
+          fromStoreId TEXT NOT NULL,
+          toStoreId   TEXT NOT NULL,
+          type        TEXT NOT NULL CHECK(type IN ('STOCK','CASH')),
+          amount      REAL NOT NULL DEFAULT 0,
+          productId   TEXT,
+          qty         REAL,
+          status      TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COMPLETED')),
+          createdAt   TEXT NOT NULL
+        )
+      `)
+
+      // Get all franchise stores under this group
+      await exec(`
+        CREATE TABLE IF NOT EXISTS FranchiseConfig (
+          id            TEXT PRIMARY KEY,
+          storeId       TEXT NOT NULL,
+          parentStoreId TEXT NOT NULL,
+          royaltyRate   REAL NOT NULL DEFAULT 5,
+          minorityPct   REAL NOT NULL DEFAULT 0,
+          contractStart TEXT,
+          contractEnd   TEXT,
+          createdAt     TEXT NOT NULL,
+          updatedAt     TEXT NOT NULL
+        )
+      `)
+
+      const childConfigs = (await query(
+        `SELECT fc.storeId, fc.royaltyRate, fc.minorityPct, s.name as storeName
+           FROM FranchiseConfig fc
+           JOIN Store s ON fc.storeId = s.id
+          WHERE fc.parentStoreId = ?`,
+        [groupId],
+      )) as any[]
+
+      const parentStore = (await queryOne(`SELECT id, name FROM Store WHERE id = ?`, [groupId])) as any
+      const allStoreIds = [groupId, ...childConfigs.map((c: any) => c.storeId)]
+      const minorityMap = new Map(childConfigs.map((c: any) => [c.storeId, Number(c.minorityPct ?? 0)]))
+      const nameMap = new Map([
+        [groupId, parentStore?.name ?? groupId],
+        ...childConfigs.map((c: any) => [c.storeId, c.storeName]),
+      ])
+
+      const ph = allStoreIds.map(() => '?').join(',')
+      const fromTs = from + 'T00:00:00.000Z'
+      const toTs = to + 'T23:59:59.999Z'
+
+      const revenueRows = (await query(
+        `SELECT storeId, COALESCE(SUM(totalAmount),0) as revenue, COUNT(*) as orders
+           FROM "Order"
+          WHERE storeId IN (${ph}) AND status='COMPLETED'
+            AND createdAt BETWEEN ? AND ?
+          GROUP BY storeId`,
+        [...allStoreIds, fromTs, toTs],
+      )) as any[]
+
+      const cogsRows = (await query(
+        `SELECT oi.storeId,
+                COALESCE(SUM(oi.qty * COALESCE(p.costPrice,0)),0) as cogs
+           FROM OrderItem oi
+           JOIN "Order" o ON oi.orderId = o.id
+           JOIN Product p ON oi.productId = p.id
+          WHERE oi.storeId IN (${ph}) AND o.status='COMPLETED'
+            AND o.createdAt BETWEEN ? AND ?
+          GROUP BY oi.storeId`,
+        [...allStoreIds, fromTs, toTs],
+      )) as any[]
+
+      const expenseRows = (await query(
+        `SELECT storeId, COALESCE(SUM(amount),0) as expenses
+           FROM Expense
+          WHERE storeId IN (${ph})
+            AND date BETWEEN ? AND ?
+          GROUP BY storeId`,
+        [...allStoreIds, from, to],
+      )) as any[]
+
+      // Completed inter-company transfers in period — for elimination
+      const icTransfers = (await query(
+        `SELECT fromStoreId, toStoreId, SUM(amount) as total
+           FROM InterCompanyTransfer
+          WHERE (fromStoreId IN (${ph}) OR toStoreId IN (${ph}))
+            AND status = 'COMPLETED'
+            AND createdAt BETWEEN ? AND ?
+          GROUP BY fromStoreId, toStoreId`,
+        [...allStoreIds, ...allStoreIds, fromTs, toTs],
+      )) as any[]
+
+      const revenueMap = new Map(revenueRows.map((r: any) => [r.storeId, r]))
+      const cogsMap = new Map(cogsRows.map((r: any) => [r.storeId, r]))
+      const expenseMap = new Map(expenseRows.map((r: any) => [r.storeId, r]))
+
+      // Per-store IC revenue/cost
+      const icRevenueByStore = new Map<string, number>()
+      const icCostByStore = new Map<string, number>()
+      let totalElimRevenue = 0
+      let totalElimCost = 0
+
+      for (const ic of icTransfers) {
+        // The receiving store inflated its revenue; we eliminate it
+        const amt = Number(ic.total ?? 0)
+        icRevenueByStore.set(ic.toStoreId, (icRevenueByStore.get(ic.toStoreId) ?? 0) + amt)
+        icCostByStore.set(ic.fromStoreId, (icCostByStore.get(ic.fromStoreId) ?? 0) + amt)
+        totalElimRevenue += amt
+        totalElimCost += amt
+      }
+
+      let totalRevenue = 0
+      let totalCogs = 0
+      let totalExpenses = 0
+      let totalMinority = 0
+
+      const stores = allStoreIds.map(sid => {
+        const rev = Number(revenueMap.get(sid)?.revenue ?? 0)
+        const cogs = Number(cogsMap.get(sid)?.cogs ?? 0)
+        const exp = Number(expenseMap.get(sid)?.expenses ?? 0)
+        const icRev = icRevenueByStore.get(sid) ?? 0
+        const icCost = icCostByStore.get(sid) ?? 0
+        const adjRevenue = rev - icRev
+        const grossProfit = adjRevenue - cogs
+        const netProfit = grossProfit - exp
+        const minPct = minorityMap.get(sid) ?? 0
+        const minorityShare = netProfit * (minPct / 100)
+
+        totalRevenue += adjRevenue
+        totalCogs += cogs
+        totalExpenses += exp
+        totalMinority += minorityShare
+
+        return {
+          storeId: sid,
+          storeName: nameMap.get(sid) ?? sid,
+          revenue: rev,
+          cogs,
+          grossProfit,
+          operatingExpenses: exp,
+          netProfit,
+          intercompanyRevenue: icRev,
+          intercompanyCost: icCost,
+        }
+      })
+
+      const grossProfit = totalRevenue - totalCogs
+      const netProfit = grossProfit - totalExpenses
+
+      return ok({
+        groupId,
+        from,
+        to,
+        stores,
+        eliminations: {
+          intercompanyRevenue: totalElimRevenue,
+          intercompanyCost: totalElimCost,
+        },
+        minorityInterest: totalMinority,
+        consolidated: {
+          revenue: totalRevenue,
+          cogs: totalCogs,
+          grossProfit,
+          operatingExpenses: totalExpenses,
+          netProfit,
+          minorityInterest: totalMinority,
+          netProfitAttributableToParent: netProfit - totalMinority,
+        },
+        generatedAt: nowISO(),
+      })
+    }
+
+    // ─── INTER-COMPANY TRANSFERS ──────────────────────────────────────────────
+
+    // Lazy schema helper (reused across endpoints)
+    async function ensureICTransferTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS InterCompanyTransfer (
+          id          TEXT PRIMARY KEY,
+          fromStoreId TEXT NOT NULL,
+          toStoreId   TEXT NOT NULL,
+          type        TEXT NOT NULL CHECK(type IN ('STOCK','CASH')),
+          amount      REAL NOT NULL DEFAULT 0,
+          productId   TEXT,
+          qty         REAL,
+          status      TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COMPLETED')),
+          createdAt   TEXT NOT NULL
+        )
+      `)
+    }
+
+    // GET /api/intercompany-transfers?storeId=
+    if (segs[0] === 'intercompany-transfers' && !segs[1] && method === 'GET') {
+      await ensureICTransferTable()
+      const sid = sp.get('storeId') ?? storeId
+      const transfers = (await query(
+        `SELECT t.*,
+                fs.name as fromStoreName,
+                ts.name as toStoreName,
+                p.name  as productName
+           FROM InterCompanyTransfer t
+           LEFT JOIN Store fs ON t.fromStoreId = fs.id
+           LEFT JOIN Store ts ON t.toStoreId   = ts.id
+           LEFT JOIN Product p ON t.productId  = p.id
+          WHERE t.fromStoreId = ? OR t.toStoreId = ?
+          ORDER BY t.createdAt DESC
+          LIMIT 200`,
+        [sid, sid],
+      )) as any[]
+      return ok({ transfers })
+    }
+
+    // POST /api/intercompany-transfers
+    if (segs[0] === 'intercompany-transfers' && !segs[1] && method === 'POST') {
+      await ensureICTransferTable()
+      const b = await req.json()
+      validateRequired(b, ['fromStoreId', 'toStoreId', 'type', 'amount'])
+      if (!['STOCK', 'CASH'].includes(b.type)) {
+        throw new ValidationError("type must be 'STOCK' or 'CASH'", 'INVALID_VALUE')
+      }
+      validatePositive(b.amount, 'amount')
+      if (b.fromStoreId === b.toStoreId) {
+        throw new ValidationError('fromStoreId and toStoreId must differ', 'INVALID_VALUE')
+      }
+      if (b.type === 'STOCK') {
+        validateRequired(b, ['productId', 'qty'])
+        validatePositive(b.qty, 'qty')
+      }
+
+      const id = newId('ict')
+      await exec(
+        `INSERT INTO InterCompanyTransfer (id, fromStoreId, toStoreId, type, amount, productId, qty, status, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
+        [id, b.fromStoreId, b.toStoreId, b.type, Number(b.amount), b.productId ?? null, b.qty ?? null, nowISO()],
+      )
+      const created = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id])
+      return ok({ transfer: created }, 201)
+    }
+
+    // PATCH /api/intercompany-transfers/:id
+    if (segs[0] === 'intercompany-transfers' && segs[1] && method === 'PATCH') {
+      await ensureICTransferTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id]) as any
+      if (!existing) return err('Transfer not found', 404, 'NOT_FOUND')
+      const b = await req.json()
+      if (b.status && !['PENDING', 'COMPLETED'].includes(b.status)) {
+        throw new ValidationError("status must be 'PENDING' or 'COMPLETED'", 'INVALID_VALUE')
+      }
+      const newStatus = b.status ?? existing.status
+      await exec(`UPDATE InterCompanyTransfer SET status = ? WHERE id = ?`, [newStatus, id])
+      const updated = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id])
+      return ok({ transfer: updated })
+    }
+
   } catch (e: any) {
     console.error('API error:', e)
     if (e instanceof ValidationError) {
