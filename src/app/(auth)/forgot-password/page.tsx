@@ -14,7 +14,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 const inputClass =
-  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-amber-400 focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-amber-400/20'
+  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input,var(--bg-subtle))] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-[var(--accent)] focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20'
 
 export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
     <div className="space-y-6">
       {/* Logo */}
       <div className="flex flex-col items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[var(--shadow-md)]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[var(--shadow-md)]">
           <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.5} />
         </div>
         <span className="text-lg font-bold tracking-tight text-[var(--text-1)]">Lakoo</span>
@@ -59,8 +59,8 @@ export default function ForgotPasswordPage() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-8 shadow-[var(--shadow-lg)]">
         {sent ? (
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
             </div>
             <Link
               href="/login"
-              className="mt-2 flex items-center gap-1.5 text-sm font-medium text-amber-600 transition-colors hover:text-amber-700"
+              className="mt-2 flex items-center gap-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)]"
             >
               <ArrowLeft className="h-4 w-4" />
               Kembali ke halaman masuk
@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {error && (
-                <div className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="flex items-center gap-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">
                   <div className="h-2 w-2 flex-shrink-0 rounded-full bg-red-400" />
                   {error}
                 </div>
@@ -118,7 +118,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? (
                   <>
@@ -138,7 +138,7 @@ export default function ForgotPasswordPage() {
         Ingat password?{' '}
         <Link
           href="/login"
-          className="font-medium text-amber-600 transition-colors hover:text-amber-700"
+          className="font-medium text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)]"
         >
           Masuk
         </Link>
