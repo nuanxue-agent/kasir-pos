@@ -1,130 +1,123 @@
-// GET /api/stock-transfers?storeId=
-// POST /api/stock-transfers
+// GET/POST /api/stock-transfers
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, exec, newId, nowISO } from '@/lib/db'
 
-function err(msg: string, status = 400, code = 'ERROR') {
-  return NextResponse.json({ error: msg, code }, { status })
+function ok(data: unknown, status = 200) { return NextResponse.json(data, { status }) }
+function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
+
+export async function ensureStockTransferTables() {
+  await exec(`CREATE TABLE IF NOT EXISTS StockTransfer (
+    id               TEXT PRIMARY KEY,
+    fromStoreId      TEXT,
+    toStoreId        TEXT,
+    fromWarehouseId  TEXT,
+    toWarehouseId    TEXT,
+    status           TEXT NOT NULL DEFAULT 'DRAFT',
+    requestedBy      TEXT NOT NULL,
+    approvedBy       TEXT,
+    notes            TEXT,
+    createdAt        TEXT NOT NULL,
+    updatedAt        TEXT NOT NULL
+  )`)
+  await exec(`CREATE TABLE IF NOT EXISTS StockTransferItem (
+    id           TEXT PRIMARY KEY,
+    transferId   TEXT NOT NULL,
+    productId    TEXT NOT NULL,
+    requestedQty REAL NOT NULL DEFAULT 0,
+    sentQty      REAL NOT NULL DEFAULT 0,
+    receivedQty  REAL NOT NULL DEFAULT 0,
+    createdAt    TEXT NOT NULL,
+    updatedAt    TEXT NOT NULL
+  )`)
 }
 
-async function ensureTables() {
-  await exec(`
-    CREATE TABLE IF NOT EXISTS Warehouse (
-      id        TEXT PRIMARY KEY,
-      storeId   TEXT NOT NULL,
-      name      TEXT NOT NULL,
-      address   TEXT,
-      type      TEXT NOT NULL DEFAULT 'MAIN' CHECK(type IN ('MAIN','SATELLITE','TRANSIT')),
-      active    INTEGER NOT NULL DEFAULT 1,
-      createdAt TEXT NOT NULL
-    )
-  `)
-  await exec(`
-    CREATE TABLE IF NOT EXISTS StockTransfer (
-      id              TEXT PRIMARY KEY,
-      fromWarehouseId TEXT NOT NULL,
-      toWarehouseId   TEXT NOT NULL,
-      storeId         TEXT NOT NULL,
-      status          TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','IN_TRANSIT','RECEIVED','CANCELLED')),
-      notes           TEXT,
-      createdAt       TEXT NOT NULL
-    )
-  `)
-  await exec(`
-    CREATE TABLE IF NOT EXISTS StockTransferItem (
-      id          TEXT PRIMARY KEY,
-      transferId  TEXT NOT NULL,
-      productId   TEXT NOT NULL,
-      qty         REAL NOT NULL,
-      receivedQty REAL
-    )
-  `)
-}
-
+// GET /api/stock-transfers?storeId=&status=
 export async function GET(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
-  const user = session.user as any
+  try {
+    const session = await auth()
+    if (!session?.user) return err('Unauthorized', 401)
+    const user = session.user as any
 
-  const sp = req.nextUrl.searchParams
-  const storeId = sp.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
+    const url = new URL(req.url)
+    const storeId = url.searchParams.get('storeId')
+    if (!storeId) return err('storeId required')
 
-  await ensureTables()
+    const hasAccess = user.stores?.some((s: { id: string }) => s.id === storeId) ?? false
+    if (!hasAccess) return err('Forbidden', 403)
 
-  const transfers = (await query(
-    `SELECT t.*,
-            fw.name as fromWarehouseName,
-            tw.name as toWarehouseName
-       FROM StockTransfer t
-       LEFT JOIN Warehouse fw ON t.fromWarehouseId = fw.id
-       LEFT JOIN Warehouse tw ON t.toWarehouseId   = tw.id
-      WHERE t.storeId = ?
-      ORDER BY t.createdAt DESC
-      LIMIT 200`,
-    [storeId],
-  )) as any[]
+    await ensureStockTransferTables()
 
-  // Attach items to each transfer
-  const result = await Promise.all(
-    transfers.map(async (t) => {
-      const items = (await query(
-        `SELECT sti.*, p.name as productName, p.sku
-           FROM StockTransferItem sti
-           LEFT JOIN Product p ON sti.productId = p.id
-          WHERE sti.transferId = ?`,
-        [t.id],
-      )) as any[]
-      return { ...t, items }
-    }),
-  )
+    const status = url.searchParams.get('status')
+    let sql = `SELECT * FROM StockTransfer WHERE (fromStoreId = ? OR toStoreId = ?)`
+    const params: unknown[] = [storeId, storeId]
+    if (status) { sql += ` AND status = ?`; params.push(status) }
+    sql += ` ORDER BY createdAt DESC`
 
-  return NextResponse.json({ transfers: result })
+    const transfers = await query(sql, params) as any[]
+
+    const enriched = await Promise.all(
+      transfers.map(async (t) => {
+        const rows = await query(
+          `SELECT COUNT(*) as cnt, COALESCE(SUM(requestedQty),0) as totalRequested
+           FROM StockTransferItem WHERE transferId = ?`,
+          [t.id]
+        ) as any[]
+        const s = rows[0] ?? {}
+        return { ...t, itemCount: s.cnt ?? 0, totalRequested: s.totalRequested ?? 0 }
+      })
+    )
+
+    return ok(enriched)
+  } catch (e: unknown) {
+    return err(e instanceof Error ? e.message : 'Internal error', 500)
+  }
 }
 
+// POST /api/stock-transfers
+// Body: { storeId, toStoreId?, fromWarehouseId?, toWarehouseId?, requestedBy, notes?, items: [{productId, requestedQty}] }
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
-  const user = session.user as any
+  try {
+    const session = await auth()
+    if (!session?.user) return err('Unauthorized', 401)
+    const user = session.user as any
 
-  const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
+    await ensureStockTransferTables()
 
-  await ensureTables()
+    const b = (await req.json()) as any
+    if (!b.storeId) return err('storeId required')
+    if (!b.requestedBy) return err("Field 'requestedBy' is required")
+    if (!b.toStoreId && !b.toWarehouseId) return err('toStoreId or toWarehouseId required')
+    if (!Array.isArray(b.items) || b.items.length === 0) return err('At least one item required')
 
-  const b = (await req.json()) as Record<string, any>
+    const hasAccess = user.stores?.some((s: { id: string }) => s.id === b.storeId) ?? false
+    if (!hasAccess) return err('Forbidden', 403)
 
-  for (const f of ['fromWarehouseId', 'toWarehouseId', 'items']) {
-    if (!b[f]) return err(`Field '${f}' is required`, 400, 'MISSING_FIELD')
-  }
-  if (b.fromWarehouseId === b.toWarehouseId)
-    return err('Source and destination warehouses must differ', 400, 'INVALID_VALUE')
-  if (!Array.isArray(b.items) || b.items.length === 0)
-    return err('items must be a non-empty array', 400, 'INVALID_VALUE')
+    for (const item of b.items) {
+      if (!item.productId) return err('Each item must have productId')
+      if (!item.requestedQty || item.requestedQty <= 0) return err('requestedQty must be > 0')
+    }
 
-  for (const item of b.items) {
-    if (!item.productId) return err('Each item requires productId', 400, 'MISSING_FIELD')
-    const qty = Number(item.qty)
-    if (isNaN(qty) || qty <= 0) return err('Each item qty must be > 0', 400, 'INVALID_VALUE')
-  }
+    const t = nowISO()
+    const id = newId()
 
-  const transferId = newId()
-  await exec(
-    `INSERT INTO StockTransfer (id, fromWarehouseId, toWarehouseId, storeId, status, notes, createdAt)
-     VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
-    [transferId, b.fromWarehouseId, b.toWarehouseId, storeId, b.notes ?? null, nowISO()],
-  )
-
-  for (const item of b.items) {
     await exec(
-      `INSERT INTO StockTransferItem (id, transferId, productId, qty, receivedQty)
-       VALUES (?, ?, ?, ?, NULL)`,
-      [newId(), transferId, item.productId, Number(item.qty)],
+      `INSERT INTO StockTransfer (id, fromStoreId, toStoreId, fromWarehouseId, toWarehouseId, status, requestedBy, approvedBy, notes, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, NULL, ?, ?, ?)`,
+      [id, b.storeId, b.toStoreId ?? null, b.fromWarehouseId ?? null, b.toWarehouseId ?? null,
+       b.requestedBy, b.notes ?? null, t, t]
     )
-  }
 
-  const transfer = (await query(`SELECT * FROM StockTransfer WHERE id = ?`, [transferId])) as any[]
-  const items = (await query(`SELECT * FROM StockTransferItem WHERE transferId = ?`, [transferId])) as any[]
-  return NextResponse.json({ transfer: { ...transfer[0], items } }, { status: 201 })
+    for (const item of b.items) {
+      await exec(
+        `INSERT INTO StockTransferItem (id, transferId, productId, requestedQty, sentQty, receivedQty, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?)`,
+        [newId(), id, item.productId, item.requestedQty, t, t]
+      )
+    }
+
+    return ok({ id }, 201)
+  } catch (e: unknown) {
+    return err(e instanceof Error ? e.message : 'Internal error', 500)
+  }
 }

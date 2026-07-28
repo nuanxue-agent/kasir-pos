@@ -1,131 +1,102 @@
-// PATCH /api/stock-transfers/:id  — status update or receive
+// PATCH /api/stock-transfers/[id]
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { query, exec, nowISO } from '@/lib/db'
+import { query, exec, queryOne, nowISO } from '@/lib/db'
+import { ensureStockTransferTables } from '../route'
 
-function err(msg: string, status = 400, code = 'ERROR') {
-  return NextResponse.json({ error: msg, code }, { status })
-}
+function ok(data: unknown, status = 200) { return NextResponse.json(data, { status }) }
+function err(msg: string, status = 400) { return NextResponse.json({ error: msg }, { status }) }
 
-const VALID_STATUSES = ['PENDING', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED']
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['IN_TRANSIT', 'CANCELLED'],
-  IN_TRANSIT: ['RECEIVED', 'CANCELLED'],
-  RECEIVED: [],
-  CANCELLED: [],
-}
+// PATCH /api/stock-transfers/[id]
+// Body: { action: 'approve'|'ship'|'receive'|'cancel', approvedBy?, items?: [{id, receivedQty}] }
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth()
+    if (!session?.user) return err('Unauthorized', 401)
+    const user = session.user as any
 
-async function ensureTables() {
-  await exec(`
-    CREATE TABLE IF NOT EXISTS StockTransfer (
-      id              TEXT PRIMARY KEY,
-      fromWarehouseId TEXT NOT NULL,
-      toWarehouseId   TEXT NOT NULL,
-      storeId         TEXT NOT NULL,
-      status          TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','IN_TRANSIT','RECEIVED','CANCELLED')),
-      notes           TEXT,
-      createdAt       TEXT NOT NULL
-    )
-  `)
-  await exec(`
-    CREATE TABLE IF NOT EXISTS StockTransferItem (
-      id          TEXT PRIMARY KEY,
-      transferId  TEXT NOT NULL,
-      productId   TEXT NOT NULL,
-      qty         REAL NOT NULL,
-      receivedQty REAL
-    )
-  `)
-  await exec(`
-    CREATE TABLE IF NOT EXISTS WarehouseStock (
-      id          TEXT PRIMARY KEY,
-      warehouseId TEXT NOT NULL,
-      storeId     TEXT NOT NULL,
-      productId   TEXT NOT NULL,
-      qty         REAL NOT NULL DEFAULT 0,
-      minQty      REAL NOT NULL DEFAULT 0,
-      updatedAt   TEXT NOT NULL
-    )
-  `)
-}
+    await ensureStockTransferTables()
 
-async function upsertStock(warehouseId: string, storeId: string, productId: string, delta: number) {
-  const rows = (await query(
-    `SELECT id, qty FROM WarehouseStock WHERE warehouseId = ? AND productId = ?`,
-    [warehouseId, productId],
-  )) as any[]
-  if (rows.length) {
-    await exec(
-      `UPDATE WarehouseStock SET qty = qty + ?, updatedAt = ? WHERE id = ?`,
-      [delta, nowISO(), rows[0].id],
-    )
-  } else {
-    const { newId } = await import('@/lib/db')
-    await exec(
-      `INSERT INTO WarehouseStock (id, warehouseId, storeId, productId, qty, minQty, updatedAt)
-       VALUES (?, ?, ?, ?, ?, 0, ?)`,
-      [newId(), warehouseId, storeId, productId, Math.max(0, delta), nowISO()],
-    )
-  }
-}
+    const { id } = await params
+    const b = (await req.json()) as any
+    const { action } = b
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
+    const transfer = await queryOne(`SELECT * FROM StockTransfer WHERE id = ?`, [id]) as any
+    if (!transfer) return err('Transfer not found', 404)
 
-  await ensureTables()
+    const hasAccess =
+      user.stores?.some((s: { id: string }) => s.id === transfer.fromStoreId || s.id === transfer.toStoreId) ?? false
+    if (!hasAccess) return err('Forbidden', 403)
 
-  const { id } = await params
-  const rows = (await query(`SELECT * FROM StockTransfer WHERE id = ?`, [id])) as any[]
-  if (!rows.length) return err('Transfer not found', 404, 'NOT_FOUND')
-  const transfer = rows[0]
+    const t = nowISO()
 
-  const b = (await req.json()) as Record<string, any>
-
-  if (b.status) {
-    if (!VALID_STATUSES.includes(b.status))
-      return err(`Invalid status '${b.status}'`, 400, 'INVALID_VALUE')
-
-    const allowed = VALID_TRANSITIONS[transfer.status] ?? []
-    if (!allowed.includes(b.status))
-      return err(
-        `Cannot transition from ${transfer.status} to ${b.status}`,
-        400,
-        'INVALID_TRANSITION',
+    if (action === 'approve') {
+      if (transfer.status !== 'DRAFT' && transfer.status !== 'REQUESTED') {
+        return err(`Cannot approve transfer in status ${transfer.status}`)
+      }
+      await exec(
+        `UPDATE StockTransfer SET status = 'REQUESTED', approvedBy = ?, updatedAt = ? WHERE id = ?`,
+        [b.approvedBy ?? (user as any).name ?? 'System', t, id]
       )
-
-    // When receiving: record receivedQty per item and update warehouse stock
-    if (b.status === 'RECEIVED') {
-      const items = (await query(
-        `SELECT * FROM StockTransferItem WHERE transferId = ?`,
-        [id],
-      )) as any[]
-
-      const receivedMap: Record<string, number> = {}
-      if (Array.isArray(b.receivedItems)) {
-        for (const ri of b.receivedItems) {
-          if (ri.itemId && ri.receivedQty !== undefined) {
-            receivedMap[ri.itemId] = Number(ri.receivedQty)
-          }
-        }
-      }
-
-      for (const item of items) {
-        const received = receivedMap[item.id] ?? item.qty
-        await exec(
-          `UPDATE StockTransferItem SET receivedQty = ? WHERE id = ?`,
-          [received, item.id],
-        )
-        // Deduct from source warehouse, add to destination
-        await upsertStock(transfer.fromWarehouseId, transfer.storeId, item.productId, -item.qty)
-        await upsertStock(transfer.toWarehouseId, transfer.storeId, item.productId, received)
-      }
+      return ok({ id, status: 'REQUESTED' })
     }
 
-    await exec(`UPDATE StockTransfer SET status = ? WHERE id = ?`, [b.status, id])
-  }
+    if (action === 'ship') {
+      if (transfer.status !== 'REQUESTED') {
+        return err(`Cannot ship transfer in status ${transfer.status}`)
+      }
+      // Copy requestedQty -> sentQty
+      await exec(
+        `UPDATE StockTransferItem SET sentQty = requestedQty, updatedAt = ? WHERE transferId = ?`,
+        [t, id]
+      )
+      await exec(
+        `UPDATE StockTransfer SET status = 'IN_TRANSIT', updatedAt = ? WHERE id = ?`,
+        [t, id]
+      )
+      return ok({ id, status: 'IN_TRANSIT' })
+    }
 
-  const updated = (await query(`SELECT * FROM StockTransfer WHERE id = ?`, [id])) as any[]
-  const items = (await query(`SELECT * FROM StockTransferItem WHERE transferId = ?`, [id])) as any[]
-  return NextResponse.json({ transfer: { ...updated[0], items } })
+    if (action === 'receive') {
+      if (transfer.status !== 'IN_TRANSIT') {
+        return err(`Cannot receive transfer in status ${transfer.status}`)
+      }
+      const items: Array<{ id: string; receivedQty: number }> = b.items ?? []
+      if (!Array.isArray(items) || items.length === 0) return err('items required for receive')
+
+      for (const item of items) {
+        if (item.receivedQty == null || item.receivedQty < 0) {
+          return err(`receivedQty must be >= 0 for item ${item.id}`)
+        }
+        await exec(
+          `UPDATE StockTransferItem SET receivedQty = ?, updatedAt = ? WHERE id = ? AND transferId = ?`,
+          [item.receivedQty, t, item.id, id]
+        )
+      }
+
+      await exec(
+        `UPDATE StockTransfer SET status = 'RECEIVED', updatedAt = ? WHERE id = ?`,
+        [t, id]
+      )
+      return ok({ id, status: 'RECEIVED' })
+    }
+
+    if (action === 'cancel') {
+      if (transfer.status !== 'DRAFT' && transfer.status !== 'REQUESTED') {
+        return err(`Cannot cancel transfer in status ${transfer.status}`)
+      }
+      await exec(
+        `UPDATE StockTransfer SET status = 'CANCELLED', updatedAt = ? WHERE id = ?`,
+        [t, id]
+      )
+      return ok({ id, status: 'CANCELLED' })
+    }
+
+    return err(`Unknown action: ${action}`)
+  } catch (e: unknown) {
+    return err(e instanceof Error ? e.message : 'Internal error', 500)
+  }
 }
