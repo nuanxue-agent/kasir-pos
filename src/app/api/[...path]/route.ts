@@ -9453,6 +9453,555 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       return ok(alerts)
     }
 
+    // ─── HR / REVIEW CYCLES ──────────────────────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'review-cycles') {
+      await exec(`CREATE TABLE IF NOT EXISTS ReviewCycle (
+        id        TEXT PRIMARY KEY,
+        storeId   TEXT NOT NULL,
+        name      TEXT NOT NULL,
+        period    TEXT NOT NULL DEFAULT 'QUARTERLY',
+        year      INTEGER NOT NULL,
+        startDate TEXT NOT NULL,
+        endDate   TEXT NOT NULL,
+        status    TEXT NOT NULL DEFAULT 'DRAFT',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`, [])
+
+      // GET /api/hr/review-cycles?storeId=
+      if (method === 'GET') {
+        const rows = await query<any>(
+          `SELECT * FROM ReviewCycle WHERE storeId=? ORDER BY year DESC, startDate DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/hr/review-cycles
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['name', 'startDate', 'endDate'])
+        if (!['QUARTERLY', 'ANNUAL'].includes(b.period ?? 'QUARTERLY'))
+          return err('period must be QUARTERLY or ANNUAL')
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO ReviewCycle (id,storeId,name,period,year,startDate,endDate,status,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, storeId, b.name,
+            b.period ?? 'QUARTERLY',
+            Number(b.year) || new Date().getFullYear(),
+            b.startDate, b.endDate,
+            b.status ?? 'DRAFT',
+            t, t,
+          ],
+        )
+        return ok({ id, name: b.name }, 201)
+      }
+
+      // PATCH /api/hr/review-cycles/:id
+      if (method === 'PATCH' && segs[2]) {
+        const b = (await req.json()) as any
+        const allowed = new Set(['name', 'period', 'year', 'startDate', 'endDate', 'status'])
+        const cols = Object.fromEntries(Object.entries(b).filter(([k]) => allowed.has(k)))
+        if (Object.keys(cols).length === 0) return err('Nothing to update')
+        const { setClauses, values } = buildUpdate(cols)
+        await exec(
+          `UPDATE ReviewCycle SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`,
+          [...values, nowISO(), segs[2], storeId],
+        )
+        return ok({ updated: true })
+      }
+    }
+
+    // ─── HR / PERFORMANCE REVIEWS (new cycle-based) ──────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'reviews' && segs.length >= 2) {
+      await exec(`CREATE TABLE IF NOT EXISTS ReviewCycle (
+        id        TEXT PRIMARY KEY,
+        storeId   TEXT NOT NULL,
+        name      TEXT NOT NULL,
+        period    TEXT NOT NULL DEFAULT 'QUARTERLY',
+        year      INTEGER NOT NULL,
+        startDate TEXT NOT NULL,
+        endDate   TEXT NOT NULL,
+        status    TEXT NOT NULL DEFAULT 'DRAFT',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`, [])
+      await exec(`CREATE TABLE IF NOT EXISTS PerformanceReviewV2 (
+        id             TEXT PRIMARY KEY,
+        cycleId        TEXT NOT NULL,
+        storeId        TEXT NOT NULL,
+        employeeId     TEXT NOT NULL,
+        reviewerId     TEXT,
+        scores         TEXT NOT NULL DEFAULT '{}',
+        overallScore   REAL NOT NULL DEFAULT 0,
+        comments       TEXT,
+        selfAssessment TEXT,
+        status         TEXT NOT NULL DEFAULT 'DRAFT',
+        createdAt      TEXT NOT NULL,
+        updatedAt      TEXT NOT NULL
+      )`, [])
+
+      // GET /api/hr/reviews?storeId=&cycleId=&employeeId=
+      if (method === 'GET' && segs.length === 2) {
+        const cycleId = sp.get('cycleId')
+        const employeeId = sp.get('employeeId')
+        let q = `SELECT r.*, e.name as employeeName, e.position
+                 FROM PerformanceReviewV2 r
+                 JOIN Employee e ON r.employeeId = e.id
+                 WHERE r.storeId=?`
+        const p: any[] = [storeId]
+        if (cycleId) { q += ` AND r.cycleId=?`; p.push(cycleId) }
+        if (employeeId) { q += ` AND r.employeeId=?`; p.push(employeeId) }
+        q += ` ORDER BY r.createdAt DESC`
+        return ok(await query(q, p))
+      }
+
+      // POST /api/hr/reviews
+      if (method === 'POST' && segs.length === 2) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['cycleId', 'employeeId'])
+        const scores = b.scores ?? { attendance: 3, sales: 3, teamwork: 3, punctuality: 3 }
+        const overall = b.overallScore ??
+          Math.round((Object.values(scores as Record<string, number>).reduce((a: number, v) => a + (v as number), 0) /
+            Object.keys(scores).length) * 10) / 10
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO PerformanceReviewV2
+           (id,cycleId,storeId,employeeId,reviewerId,scores,overallScore,comments,selfAssessment,status,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, b.cycleId, storeId, b.employeeId,
+            user.id ?? null,
+            JSON.stringify(scores),
+            overall,
+            b.comments ?? null,
+            b.selfAssessment ?? null,
+            b.status ?? 'DRAFT',
+            t, t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+
+      // PATCH /api/hr/reviews/:id
+      if (method === 'PATCH' && segs[2]) {
+        const b = (await req.json()) as any
+        const t = nowISO()
+        const updates: Record<string, any> = {}
+        if (b.scores !== undefined) updates.scores = JSON.stringify(b.scores)
+        if (b.overallScore !== undefined) updates.overallScore = b.overallScore
+        if (b.comments !== undefined) updates.comments = b.comments
+        if (b.selfAssessment !== undefined) updates.selfAssessment = b.selfAssessment
+        if (b.status !== undefined) updates.status = b.status
+        if (Object.keys(updates).length === 0) return err('Nothing to update')
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE PerformanceReviewV2 SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`,
+          [...values, t, segs[2], storeId],
+        )
+        return ok({ updated: true })
+      }
+    }
+
+    // ─── RECIPES ─────────────────────────────────────────────────────────────
+    if (segs[0] === 'recipes') {
+      await exec(`CREATE TABLE IF NOT EXISTS Recipe (
+        id        TEXT PRIMARY KEY,
+        storeId   TEXT NOT NULL,
+        productId TEXT NOT NULL,
+        name      TEXT NOT NULL,
+        yieldQty  REAL NOT NULL DEFAULT 1,
+        notes     TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`, [])
+      await exec(`CREATE TABLE IF NOT EXISTS RecipeIngredient (
+        id                  TEXT PRIMARY KEY,
+        recipeId            TEXT NOT NULL,
+        ingredientProductId TEXT NOT NULL,
+        qty                 REAL NOT NULL DEFAULT 1,
+        unit                TEXT NOT NULL DEFAULT 'g'
+      )`, [])
+
+      // GET /api/recipes?storeId=
+      if (method === 'GET' && segs.length === 1) {
+        const recipes = await query<any>(
+          `SELECT r.*, p.name as productName
+           FROM Recipe r
+           JOIN Product p ON r.productId = p.id
+           WHERE r.storeId=? ORDER BY r.name`,
+          [storeId],
+        )
+        // attach ingredients
+        for (const recipe of recipes) {
+          recipe.ingredients = await query<any>(
+            `SELECT ri.*, p.name as ingredientName, p.cost as ingredientCost
+             FROM RecipeIngredient ri
+             JOIN Product p ON ri.ingredientProductId = p.id
+             WHERE ri.recipeId=?`,
+            [recipe.id],
+          )
+        }
+        return ok(recipes)
+      }
+
+      // POST /api/recipes
+      if (method === 'POST' && segs.length === 1) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['productId', 'name'])
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO Recipe (id,storeId,productId,name,yieldQty,notes,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [id, storeId, b.productId, b.name, Number(b.yieldQty) || 1, b.notes ?? null, t, t],
+        )
+        const ingredients: any[] = b.ingredients ?? []
+        for (const ing of ingredients) {
+          await exec(
+            `INSERT INTO RecipeIngredient (id,recipeId,ingredientProductId,qty,unit) VALUES (?,?,?,?,?)`,
+            [newId(), id, ing.ingredientProductId, Number(ing.qty) || 1, ing.unit ?? 'g'],
+          )
+        }
+        return ok({ id }, 201)
+      }
+
+      // PATCH /api/recipes/:id
+      if (method === 'PATCH' && segs.length === 2 && segs[1] !== undefined) {
+        const recipeId = segs[1]
+        const b = (await req.json()) as any
+        const allowed = new Set(['name', 'productId', 'yieldQty', 'notes'])
+        const cols = Object.fromEntries(Object.entries(b).filter(([k]) => allowed.has(k)))
+        if (Object.keys(cols).length > 0) {
+          const { setClauses, values } = buildUpdate(cols)
+          await exec(
+            `UPDATE Recipe SET ${setClauses}, updatedAt=? WHERE id=? AND storeId=?`,
+            [...values, nowISO(), recipeId, storeId],
+          )
+        }
+        if (Array.isArray(b.ingredients)) {
+          await exec(`DELETE FROM RecipeIngredient WHERE recipeId=?`, [recipeId])
+          for (const ing of b.ingredients) {
+            await exec(
+              `INSERT INTO RecipeIngredient (id,recipeId,ingredientProductId,qty,unit) VALUES (?,?,?,?,?)`,
+              [newId(), recipeId, ing.ingredientProductId, Number(ing.qty) || 1, ing.unit ?? 'g'],
+            )
+          }
+        }
+        return ok({ updated: true })
+      }
+
+      // GET /api/recipes/:id/cost
+      if (method === 'GET' && segs.length === 3 && segs[2] === 'cost') {
+        const recipeId = segs[1]
+        const recipe = await queryOne<any>(
+          `SELECT * FROM Recipe WHERE id=? AND storeId=?`, [recipeId, storeId],
+        )
+        if (!recipe) return err('Recipe not found', 404)
+        const ingredients = await query<any>(
+          `SELECT ri.qty, p.cost
+           FROM RecipeIngredient ri
+           JOIN Product p ON ri.ingredientProductId = p.id
+           WHERE ri.recipeId=?`,
+          [recipeId],
+        )
+        const totalCost = (ingredients as any[]).reduce(
+          (sum: number, i: any) => sum + Number(i.qty) * Number(i.cost ?? 0), 0,
+        )
+        const costPerUnit = recipe.yieldQty > 0 ? totalCost / recipe.yieldQty : 0
+        return ok({ totalCost, costPerUnit, yieldQty: recipe.yieldQty })
+      }
+
+      // GET /api/recipes/:id/availability?batches=N
+      if (method === 'GET' && segs.length === 3 && segs[2] === 'availability') {
+        const recipeId = segs[1]
+        const batches = Math.max(1, Number(sp.get('batches') ?? 1))
+        const recipe = await queryOne<any>(
+          `SELECT * FROM Recipe WHERE id=? AND storeId=?`, [recipeId, storeId],
+        )
+        if (!recipe) return err('Recipe not found', 404)
+        const ingredients = await query<any>(
+          `SELECT ri.ingredientProductId, ri.qty, ri.unit, p.name, p.stock, p.trackStock
+           FROM RecipeIngredient ri
+           JOIN Product p ON ri.ingredientProductId = p.id
+           WHERE ri.recipeId=?`,
+          [recipeId],
+        )
+        const shortfalls: any[] = []
+        let canProduce = true
+        for (const ing of ingredients as any[]) {
+          if (!ing.trackStock) continue
+          const required = Number(ing.qty) * batches
+          const available = Number(ing.stock ?? 0)
+          if (available < required) {
+            canProduce = false
+            shortfalls.push({
+              productId: ing.ingredientProductId,
+              name: ing.name,
+              required,
+              available,
+              unit: ing.unit,
+            })
+          }
+        }
+        return ok({ canProduce, batches, shortfalls })
+      }
+    }
+
+    // ─── PRODUCTION ORDERS ───────────────────────────────────────────────────
+    if (segs[0] === 'production-orders') {
+      await exec(`CREATE TABLE IF NOT EXISTS ProductionOrder (
+        id          TEXT PRIMARY KEY,
+        storeId     TEXT NOT NULL,
+        recipeId    TEXT NOT NULL,
+        qty         REAL NOT NULL DEFAULT 1,
+        status      TEXT NOT NULL DEFAULT 'PENDING',
+        startedAt   TEXT,
+        completedAt TEXT,
+        createdAt   TEXT NOT NULL,
+        updatedAt   TEXT NOT NULL
+      )`, [])
+
+      // GET /api/production-orders?storeId=
+      if (method === 'GET' && segs.length === 1) {
+        const rows = await query<any>(
+          `SELECT po.*, r.name as recipeName
+           FROM ProductionOrder po
+           JOIN Recipe r ON po.recipeId = r.id
+           WHERE po.storeId=? ORDER BY po.createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/production-orders
+      if (method === 'POST' && segs.length === 1) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['recipeId'])
+        const recipe = await queryOne<any>(
+          `SELECT id FROM Recipe WHERE id=? AND storeId=?`, [b.recipeId, storeId],
+        )
+        if (!recipe) return err('Recipe not found', 404)
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO ProductionOrder (id,storeId,recipeId,qty,status,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?)`,
+          [id, storeId, b.recipeId, Number(b.qty) || 1, 'PENDING', t, t],
+        )
+        return ok({ id }, 201)
+      }
+
+      // PATCH /api/production-orders/:id
+      if (method === 'PATCH' && segs.length === 2) {
+        const orderId = segs[1]
+        const b = (await req.json()) as any
+        const t = nowISO()
+        const updates: Record<string, any> = { updatedAt: t }
+        if (b.status) {
+          const valid = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+          if (!valid.includes(b.status)) return err('Invalid status')
+          updates.status = b.status
+          if (b.status === 'IN_PROGRESS') updates.startedAt = t
+          if (b.status === 'COMPLETED') updates.completedAt = t
+        }
+        if (b.qty !== undefined) updates.qty = Number(b.qty)
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE ProductionOrder SET ${setClauses} WHERE id=? AND storeId=?`,
+          [...values, orderId, storeId],
+        )
+        return ok({ updated: true })
+      }
+    }
+
+    // ─── MEMBERSHIP PLANS ────────────────────────────────────────────────────
+    if (segs[0] === 'membership-plans') {
+      await exec(`CREATE TABLE IF NOT EXISTS MembershipPlan (
+        id            TEXT PRIMARY KEY,
+        storeId       TEXT NOT NULL,
+        name          TEXT NOT NULL,
+        price         REAL NOT NULL DEFAULT 0,
+        billingCycle  TEXT NOT NULL DEFAULT 'MONTHLY',
+        durationDays  INTEGER NOT NULL DEFAULT 30,
+        description   TEXT,
+        benefits      TEXT,
+        active        INTEGER NOT NULL DEFAULT 1,
+        createdAt     TEXT NOT NULL,
+        updatedAt     TEXT NOT NULL
+      )`, [])
+
+      // GET /api/membership-plans?storeId=
+      if (method === 'GET') {
+        const rows = await query<any>(
+          `SELECT * FROM MembershipPlan WHERE storeId=? AND active=1 ORDER BY price ASC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/membership-plans
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        validateRequired(b, ['name', 'price'])
+        validatePositive(b.price, 'price')
+        const cycles = ['MONTHLY', 'QUARTERLY', 'ANNUAL']
+        if (b.billingCycle && !cycles.includes(b.billingCycle))
+          return err('billingCycle must be MONTHLY, QUARTERLY, or ANNUAL')
+        const t = nowISO()
+        const id = newId()
+        const durationMap: Record<string, number> = { MONTHLY: 30, QUARTERLY: 90, ANNUAL: 365 }
+        const cycle = b.billingCycle ?? 'MONTHLY'
+        await exec(
+          `INSERT INTO MembershipPlan
+           (id,storeId,name,price,billingCycle,durationDays,description,benefits,active,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, storeId, b.name, Number(b.price), cycle,
+            Number(b.durationDays) || durationMap[cycle] || 30,
+            b.description ?? null,
+            b.benefits ? JSON.stringify(b.benefits) : null,
+            1, t, t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+    }
+
+    // ─── SUBSCRIPTIONS ───────────────────────────────────────────────────────
+    if (segs[0] === 'subscriptions') {
+      await exec(`CREATE TABLE IF NOT EXISTS MembershipPlan (
+        id            TEXT PRIMARY KEY,
+        storeId       TEXT NOT NULL,
+        name          TEXT NOT NULL,
+        price         REAL NOT NULL DEFAULT 0,
+        billingCycle  TEXT NOT NULL DEFAULT 'MONTHLY',
+        durationDays  INTEGER NOT NULL DEFAULT 30,
+        description   TEXT,
+        benefits      TEXT,
+        active        INTEGER NOT NULL DEFAULT 1,
+        createdAt     TEXT NOT NULL,
+        updatedAt     TEXT NOT NULL
+      )`, [])
+      await exec(`CREATE TABLE IF NOT EXISTS CustomerSubscription (
+        id            TEXT PRIMARY KEY,
+        storeId       TEXT NOT NULL,
+        customerId    TEXT NOT NULL,
+        planId        TEXT NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'ACTIVE',
+        startDate     TEXT NOT NULL,
+        nextBillingAt TEXT NOT NULL,
+        endDate       TEXT,
+        cancelledAt   TEXT,
+        autoRenew     INTEGER NOT NULL DEFAULT 1,
+        createdAt     TEXT NOT NULL,
+        updatedAt     TEXT NOT NULL
+      )`, [])
+
+      // GET /api/subscriptions?storeId=&status=&customerId=
+      if (method === 'GET' && segs.length === 1) {
+        const status = sp.get('status')
+        const customerId = sp.get('customerId')
+        let q = `SELECT cs.*, c.name as customerName, c.phone as customerPhone,
+                        mp.name as planName, mp.price as planPrice, mp.billingCycle
+                 FROM CustomerSubscription cs
+                 JOIN Customer c ON cs.customerId = c.id
+                 JOIN MembershipPlan mp ON cs.planId = mp.id
+                 WHERE cs.storeId=?`
+        const p: any[] = [storeId]
+        if (status) { q += ` AND cs.status=?`; p.push(status) }
+        if (customerId) { q += ` AND cs.customerId=?`; p.push(customerId) }
+        q += ` ORDER BY cs.createdAt DESC`
+        return ok(await query(q, p))
+      }
+
+      // POST /api/subscriptions
+      if (method === 'POST' && segs.length === 1) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['customerId', 'planId'])
+        const plan = await queryOne<any>(
+          `SELECT * FROM MembershipPlan WHERE id=? AND storeId=?`, [b.planId, storeId],
+        )
+        if (!plan) return err('Membership plan not found', 404)
+        const startDate = b.startDate ?? new Date().toISOString().slice(0, 10)
+        const nextBillingAt = (() => {
+          const d = new Date(startDate)
+          if (plan.billingCycle === 'MONTHLY') d.setMonth(d.getMonth() + 1)
+          else if (plan.billingCycle === 'QUARTERLY') d.setMonth(d.getMonth() + 3)
+          else if (plan.billingCycle === 'ANNUAL') d.setFullYear(d.getFullYear() + 1)
+          else d.setDate(d.getDate() + (plan.durationDays ?? 30))
+          return d.toISOString().slice(0, 10)
+        })()
+        const t = nowISO()
+        const id = newId()
+        await exec(
+          `INSERT INTO CustomerSubscription
+           (id,storeId,customerId,planId,status,startDate,nextBillingAt,autoRenew,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id, storeId, b.customerId, b.planId,
+            b.status ?? 'ACTIVE',
+            startDate, nextBillingAt,
+            b.autoRenew !== false ? 1 : 0,
+            t, t,
+          ],
+        )
+        return ok({ id, nextBillingAt }, 201)
+      }
+
+      // PATCH /api/subscriptions/:id
+      if (method === 'PATCH' && segs.length === 2) {
+        const subId = segs[1]
+        const b = (await req.json()) as any
+        const t = nowISO()
+        const updates: Record<string, any> = { updatedAt: t }
+        const allowed = ['status', 'nextBillingAt', 'endDate', 'autoRenew', 'cancelledAt']
+        for (const k of allowed) {
+          if (b[k] !== undefined) updates[k] = b[k]
+        }
+        if (b.status === 'CANCELLED' && !updates.cancelledAt) updates.cancelledAt = t
+        if (Object.keys(updates).length === 1) return err('Nothing to update')
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE CustomerSubscription SET ${setClauses} WHERE id=? AND storeId=?`,
+          [...values, subId, storeId],
+        )
+        return ok({ updated: true })
+      }
+
+      // POST /api/subscriptions/process-billing
+      if (method === 'POST' && segs[1] === 'process-billing') {
+        const today = new Date().toISOString().slice(0, 10)
+        const due = await query<any>(
+          `SELECT cs.*, mp.price, mp.billingCycle, mp.durationDays
+           FROM CustomerSubscription cs
+           JOIN MembershipPlan mp ON cs.planId = mp.id
+           WHERE cs.storeId=? AND cs.status='ACTIVE' AND cs.autoRenew=1
+             AND cs.nextBillingAt <= ?`,
+          [storeId, today],
+        )
+        let processed = 0
+        for (const sub of due as any[]) {
+          const d = new Date(sub.nextBillingAt)
+          if (sub.billingCycle === 'MONTHLY') d.setMonth(d.getMonth() + 1)
+          else if (sub.billingCycle === 'QUARTERLY') d.setMonth(d.getMonth() + 3)
+          else if (sub.billingCycle === 'ANNUAL') d.setFullYear(d.getFullYear() + 1)
+          else d.setDate(d.getDate() + (sub.durationDays ?? 30))
+          const nextBillingAt = d.toISOString().slice(0, 10)
+          await exec(
+            `UPDATE CustomerSubscription SET nextBillingAt=?, updatedAt=? WHERE id=?`,
+            [nextBillingAt, nowISO(), sub.id],
+          )
+          processed++
+        }
+        return ok({ processed, date: today })
+      }
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)

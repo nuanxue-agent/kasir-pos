@@ -3,23 +3,26 @@
 :root {
   --radius: 0.625rem;
 
-  /* Lakoo light — warm, low-contrast, easy on eyes */
-  --bg-base: #faf8f4; /* warmer, less yellow than before */
-  --bg-card: #fefefe; /* near-white, not pure white */
-  --bg-subtle: #f5f2ec; /* muted warm gray for hover/subtle bg */
-  --bg-muted: #ede9e1; /* deeper muted for pressed states */
-  --bg-input: #fefefe; /* input background */
-  --border: #e8e3da; /* warm gray, not amber — much softer */
-  --border-mid: #d4cfc6; /* medium border, replaces harsh amber */
-  --text-1: #2c2825; /* warm near-black, not pure stone-900 */
-  --text-2: #6b6560; /* muted body text */
-  --text-3: #a09890; /* placeholder / caption */
-  --primary: #d97706; /* amber-600 — less glaring than amber-500 */
-  --primary-fg: #fffbf0; /* warm white on primary */
-  --primary-subtle: #fef3c7; /* amber-100 for light primary bg */
-  --accent: #ea580c; /* orange-600 for destructive/hot accents */
-  --success: #16a34a; /* green-600 */
-  --success-subtle: #dcfce7;
+  /* Lakoo light — cool navy/indigo palette */
+  --bg-canvas: #f0f2f8;
+  --bg-base: #f0f2f8;
+  --bg-card: #ffffff;
+  --bg-subtle: #eef0f7;
+  --bg-muted: #e4e7f2;
+  --bg-input: #ffffff;
+  --border: #dde1ef;
+  --border-mid: #c4cae0;
+  --text-1: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-text: #ffffff;
+  --primary: #4f46e5;
+  --primary-fg: #ffffff;
+  --primary-subtle: #eef2ff;
+  --success: #059669;
+  --success-subtle: #d1fae5;
   --danger: #dc2626;
   --danger-subtle: #fee2e2;
   --warning: #d97706;
@@ -27,40 +30,43 @@
   --info: #0284c7;
   --info-subtle: #e0f2fe;
 
-  /* shadows — tinted warm, soft */
-  --shadow-sm: 0 1px 3px 0 rgba(44, 40, 37, 0.06), 0 1px 2px -1px rgba(44, 40, 37, 0.04);
-  --shadow-md: 0 4px 8px -2px rgba(44, 40, 37, 0.08), 0 2px 4px -2px rgba(44, 40, 37, 0.04);
-  --shadow-lg: 0 10px 24px -4px rgba(44, 40, 37, 0.1), 0 4px 8px -4px rgba(44, 40, 37, 0.04);
+  /* shadows — cool tinted */
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 10px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -4px rgba(15, 23, 42, 0.06);
 }
 
 html.dark,
 .dark {
-  --bg-base: #1c1917;
-  --bg-card: #292524;
-  --bg-subtle: #2e2a22;
-  --bg-muted: #1c1917;
-  --bg-input: #292524;
-  --border: #44403c;
-  --border-mid: #57534e;
-  --text-1: #fafaf9;
-  --text-2: #a8a29e;
-  --text-3: #78716c;
-  --primary: #f59e0b;
-  --primary-fg: #1c1712;
-  --primary-subtle: #422006;
-  --accent: #f97316;
-  --success: #22c55e;
-  --success-subtle: #14532d;
-  --danger: #f87171;
+  --bg-canvas: #0a0f1e;
+  --bg-base: #0a0f1e;
+  --bg-card: #111827;
+  --bg-subtle: #1e293b;
+  --bg-muted: #0f172a;
+  --bg-input: #111827;
+  --border: #1e3a5f;
+  --border-mid: #2d4a73;
+  --text-1: #f1f5f9;
+  --text-2: #94a3b8;
+  --text-3: #475569;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-text: #ffffff;
+  --primary: #6366f1;
+  --primary-fg: #ffffff;
+  --primary-subtle: #1e1b4b;
+  --success: #10b981;
+  --success-subtle: #064e3b;
+  --danger: #ef4444;
   --danger-subtle: #7f1d1d;
-  --warning: #fbbf24;
+  --warning: #f59e0b;
   --warning-subtle: #451a03;
   --info: #38bdf8;
   --info-subtle: #0c4a6e;
 
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.28);
-  --shadow-lg: 0 10px 24px -4px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 24px -4px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -68,7 +74,7 @@ html.dark,
 }
 
 body {
-  background-color: var(--bg-base);
+  background-color: var(--bg-canvas);
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
@@ -98,9 +104,9 @@ body {
   scrollbar-width: none;
 }
 
-/* ── Focus rings — warm, not blue ────────────────────────────────────────── */
+/* ── Focus rings — indigo ─────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius);
 }
@@ -111,6 +117,46 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+}
+
+/* ── Button styles ───────────────────────────────────────────────────────── */
+.btn-primary {
+  background-color: #4f46e5;
+  color: #ffffff;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: background-color 150ms ease;
+}
+.btn-primary:hover {
+  background-color: #4338ca;
+}
+.dark .btn-primary {
+  background-color: #6366f1;
+}
+.dark .btn-primary:hover {
+  background-color: #818cf8;
+}
+
+.btn-secondary {
+  border: 1px solid #c7d2fe;
+  color: #4338ca;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: background-color 150ms ease;
+}
+.btn-secondary:hover {
+  background-color: #eef2ff;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  color: #ffffff;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: background-color 150ms ease;
+}
+.btn-danger:hover {
+  background-color: #dc2626;
 }
 
 /* ── Barcode scanner animation ───────────────────────────────────────────── */
@@ -136,7 +182,7 @@ body {
 /* Sidebar mirrors to the right in RTL */
 [dir='rtl'] aside {
   border-right: none;
-  border-left: 1px solid rgb(231 229 228); /* stone-200 */
+  border-left: 1px solid var(--border);
 }
 
 /* Flip chevrons and directional icons */

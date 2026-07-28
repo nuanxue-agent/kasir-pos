@@ -27,12 +27,14 @@ import {
   Cog,
   Heart,
   UtensilsCrossed,
+  ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
 import type { UserRole } from '@/lib/permissions'
 import StoreSwitcher from '@/components/StoreSwitcher'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { useState } from 'react'
 
 interface NavItem {
   label: string
@@ -116,6 +118,71 @@ interface SidebarProps {
   onStoreChange?: (storeId: string) => void
 }
 
+function NavGroupSection({
+  group,
+  isActive,
+  onClose,
+  filterItems,
+}: {
+  group: NavGroup
+  isActive: (href: string) => boolean
+  onClose: () => void
+  filterItems: (items: NavItem[]) => NavItem[]
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+  const visibleItems = filterItems(group.items)
+  if (visibleItems.length === 0) return null
+
+  return (
+    <div>
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        className="mb-1.5 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-widest text-indigo-300/60 hover:text-indigo-200/80 transition-colors"
+      >
+        <span>{group.title}</span>
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 transition-transform duration-200',
+            collapsed && '-rotate-90',
+          )}
+        />
+      </button>
+      {!collapsed && (
+        <ul className="space-y-0.5">
+          {visibleItems.map(item => {
+            const active = isActive(item.href)
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
+                    active
+                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/40'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+                  )}
+                >
+                  <item.icon
+                    className={cn(
+                      'h-[17px] w-[17px] shrink-0',
+                      active ? 'text-white' : 'text-slate-500',
+                    )}
+                  />
+                  <span className="truncate">{item.label}</span>
+                  {active && (
+                    <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-300/70" />
+                  )}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export function Sidebar({
   userRole,
   isSuperAdmin,
@@ -142,7 +209,6 @@ export function Sidebar({
     return true
   }
 
-  // Filter nav items by module
   function filterItems(items: NavItem[]): NavItem[] {
     return items.filter(item => {
       if (item.href === '/dashboard/pos') return enabledModules.includes('pos')
@@ -168,18 +234,20 @@ export function Sidebar({
   }
 
   const sidebarContent = (
-    <div className="flex h-full flex-col border-r border-[var(--border)] bg-[var(--bg-card)]">
+    <div className="flex h-full flex-col bg-[#0f172a] dark:bg-[#0a0f1e]">
       {/* Logo */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
-        <a href="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm shadow-amber-200/60">
-            <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-5">
+        <a href="/" className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-md shadow-indigo-900/50">
+            <ShoppingBag className="h-4.5 w-4.5 text-white" strokeWidth={2.5} style={{ width: 18, height: 18 }} />
           </div>
-          <span className="text-base font-bold tracking-tight text-[var(--text-1)]">Lakoo</span>
+          <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-lg font-bold tracking-tight text-transparent">
+            Lakoo
+          </span>
         </a>
         <button
           onClick={onClose}
-          className="rounded-lg p-1 text-[var(--text-3)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)] lg:hidden"
+          className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300 lg:hidden"
           aria-label="Tutup sidebar"
         >
           <X className="h-4 w-4" />
@@ -188,7 +256,7 @@ export function Sidebar({
 
       {/* Store switcher */}
       {stores.length > 0 && (
-        <div className="border-b border-[var(--border)] px-3 pt-3 pb-1">
+        <div className="border-b border-white/5 px-4 pt-3 pb-2">
           <StoreSwitcher
             stores={stores}
             currentStoreId={currentStoreId ?? stores[0]?.id}
@@ -202,47 +270,15 @@ export function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-        {NAV_GROUPS.filter(canSeeGroup).map(group => {
-          const visibleItems = filterItems(group.items)
-          if (visibleItems.length === 0) return null
-          return (
-            <div key={group.title}>
-              <p className="mb-1.5 px-2 text-[10px] font-semibold tracking-widest text-[var(--text-3)] uppercase">
-                {group.title}
-              </p>
-              <ul className="space-y-0.5">
-                {visibleItems.map(item => {
-                  const active = isActive(item.href)
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={onClose}
-                        className={cn(
-                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
-                          active
-                            ? 'border border-amber-200/60 bg-[var(--primary-subtle)] text-amber-700'
-                            : 'text-[var(--text-2)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)]',
-                        )}
-                      >
-                        <item.icon
-                          className={cn(
-                            'h-[17px] w-[17px] shrink-0',
-                            active ? 'text-amber-600' : 'text-[var(--text-3)]',
-                          )}
-                        />
-                        <span className="truncate">{item.label}</span>
-                        {active && (
-                          <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500/70" />
-                        )}
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )
-        })}
+        {NAV_GROUPS.filter(canSeeGroup).map(group => (
+          <NavGroupSection
+            key={group.title}
+            group={group}
+            isActive={isActive}
+            onClose={onClose}
+            filterItems={filterItems}
+          />
+        ))}
       </nav>
 
       {/* Settings */}
@@ -251,18 +287,16 @@ export function Sidebar({
           href="/dashboard/settings"
           onClick={onClose}
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
+            'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
             pathname.startsWith('/dashboard/settings')
-              ? 'border border-amber-200/60 bg-[var(--primary-subtle)] text-amber-700'
-              : 'text-[var(--text-2)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-1)]',
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/40'
+              : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
           )}
         >
           <Settings
             className={cn(
               'h-[17px] w-[17px] shrink-0',
-              pathname.startsWith('/dashboard/settings')
-                ? 'text-amber-600'
-                : 'text-[var(--text-3)]',
+              pathname.startsWith('/dashboard/settings') ? 'text-white' : 'text-slate-500',
             )}
           />
           Pengaturan
@@ -270,21 +304,21 @@ export function Sidebar({
       </div>
 
       {/* User section */}
-      <div className="shrink-0 space-y-2 border-t border-[var(--border)] p-3">
+      <div className="shrink-0 space-y-2 border-t border-white/5 p-3">
         <LocaleSwitcher showName={true} />
-        <div className="flex items-center gap-3 rounded-lg bg-[var(--bg-subtle)] px-2 py-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-xs font-bold text-white">
+        <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-sm">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-[var(--text-1)]">
+            <p className="truncate text-sm font-medium text-slate-200">
               {userName ?? 'Pengguna'}
             </p>
-            {userEmail && <p className="truncate text-xs text-[var(--text-3)]">{userEmail}</p>}
+            {userEmail && <p className="truncate text-xs text-slate-500">{userEmail}</p>}
           </div>
           <button
             onClick={handleLogout}
-            className="shrink-0 rounded-md p-1.5 text-[var(--text-3)] transition-colors hover:bg-red-50 hover:text-red-500"
+            className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
             aria-label="Keluar"
             title="Keluar"
           >
@@ -299,7 +333,7 @@ export function Sidebar({
     <>
       {/* Desktop */}
       <aside
-        className="sticky top-0 hidden h-screen w-[240px] shrink-0 flex-col lg:flex"
+        className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col lg:flex"
         aria-label="Navigasi utama"
       >
         {sidebarContent}
@@ -309,12 +343,12 @@ export function Sidebar({
       {open && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onClose}
             aria-hidden="true"
           />
           <aside
-            className="relative z-50 flex h-full w-[240px] flex-col shadow-2xl"
+            className="relative z-50 flex h-full w-72 flex-col shadow-2xl"
             aria-label="Navigasi utama"
           >
             {sidebarContent}
