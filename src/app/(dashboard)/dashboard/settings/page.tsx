@@ -6,6 +6,7 @@ import { LoyaltySettingsClient } from '@/components/settings/LoyaltySettingsClie
 import { GiftCardsClient } from '@/components/settings/GiftCardsClient'
 import { CurrencyClient } from '@/components/settings/CurrencyClient'
 import { ScheduledReportsClient } from '@/components/settings/ScheduledReportsClient'
+import { TaxSettingsClient } from '@/components/settings/TaxSettingsClient'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -55,6 +56,11 @@ export default async function SettingsPage() {
       <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
           <ScheduledReportsClient storeId={storeId} />
+        </div>
+      </div>
+      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <TaxSettingsClient storeId={storeId} />
         </div>
       </div>
     </div>

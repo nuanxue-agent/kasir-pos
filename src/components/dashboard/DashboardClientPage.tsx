@@ -364,6 +364,45 @@ export default function DashboardClientPage({
     return () => clearInterval(id)
   }, [lastUpdated])
 
+  // NPS — current month average from surveys
+  const currentMonthStart = (() => {
+    const d = new Date()
+    d.setDate(1)
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString()
+  })()
+  const { data: npsData } = useQuery<{ avgNps: number | null; totalResponses: number }>({
+    queryKey: ['dashboard-nps', storeId, currentMonthStart.slice(0, 7)],
+    queryFn: () =>
+      fetch(`/api/surveys?storeId=${storeId}`)
+        .then(r => r.json())
+        .then(async (surveys: unknown) => {
+          const surveyList = (surveys as any[]) ?? []
+          if (!surveyList.length) return { avgNps: null, totalResponses: 0 }
+          const analyticsResults = await Promise.allSettled(
+            surveyList.map((s: any) =>
+              fetch(`/api/surveys/${s.id}/analytics?storeId=${storeId}`).then(r => r.json()),
+            ),
+          )
+          let npsSum = 0, npsCount = 0, totalResponses = 0
+          for (const r of analyticsResults) {
+            if (r.status === 'fulfilled') {
+              const a = r.value as any
+              totalResponses += a.totalResponses ?? 0
+              if (a.avgNps !== null && a.avgNps !== undefined) {
+                npsSum += a.avgNps
+                npsCount++
+              }
+            }
+          }
+          return {
+            avgNps: npsCount > 0 ? Math.round((npsSum / npsCount) * 10) / 10 : null,
+            totalResponses,
+          }
+        }),
+    refetchInterval: 120_000,
+  })
+
   // Today's summary
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-summary', storeId],
@@ -638,6 +677,71 @@ export default function DashboardClientPage({
 
       {/* ── KPI Goal Row ── */}
       <KpiGoalRow storeId={storeId} currency={currency} />
+
+      {/* ── NPS Score Card ── */}
+      {(() => {
+        const score = npsData?.avgNps ?? null
+        const responses = npsData?.totalResponses ?? 0
+        const scoreColor =
+          score === null
+            ? 'text-[var(--text-3)]'
+            : score < 6
+              ? 'text-red-500'
+              : score < 9
+                ? 'text-amber-500'
+                : 'text-emerald-500'
+        const bgColor =
+          score === null
+            ? 'bg-[var(--bg-subtle)]'
+            : score < 6
+              ? 'bg-red-50'
+              : score < 9
+                ? 'bg-amber-50'
+                : 'bg-emerald-50'
+        const borderColor =
+          score === null
+            ? 'border-[var(--border)]'
+            : score < 6
+              ? 'border-red-200'
+              : score < 9
+                ? 'border-amber-200'
+                : 'border-emerald-200'
+        const label =
+          score === null ? '—' : score < 6 ? 'Detractor' : score < 9 ? 'Passive' : 'Promoter'
+        return (
+          <Link href="/dashboard/crm/feedback" className="block">
+            <div
+              className={`flex items-center justify-between rounded-xl border ${borderColor} ${bgColor} px-5 py-4 shadow-sm transition-shadow hover:shadow-md`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${score === null ? 'bg-[var(--bg-muted)]' : score < 6 ? 'bg-red-100' : score < 9 ? 'bg-amber-100' : 'bg-emerald-100'}`}
+                >
+                  <Star
+                    className={`h-5 w-5 ${score === null ? 'text-[var(--text-3)]' : score < 6 ? 'text-red-500' : score < 9 ? 'text-amber-500' : 'text-emerald-500'}`}
+                  />
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-3)]">
+                    NPS Bulan Ini
+                  </p>
+                  <p className={`mt-0.5 text-xl font-bold ${scoreColor}`}>
+                    {score !== null ? score.toFixed(1) : '—'}
+                    <span className="ml-1.5 text-xs font-medium opacity-70">{label}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-[var(--text-1)]">{responses}</p>
+                <p className="text-xs text-[var(--text-3)]">respons survei</p>
+                <p className="mt-1 flex items-center justify-end gap-0.5 text-[10px] font-medium text-[var(--text-3)] hover:text-amber-600">
+                  Lihat detail <ChevronRight className="h-3 w-3" />
+                </p>
+              </div>
+            </div>
+          </Link>
+        )
+      })()}
 
       {/* ── Today's Performance summary bar ── */}
       {!isLoading && (
