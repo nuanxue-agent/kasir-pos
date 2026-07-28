@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import JournalEntryClient from '@/components/accounting/JournalEntryClient'
+import JournalEntryClient from '@/components/accounting/JournalPageClient'
 
 export const metadata = { title: 'Jurnal Umum | Kasir' }
 
