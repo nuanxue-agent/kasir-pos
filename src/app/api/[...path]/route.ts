@@ -10199,7 +10199,450 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── REFERRAL PROGRAMS ────────────────────────────────────────────────────
+    if (segs[0] === 'referral-programs') {
+      // Lazy-create ReferralProgram table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ReferralProgram (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          name         TEXT NOT NULL,
+          rewardType   TEXT NOT NULL DEFAULT 'POINTS',
+          rewardAmount REAL NOT NULL DEFAULT 0,
+          active       INTEGER NOT NULL DEFAULT 1,
+          createdAt    TEXT NOT NULL
+        )
+      `)
+
+      // GET /api/referral-programs?storeId=
+      if (method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM ReferralProgram WHERE storeId=? ORDER BY createdAt DESC`,
+          [storeId],
+        )
+        return ok((rows as any[]).map((r) => ({ ...r, active: Boolean(r.active) })))
+      }
+
+      // POST /api/referral-programs — create a new program
+      if (method === 'POST' && segs.length === 1) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['name', 'rewardType', 'rewardAmount'])
+        const validTypes = ['DISCOUNT', 'POINTS', 'CASH']
+        if (!validTypes.includes(b.rewardType)) {
+          return err('rewardType must be DISCOUNT, POINTS, or CASH', 400, 'INVALID_VALUE', requestId, startMs)
+        }
+        validatePositive(b.rewardAmount, 'rewardAmount')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO ReferralProgram (id,storeId,name,rewardType,rewardAmount,active,createdAt)
+           VALUES (?,?,?,?,?,1,?)`,
+          [id, storeId, b.name, b.rewardType, Number(b.rewardAmount), t],
+        )
+        return ok({ id, name: b.name, rewardType: b.rewardType, rewardAmount: Number(b.rewardAmount), active: true, createdAt: t }, 201)
+      }
+
+      // PATCH /api/referral-programs/:id — toggle active or update fields
+      if (method === 'PATCH' && segs.length === 2) {
+        const progId = segs[1]
+        const b = (await req.json()) as any
+        const existing = await queryOne(`SELECT * FROM ReferralProgram WHERE id=? AND storeId=?`, [progId, storeId])
+        if (!existing) return err('Program not found', 404, 'NOT_FOUND', requestId, startMs)
+        const updates: Record<string, any> = {}
+        if (b.active !== undefined) updates.active = b.active ? 1 : 0
+        if (b.name !== undefined) updates.name = b.name
+        if (b.rewardType !== undefined) updates.rewardType = b.rewardType
+        if (b.rewardAmount !== undefined) updates.rewardAmount = Number(b.rewardAmount)
+        if (Object.keys(updates).length === 0) return err('Nothing to update', 400, 'VALIDATION_ERROR', requestId, startMs)
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(`UPDATE ReferralProgram SET ${setClauses} WHERE id=? AND storeId=?`, [...values, progId, storeId])
+        return ok({ updated: true })
+      }
+    }
+
+    // ─── REFERRALS (program-based) ────────────────────────────────────────────
+    if (segs[0] === 'referrals' && segs[1] !== 'track') {
+      // Lazy-create tables
+      await exec(`
+        CREATE TABLE IF NOT EXISTS CustomerReferral (
+          id          TEXT PRIMARY KEY,
+          programId   TEXT NOT NULL,
+          referrerId  TEXT NOT NULL,
+          refereeId   TEXT,
+          referralCode TEXT NOT NULL,
+          storeId     TEXT NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          createdAt   TEXT NOT NULL
+        )
+      `)
+      await exec(`ALTER TABLE Customer ADD COLUMN referralCode TEXT`, []).catch(() => {})
+
+      // GET /api/referrals?storeId=
+      if (method === 'GET' && segs.length === 1) {
+        const rows = await query(
+          `SELECT cr.*,
+                  ref.name AS referrerName,
+                  ref2.name AS refereeName
+           FROM CustomerReferral cr
+           LEFT JOIN Customer ref  ON ref.id  = cr.referrerId
+           LEFT JOIN Customer ref2 ON ref2.id = cr.refereeId
+           WHERE cr.storeId = ?
+           ORDER BY cr.createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/referrals/:id/reward — mark referral as REWARDED
+      if (method === 'POST' && segs.length === 3 && segs[2] === 'reward') {
+        const refId = segs[1]
+        const referral = await queryOne<any>(
+          `SELECT cr.*, rp.rewardType, rp.rewardAmount
+           FROM CustomerReferral cr
+           JOIN ReferralProgram rp ON rp.id = cr.programId
+           WHERE cr.id=? AND cr.storeId=?`,
+          [refId, storeId],
+        )
+        if (!referral) return err('Referral not found', 404, 'NOT_FOUND', requestId, startMs)
+        if (referral.status !== 'QUALIFIED') {
+          return err('Referral must be QUALIFIED before rewarding', 400, 'INVALID_TRANSITION', requestId, startMs)
+        }
+        await exec(`UPDATE CustomerReferral SET status='REWARDED' WHERE id=?`, [refId])
+        return ok({ rewarded: true, rewardType: referral.rewardType, rewardAmount: referral.rewardAmount })
+      }
+    }
+
+    // ─── REFERRALS TRACK ─────────────────────────────────────────────────────
+    if (segs[0] === 'referrals' && segs[1] === 'track' && method === 'POST') {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS CustomerReferral (
+          id          TEXT PRIMARY KEY,
+          programId   TEXT NOT NULL,
+          referrerId  TEXT NOT NULL,
+          refereeId   TEXT,
+          referralCode TEXT NOT NULL,
+          storeId     TEXT NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          createdAt   TEXT NOT NULL
+        )
+      `)
+      await exec(`ALTER TABLE Customer ADD COLUMN referralCode TEXT`, []).catch(() => {})
+
+      const b = (await req.json()) as any
+      validateRequired(b, ['referralCode', 'refereePhone'])
+
+      // Find referrer by referralCode
+      const referrer = await queryOne<any>(
+        `SELECT * FROM Customer WHERE referralCode=? AND storeId=?`,
+        [b.referralCode, storeId],
+      )
+      if (!referrer) return err('Kode referral tidak valid', 404, 'NOT_FOUND', requestId, startMs)
+
+      // Find referee by phone
+      const referee = await queryOne<any>(
+        `SELECT * FROM Customer WHERE phone=? AND storeId=?`,
+        [b.refereePhone, storeId],
+      )
+      if (!referee) return err('Pelanggan referee tidak ditemukan', 404, 'NOT_FOUND', requestId, startMs)
+
+      if (referee.id === referrer.id) {
+        return err('Pelanggan tidak bisa mereferral diri sendiri', 400, 'SELF_REFERRAL', requestId, startMs)
+      }
+
+      // Duplicate: referee already referred by anyone
+      const alreadyReferred = await queryOne(
+        `SELECT id FROM CustomerReferral WHERE refereeId=? AND storeId=?`,
+        [referee.id, storeId],
+      )
+      if (alreadyReferred) return err('Pelanggan sudah pernah direferral', 409, 'DUPLICATE_REFERRAL', requestId, startMs)
+
+      // Duplicate: same referrer→referee pair
+      const dupPair = await queryOne(
+        `SELECT id FROM CustomerReferral WHERE referrerId=? AND refereeId=? AND storeId=?`,
+        [referrer.id, referee.id, storeId],
+      )
+      if (dupPair) return err('Referral ini sudah tercatat', 409, 'DUPLICATE_REFERRAL', requestId, startMs)
+
+      // Find active program
+      const program = await queryOne<any>(
+        `SELECT * FROM ReferralProgram WHERE storeId=? AND active=1 LIMIT 1`,
+        [storeId],
+      )
+      if (!program) return err('Tidak ada program referral aktif', 400, 'NO_ACTIVE_PROGRAM', requestId, startMs)
+
+      const id = newId()
+      const t = nowISO()
+      await exec(
+        `INSERT INTO CustomerReferral (id,programId,referrerId,refereeId,referralCode,storeId,status,createdAt)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [id, program.id, referrer.id, referee.id, b.referralCode, storeId, 'QUALIFIED', t],
+      )
+      return ok({ id, status: 'QUALIFIED', referrerId: referrer.id, refereeId: referee.id }, 201)
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
+
+    // ─── CONSOLIDATED P&L ────────────────────────────────────────────────────
+    // GET /api/reports/consolidated-pnl?groupId=&from=&to=
+    if (segs[0] === 'reports' && segs[1] === 'consolidated-pnl' && method === 'GET') {
+      const groupId = sp.get('groupId') ?? storeId
+      const from = sp.get('from') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+      const to = sp.get('to') ?? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10)
+
+      // Lazy init InterCompanyTransfer table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS InterCompanyTransfer (
+          id          TEXT PRIMARY KEY,
+          fromStoreId TEXT NOT NULL,
+          toStoreId   TEXT NOT NULL,
+          type        TEXT NOT NULL CHECK(type IN ('STOCK','CASH')),
+          amount      REAL NOT NULL DEFAULT 0,
+          productId   TEXT,
+          qty         REAL,
+          status      TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COMPLETED')),
+          createdAt   TEXT NOT NULL
+        )
+      `)
+
+      // Get all franchise stores under this group
+      await exec(`
+        CREATE TABLE IF NOT EXISTS FranchiseConfig (
+          id            TEXT PRIMARY KEY,
+          storeId       TEXT NOT NULL,
+          parentStoreId TEXT NOT NULL,
+          royaltyRate   REAL NOT NULL DEFAULT 5,
+          minorityPct   REAL NOT NULL DEFAULT 0,
+          contractStart TEXT,
+          contractEnd   TEXT,
+          createdAt     TEXT NOT NULL,
+          updatedAt     TEXT NOT NULL
+        )
+      `)
+
+      const childConfigs = (await query(
+        `SELECT fc.storeId, fc.royaltyRate, fc.minorityPct, s.name as storeName
+           FROM FranchiseConfig fc
+           JOIN Store s ON fc.storeId = s.id
+          WHERE fc.parentStoreId = ?`,
+        [groupId],
+      )) as any[]
+
+      const parentStore = (await queryOne(`SELECT id, name FROM Store WHERE id = ?`, [groupId])) as any
+      const allStoreIds = [groupId, ...childConfigs.map((c: any) => c.storeId)]
+      const minorityMap = new Map(childConfigs.map((c: any) => [c.storeId, Number(c.minorityPct ?? 0)]))
+      const nameMap = new Map<string, string>([
+        [groupId, parentStore?.name ?? groupId],
+        ...childConfigs.map((c: any) => [c.storeId, c.storeName] as [string, string]),
+      ])
+
+      const ph = allStoreIds.map(() => '?').join(',')
+      const fromTs = from + 'T00:00:00.000Z'
+      const toTs = to + 'T23:59:59.999Z'
+
+      const revenueRows = (await query(
+        `SELECT storeId, COALESCE(SUM(totalAmount),0) as revenue, COUNT(*) as orders
+           FROM "Order"
+          WHERE storeId IN (${ph}) AND status='COMPLETED'
+            AND createdAt BETWEEN ? AND ?
+          GROUP BY storeId`,
+        [...allStoreIds, fromTs, toTs],
+      )) as any[]
+
+      const cogsRows = (await query(
+        `SELECT oi.storeId,
+                COALESCE(SUM(oi.qty * COALESCE(p.costPrice,0)),0) as cogs
+           FROM OrderItem oi
+           JOIN "Order" o ON oi.orderId = o.id
+           JOIN Product p ON oi.productId = p.id
+          WHERE oi.storeId IN (${ph}) AND o.status='COMPLETED'
+            AND o.createdAt BETWEEN ? AND ?
+          GROUP BY oi.storeId`,
+        [...allStoreIds, fromTs, toTs],
+      )) as any[]
+
+      const expenseRows = (await query(
+        `SELECT storeId, COALESCE(SUM(amount),0) as expenses
+           FROM Expense
+          WHERE storeId IN (${ph})
+            AND date BETWEEN ? AND ?
+          GROUP BY storeId`,
+        [...allStoreIds, from, to],
+      )) as any[]
+
+      // Completed inter-company transfers in period — for elimination
+      const icTransfers = (await query(
+        `SELECT fromStoreId, toStoreId, SUM(amount) as total
+           FROM InterCompanyTransfer
+          WHERE (fromStoreId IN (${ph}) OR toStoreId IN (${ph}))
+            AND status = 'COMPLETED'
+            AND createdAt BETWEEN ? AND ?
+          GROUP BY fromStoreId, toStoreId`,
+        [...allStoreIds, ...allStoreIds, fromTs, toTs],
+      )) as any[]
+
+      const revenueMap = new Map(revenueRows.map((r: any) => [r.storeId, r]))
+      const cogsMap = new Map(cogsRows.map((r: any) => [r.storeId, r]))
+      const expenseMap = new Map(expenseRows.map((r: any) => [r.storeId, r]))
+
+      // Per-store IC revenue/cost
+      const icRevenueByStore = new Map<string, number>()
+      const icCostByStore = new Map<string, number>()
+      let totalElimRevenue = 0
+      let totalElimCost = 0
+
+      for (const ic of icTransfers) {
+        // The receiving store inflated its revenue; we eliminate it
+        const amt = Number(ic.total ?? 0)
+        icRevenueByStore.set(ic.toStoreId, (icRevenueByStore.get(ic.toStoreId) ?? 0) + amt)
+        icCostByStore.set(ic.fromStoreId, (icCostByStore.get(ic.fromStoreId) ?? 0) + amt)
+        totalElimRevenue += amt
+        totalElimCost += amt
+      }
+
+      let totalRevenue = 0
+      let totalCogs = 0
+      let totalExpenses = 0
+      let totalMinority = 0
+
+      const stores = allStoreIds.map(sid => {
+        const rev = Number(revenueMap.get(sid)?.revenue ?? 0)
+        const cogs = Number(cogsMap.get(sid)?.cogs ?? 0)
+        const exp = Number(expenseMap.get(sid)?.expenses ?? 0)
+        const icRev = icRevenueByStore.get(sid) ?? 0
+        const icCost = icCostByStore.get(sid) ?? 0
+        const adjRevenue = rev - icRev
+        const grossProfit = adjRevenue - cogs
+        const netProfit = grossProfit - exp
+        const minPct = minorityMap.get(sid) ?? 0
+        const minorityShare = netProfit * (minPct / 100)
+
+        totalRevenue += adjRevenue
+        totalCogs += cogs
+        totalExpenses += exp
+        totalMinority += minorityShare
+
+        return {
+          storeId: sid,
+          storeName: nameMap.get(sid) ?? sid,
+          revenue: rev,
+          cogs,
+          grossProfit,
+          operatingExpenses: exp,
+          netProfit,
+          intercompanyRevenue: icRev,
+          intercompanyCost: icCost,
+        }
+      })
+
+      const grossProfit = totalRevenue - totalCogs
+      const netProfit = grossProfit - totalExpenses
+
+      return ok({
+        groupId,
+        from,
+        to,
+        stores,
+        eliminations: {
+          intercompanyRevenue: totalElimRevenue,
+          intercompanyCost: totalElimCost,
+        },
+        minorityInterest: totalMinority,
+        consolidated: {
+          revenue: totalRevenue,
+          cogs: totalCogs,
+          grossProfit,
+          operatingExpenses: totalExpenses,
+          netProfit,
+          minorityInterest: totalMinority,
+          netProfitAttributableToParent: netProfit - totalMinority,
+        },
+        generatedAt: nowISO(),
+      })
+    }
+
+    // ─── INTER-COMPANY TRANSFERS ──────────────────────────────────────────────
+
+    // Lazy schema helper (reused across endpoints)
+    async function ensureICTransferTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS InterCompanyTransfer (
+          id          TEXT PRIMARY KEY,
+          fromStoreId TEXT NOT NULL,
+          toStoreId   TEXT NOT NULL,
+          type        TEXT NOT NULL CHECK(type IN ('STOCK','CASH')),
+          amount      REAL NOT NULL DEFAULT 0,
+          productId   TEXT,
+          qty         REAL,
+          status      TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COMPLETED')),
+          createdAt   TEXT NOT NULL
+        )
+      `)
+    }
+
+    // GET /api/intercompany-transfers?storeId=
+    if (segs[0] === 'intercompany-transfers' && !segs[1] && method === 'GET') {
+      await ensureICTransferTable()
+      const sid = sp.get('storeId') ?? storeId
+      const transfers = (await query(
+        `SELECT t.*,
+                fs.name as fromStoreName,
+                ts.name as toStoreName,
+                p.name  as productName
+           FROM InterCompanyTransfer t
+           LEFT JOIN Store fs ON t.fromStoreId = fs.id
+           LEFT JOIN Store ts ON t.toStoreId   = ts.id
+           LEFT JOIN Product p ON t.productId  = p.id
+          WHERE t.fromStoreId = ? OR t.toStoreId = ?
+          ORDER BY t.createdAt DESC
+          LIMIT 200`,
+        [sid, sid],
+      )) as any[]
+      return ok({ transfers })
+    }
+
+    // POST /api/intercompany-transfers
+    if (segs[0] === 'intercompany-transfers' && !segs[1] && method === 'POST') {
+      await ensureICTransferTable()
+      const b = await req.json() as Record<string, any>
+      validateRequired(b, ['fromStoreId', 'toStoreId', 'type', 'amount'])
+      if (!['STOCK', 'CASH'].includes(b.type)) {
+        throw new ValidationError("type must be 'STOCK' or 'CASH'", 'INVALID_VALUE')
+      }
+      validatePositive(b.amount, 'amount')
+      if (b.fromStoreId === b.toStoreId) {
+        throw new ValidationError('fromStoreId and toStoreId must differ', 'INVALID_VALUE')
+      }
+      if (b.type === 'STOCK') {
+        validateRequired(b, ['productId', 'qty'])
+        validatePositive(b.qty, 'qty')
+      }
+
+      const id = newId()
+      await exec(
+        `INSERT INTO InterCompanyTransfer (id, fromStoreId, toStoreId, type, amount, productId, qty, status, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
+        [id, b.fromStoreId, b.toStoreId, b.type, Number(b.amount), b.productId ?? null, b.qty ?? null, nowISO()],
+      )
+      const created = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id])
+      return ok({ transfer: created }, 201)
+    }
+
+    // PATCH /api/intercompany-transfers/:id
+    if (segs[0] === 'intercompany-transfers' && segs[1] && method === 'PATCH') {
+      await ensureICTransferTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id]) as any
+      if (!existing) return err('Transfer not found', 404, 'NOT_FOUND')
+      const b = await req.json() as Record<string, any>
+      if (b.status && !['PENDING', 'COMPLETED'].includes(b.status)) {
+        throw new ValidationError("status must be 'PENDING' or 'COMPLETED'", 'INVALID_VALUE')
+      }
+      const newStatus = b.status ?? existing.status
+      await exec(`UPDATE InterCompanyTransfer SET status = ? WHERE id = ?`, [newStatus, id])
+      const updated = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id])
+      return ok({ transfer: updated })
+    }
+
   } catch (e: any) {
     console.error('API error:', e)
     if (e instanceof ValidationError) {
