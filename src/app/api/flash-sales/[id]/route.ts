@@ -1,47 +1,56 @@
-// PATCH /api/flash-sales/:id
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { queryOne, exec, nowISO } from '@/lib/db'
+import { query, exec, nowISO } from '@/lib/db'
 
-function err(msg: string, status = 400, code = 'ERROR') {
-  return NextResponse.json({ error: msg, code }, { status })
+function ok(data: unknown, status = 200) {
+  return NextResponse.json(data, { status })
+}
+function err(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status })
 }
 
+// PATCH /api/flash-sales/[id]
+// Body: { name?, startAt?, endAt?, status? }
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
-  const user = session.user as any
+  try {
+    const session = await auth()
+    if (!session?.user) return err('Unauthorized', 401)
 
-  const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
+    const { id } = await params
+    const body = (await req.json()) as any
+    const user = session.user as any
 
-  const { id } = await params
+    const rows = await query(`SELECT * FROM FlashSale WHERE id = ?`, [id])
+    if (!rows.length) return err('Not found', 404)
+    const sale = rows[0] as any
 
-  const existing = await queryOne(`SELECT * FROM FlashSale WHERE id=? AND storeId=?`, [
-    id,
-    storeId,
-  ])
-  if (!existing) return err('Flash sale not found', 404, 'NOT_FOUND')
+    const hasAccess = user.stores?.some((s: any) => s.id === sale.storeId) ?? false
+    if (!hasAccess) return err('Forbidden', 403)
 
-  const b = (await req.json()) as any
-  const updates: Record<string, any> = {}
-  if (b.name !== undefined) updates.name = b.name
-  if (b.startAt !== undefined) updates.startAt = b.startAt
-  if (b.endAt !== undefined) updates.endAt = b.endAt
-  if (b.active !== undefined) updates.active = b.active ? 1 : 0
-  if (Object.keys(updates).length === 0) return err('Nothing to update', 400, 'VALIDATION_ERROR')
+    const allowedStatuses = ['SCHEDULED', 'ACTIVE', 'ENDED', 'CANCELLED']
+    if (body.status && !allowedStatuses.includes(body.status)) {
+      return err(`status must be one of: ${allowedStatuses.join(', ')}`)
+    }
 
-  // Validate date range if either date is being updated
-  const startAt = updates.startAt ?? (existing as any).startAt
-  const endAt = updates.endAt ?? (existing as any).endAt
-  if (new Date(endAt) <= new Date(startAt))
-    return err("'endAt' must be after 'startAt'", 400, 'VALIDATION_ERROR')
+    const name     = body.name     ?? sale.name
+    const startAt  = body.startAt  ?? sale.startAt
+    const endAt    = body.endAt    ?? sale.endAt
+    const status   = body.status   ?? sale.status
+    const updatedAt = nowISO()
 
-  updates.updatedAt = nowISO()
-  const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ')
-  await exec(
-    `UPDATE FlashSale SET ${setClauses} WHERE id=? AND storeId=?`,
-    [...Object.values(updates), id, storeId],
-  )
-  return NextResponse.json({ updated: true })
+    if (body.startAt || body.endAt) {
+      const start = new Date(startAt).getTime()
+      const end   = new Date(endAt).getTime()
+      if (end <= start) return err('endAt must be after startAt')
+    }
+
+    await exec(
+      `UPDATE FlashSale SET name = ?, startAt = ?, endAt = ?, status = ?, updatedAt = ? WHERE id = ?`,
+      [name, startAt, endAt, status, updatedAt, id],
+    )
+
+    return ok({ id, name, startAt, endAt, status, updatedAt })
+  } catch (e: unknown) {
+    return err(e instanceof Error ? e.message : 'Internal error', 500)
+  }
 }
