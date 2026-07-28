@@ -291,6 +291,93 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       })
     }
 
+    // ─── PUBLIC: GET /api/menu/:storeSlug ────────────────────────────────────
+    if (segs[0] === 'menu' && segs[1] && method === 'GET') {
+      const slug = segs[1]
+      // Look up store by slug column, fall back to matching by id
+      let store: any = await queryOne(
+        `SELECT id, name FROM Store WHERE slug = ? LIMIT 1`,
+        [slug],
+      )
+      if (!store) {
+        store = await queryOne(`SELECT id, name FROM Store WHERE id = ? LIMIT 1`, [slug])
+      }
+      if (!store) return err('Store not found', 404, 'NOT_FOUND', requestId, startMs)
+
+      try {
+        await exec(`
+          CREATE TABLE IF NOT EXISTS MenuCategory (
+            id TEXT PRIMARY KEY, storeId TEXT NOT NULL, name TEXT NOT NULL,
+            displayOrder INTEGER NOT NULL DEFAULT 0, imageUrl TEXT,
+            active INTEGER NOT NULL DEFAULT 1, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+          )
+        `)
+        await exec(`
+          CREATE TABLE IF NOT EXISTS MenuItem (
+            id TEXT PRIMARY KEY, categoryId TEXT NOT NULL, productId TEXT NOT NULL,
+            storeId TEXT NOT NULL, displayOrder INTEGER NOT NULL DEFAULT 0,
+            featured INTEGER NOT NULL DEFAULT 0, available INTEGER NOT NULL DEFAULT 1,
+            createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+          )
+        `)
+      } catch { /* already exists */ }
+
+      const categories = await query(
+        `SELECT id, name, displayOrder, imageUrl FROM MenuCategory WHERE storeId = ? AND active = 1 ORDER BY displayOrder ASC`,
+        [store.id],
+      ) as any[]
+
+      const items = await query(
+        `SELECT mi.id, mi.categoryId, mi.productId, mi.displayOrder, mi.featured, mi.available,
+                p.name as productName, p.price as productPrice, p.image as productImage
+           FROM MenuItem mi
+           LEFT JOIN Product p ON mi.productId = p.id
+          WHERE mi.storeId = ? AND mi.available = 1
+          ORDER BY mi.displayOrder ASC`,
+        [store.id],
+      ) as any[]
+
+      return okCached(
+        {
+          storeId: store.id,
+          storeName: store.name,
+          categories,
+          items: items.map(i => ({ ...i, featured: Boolean(i.featured), available: Boolean(i.available) })),
+        },
+        'public, max-age=30, stale-while-revalidate=60',
+      )
+    }
+
+    // ─── PUBLIC: POST /api/kiosk-orders ──────────────────────────────────────
+    if (segs[0] === 'kiosk-orders' && !segs[1] && method === 'POST') {
+      try {
+        await exec(`
+          CREATE TABLE IF NOT EXISTS KioskOrder (
+            id TEXT PRIMARY KEY, storeId TEXT NOT NULL, tableNumber TEXT,
+            items TEXT NOT NULL DEFAULT '[]', total REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','CONFIRMED','CANCELLED')),
+            createdAt TEXT NOT NULL
+          )
+        `)
+      } catch { /* already exists */ }
+
+      const b = await req.json() as Record<string, any>
+      validateRequired(b, ['storeId', 'items', 'total'])
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        throw new ValidationError('items must be a non-empty array', 'INVALID_VALUE')
+      }
+      validatePositive(b.total, 'total')
+
+      const id = newId()
+      await exec(
+        `INSERT INTO KioskOrder (id, storeId, tableNumber, items, total, status, createdAt)
+         VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+        [id, b.storeId, b.tableNumber ?? null, JSON.stringify(b.items), Number(b.total), nowISO()],
+      )
+      const created = await queryOne(`SELECT * FROM KioskOrder WHERE id = ?`, [id]) as any
+      return ok({ order: { ...created, items: JSON.parse(created?.items ?? '[]') } }, 201)
+    }
+
     const session = await auth()
     if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED', requestId, startMs)
     const user = session.user as any
@@ -10641,6 +10728,550 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       await exec(`UPDATE InterCompanyTransfer SET status = ? WHERE id = ?`, [newStatus, id])
       const updated = await queryOne(`SELECT * FROM InterCompanyTransfer WHERE id = ?`, [id])
       return ok({ transfer: updated })
+    }
+
+    // ─── MULTI-CURRENCY / FOREIGN EXCHANGE ───────────────────────────────────
+
+    async function ensureStoreCurrencyTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StoreCurrency (
+          id         TEXT PRIMARY KEY,
+          storeId    TEXT NOT NULL,
+          code       TEXT NOT NULL,
+          symbol     TEXT NOT NULL DEFAULT '',
+          rate       REAL NOT NULL DEFAULT 1.0,
+          active     INTEGER NOT NULL DEFAULT 1,
+          isBase     INTEGER NOT NULL DEFAULT 0,
+          updatedAt  TEXT NOT NULL,
+          UNIQUE(storeId, code)
+        )
+      `)
+    }
+
+    async function ensureCurrencyTransactionTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS CurrencyTransaction (
+          id              TEXT PRIMARY KEY,
+          orderId         TEXT,
+          storeId         TEXT NOT NULL,
+          fromCurrency    TEXT NOT NULL,
+          toCurrency      TEXT NOT NULL,
+          rate            REAL NOT NULL,
+          originalAmount  REAL NOT NULL,
+          convertedAmount REAL NOT NULL,
+          createdAt       TEXT NOT NULL
+        )
+      `)
+    }
+
+    // GET /api/currencies?storeId= — list all store currencies
+    if (segs[0] === 'currencies' && !segs[1] && method === 'GET') {
+      await ensureStoreCurrencyTable()
+      const sid = sp.get('storeId') ?? storeId
+      const rows = await query(
+        `SELECT * FROM StoreCurrency WHERE storeId = ? ORDER BY isBase DESC, code ASC`,
+        [sid],
+      ) as any[]
+      return ok({ currencies: rows.map(r => ({ ...r, active: !!r.active, isBase: !!r.isBase })) })
+    }
+
+    // POST /api/currencies — add a currency to the store
+    if (segs[0] === 'currencies' && !segs[1] && method === 'POST') {
+      await ensureStoreCurrencyTable()
+      const b = await req.json() as Record<string, any>
+      validateRequired(b, ['storeId', 'code'])
+      const sid  = b.storeId as string
+      const code = (b.code as string).toUpperCase()
+      const rate = b.rate !== undefined ? Number(b.rate) : 1.0
+      if (isNaN(rate) || rate <= 0) {
+        throw new ValidationError("'rate' must be a positive number", 'INVALID_VALUE')
+      }
+      const symbol = (b.symbol as string | undefined) ?? code
+
+      // First currency for this store is auto-set as base
+      const existingRows = await query(
+        `SELECT id FROM StoreCurrency WHERE storeId = ?`,
+        [sid],
+      ) as any[]
+      const isBase = existingRows.length === 0 ? 1 : 0
+      const effectiveRate = isBase ? 1.0 : rate
+
+      const id = newId()
+      await exec(
+        `INSERT INTO StoreCurrency (id, storeId, code, symbol, rate, active, isBase, updatedAt)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+         ON CONFLICT(storeId, code) DO UPDATE SET
+           symbol = excluded.symbol,
+           rate   = excluded.rate,
+           active = 1,
+           updatedAt = excluded.updatedAt`,
+        [id, sid, code, symbol, effectiveRate, isBase, nowISO()],
+      )
+      const created = await queryOne(
+        `SELECT * FROM StoreCurrency WHERE storeId = ? AND code = ?`,
+        [sid, code],
+      ) as any
+      return ok({ currency: { ...created, active: !!created.active, isBase: !!created.isBase } }, 201)
+    }
+
+    // PATCH /api/currencies/:code — update rate, active, or isBase
+    if (segs[0] === 'currencies' && segs[1] && segs[1] !== 'convert' && !segs[2] && method === 'PATCH') {
+      await ensureStoreCurrencyTable()
+      const code = segs[1].toUpperCase()
+      const b    = await req.json() as Record<string, any>
+      const sid  = (b.storeId as string | undefined) ?? storeId
+
+      const existing = await queryOne(
+        `SELECT * FROM StoreCurrency WHERE storeId = ? AND code = ?`,
+        [sid, code],
+      ) as any
+      if (!existing) return err('Currency not found', 404, 'NOT_FOUND', requestId, startMs)
+
+      // Disallow deactivating the base currency
+      if (b.active === false && existing.isBase) {
+        throw new ValidationError('Base currency cannot be deactivated', 'BASE_CURRENCY_ACTIVE')
+      }
+
+      if (b.isBase === true) {
+        // Unset all others, set rate=1 for new base
+        await exec(`UPDATE StoreCurrency SET isBase = 0 WHERE storeId = ?`, [sid])
+        await exec(
+          `UPDATE StoreCurrency SET isBase = 1, rate = 1.0, active = 1, updatedAt = ? WHERE storeId = ? AND code = ?`,
+          [nowISO(), sid, code],
+        )
+      } else {
+        const setClauses: string[] = ['updatedAt = ?']
+        const vals: any[]          = [nowISO()]
+
+        if (b.rate !== undefined) {
+          const rate = Number(b.rate)
+          if (isNaN(rate) || rate <= 0) {
+            throw new ValidationError("'rate' must be a positive number", 'INVALID_VALUE')
+          }
+          setClauses.push('rate = ?')
+          vals.push(rate)
+        }
+        if (b.active !== undefined) {
+          setClauses.push('active = ?')
+          vals.push(b.active ? 1 : 0)
+        }
+        if (b.symbol !== undefined) {
+          setClauses.push('symbol = ?')
+          vals.push(String(b.symbol))
+        }
+
+        vals.push(sid, code)
+        await exec(
+          `UPDATE StoreCurrency SET ${setClauses.join(', ')} WHERE storeId = ? AND code = ?`,
+          vals,
+        )
+      }
+
+      const updatedCurrency = await queryOne(
+        `SELECT * FROM StoreCurrency WHERE storeId = ? AND code = ?`,
+        [sid, code],
+      ) as any
+      return ok({ currency: { ...updatedCurrency, active: !!updatedCurrency.active, isBase: !!updatedCurrency.isBase } })
+    }
+
+    // POST /api/currencies/convert — { storeId?, amount, from, to, orderId? }
+    if (segs[0] === 'currencies' && segs[1] === 'convert' && method === 'POST') {
+      await ensureStoreCurrencyTable()
+      await ensureCurrencyTransactionTable()
+      const b = await req.json() as Record<string, any>
+      validateRequired(b, ['amount', 'from', 'to'])
+      const sid    = (b.storeId as string | undefined) ?? storeId
+      const amount = Number(b.amount)
+      if (isNaN(amount) || amount < 0) {
+        throw new ValidationError("'amount' must be a non-negative number", 'INVALID_VALUE')
+      }
+      const fromCode = (b.from as string).toUpperCase()
+      const toCode   = (b.to   as string).toUpperCase()
+
+      if (fromCode === toCode) {
+        return ok({ from: fromCode, to: toCode, rate: 1, originalAmount: amount, convertedAmount: amount })
+      }
+
+      const fromC = await queryOne(
+        `SELECT * FROM StoreCurrency WHERE storeId = ? AND code = ? AND active = 1`,
+        [sid, fromCode],
+      ) as any
+      const toC = await queryOne(
+        `SELECT * FROM StoreCurrency WHERE storeId = ? AND code = ? AND active = 1`,
+        [sid, toCode],
+      ) as any
+
+      if (!fromC) return err(`Currency ${fromCode} not found or inactive`, 400, 'INVALID_CURRENCY', requestId, startMs)
+      if (!toC)   return err(`Currency ${toCode} not found or inactive`,   400, 'INVALID_CURRENCY', requestId, startMs)
+
+      // Convert via base: amount / fromRate * toRate  (base rate = 1)
+      const inBase        = fromC.isBase ? amount : amount / Number(fromC.rate)
+      const converted     = toC.isBase   ? inBase : inBase * Number(toC.rate)
+      const decimals      = (toCode === 'IDR' || toCode === 'JPY') ? 0 : 2
+      const factor        = Math.pow(10, decimals)
+      const roundedResult = Math.round(converted * factor) / factor
+      const effectiveRate = fromC.isBase
+        ? Number(toC.rate)
+        : Number(toC.rate) / Number(fromC.rate)
+
+      if (b.orderId) {
+        const txId = newId()
+        await exec(
+          `INSERT INTO CurrencyTransaction
+             (id, orderId, storeId, fromCurrency, toCurrency, rate, originalAmount, convertedAmount, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [txId, b.orderId, sid, fromCode, toCode, effectiveRate, amount, roundedResult, nowISO()],
+        )
+      }
+
+      return ok({ from: fromCode, to: toCode, rate: effectiveRate, originalAmount: amount, convertedAmount: roundedResult })
+    }
+
+    // ─── BUSINESS INSIGHTS ────────────────────────────────────────────────────
+
+    async function ensureBusinessInsightTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BusinessInsight (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          type        TEXT NOT NULL CHECK(type IN ('SPIKE','DIP','TREND','MILESTONE','LOW_STOCK')),
+          title       TEXT NOT NULL,
+          description TEXT NOT NULL,
+          severity    TEXT NOT NULL DEFAULT 'INFO' CHECK(severity IN ('INFO','WARNING','CRITICAL')),
+          data        TEXT NOT NULL DEFAULT '{}',
+          createdAt   TEXT NOT NULL,
+          read        INTEGER NOT NULL DEFAULT 0
+        )
+      `)
+    }
+
+    // GET /api/business-insights?storeId=&unreadOnly=
+    if (segs[0] === 'business-insights' && !segs[1] && method === 'GET') {
+      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      await ensureBusinessInsightTable()
+      const unreadOnly = sp.get('unreadOnly') === 'true' || sp.get('unreadOnly') === '1'
+      const severity = sp.get('severity') ?? ''
+      let sql = `SELECT * FROM BusinessInsight WHERE storeId = ?`
+      const params: any[] = [storeId]
+      if (unreadOnly) { sql += ` AND read = 0`; }
+      if (severity && ['INFO','WARNING','CRITICAL'].includes(severity)) {
+        sql += ` AND severity = ?`
+        params.push(severity)
+      }
+      sql += ` ORDER BY CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END, createdAt DESC LIMIT 100`
+      const rows = await query(sql, params) as any[]
+      const insights = rows.map(r => ({ ...r, data: JSON.parse(r.data || '{}'), read: r.read === 1 }))
+      return ok({ insights, total: insights.length })
+    }
+
+    // POST /api/business-insights/generate — run detection against last 30 days
+    if (segs[0] === 'business-insights' && segs[1] === 'generate' && method === 'POST') {
+      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      await ensureBusinessInsightTable()
+
+      const {
+        detectSpikes,
+        detectDips,
+        detectTrend,
+        detectMilestones,
+        detectLowStock,
+      } = await import('@/lib/insights-detection')
+
+      const now = new Date()
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400_000)
+
+      // Parallel data fetch
+      const [dailyRows, stockRows, milestoneRows] = await Promise.all([
+        query<{ date: string; revenue: number; orderCount: number }>(
+          `SELECT date(createdAt) as date,
+                  COALESCE(SUM(total), 0) as revenue,
+                  COUNT(*) as orderCount
+           FROM "Order"
+           WHERE storeId = ? AND status = 'PAID'
+             AND createdAt >= ?
+           GROUP BY date(createdAt)
+           ORDER BY date ASC`,
+          [storeId, thirtyDaysAgo.toISOString()],
+        ),
+        query<{ id: string; name: string; stock: number; reorderPoint: number }>(
+          `SELECT id, name, stock, reorderPoint FROM Product
+           WHERE storeId = ? AND trackStock = 1 AND stock < reorderPoint
+           ORDER BY stock ASC LIMIT 20`,
+          [storeId],
+        ),
+        // Fetch store revenue goal from settings (optional, fall back to empty)
+        query<{ key: string; value: string }>(
+          `SELECT key, value FROM Setting WHERE storeId = ? AND key IN ('monthlyRevenueGoal')`,
+          [storeId],
+        ).catch(() => [] as any[]),
+      ])
+
+      const detected = [
+        ...detectSpikes(dailyRows),
+        ...detectDips(dailyRows),
+        ...(detectTrend(dailyRows) ? [detectTrend(dailyRows)!] : []),
+        ...detectLowStock(stockRows),
+      ]
+
+      // Milestone detection from settings
+      const goalSetting = (milestoneRows as any[]).find((r: any) => r.key === 'monthlyRevenueGoal')
+      if (goalSetting) {
+        const target = Number(goalSetting.value)
+        const cumulative = dailyRows.reduce((s: number, r: any) => s + r.revenue, 0)
+        if (target > 0) {
+          detected.push(...detectMilestones(cumulative, [{ id: 'monthly', label: 'Monthly Revenue Goal', targetRevenue: target }]))
+        }
+      }
+
+      // Persist each detected insight (skip duplicates by type+date within 24h)
+      const inserted: string[] = []
+      for (const ins of detected) {
+        const id = newId()
+        try {
+          await exec(
+            `INSERT INTO BusinessInsight (id, storeId, type, title, description, severity, data, createdAt, read)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            [id, storeId, ins.type, ins.title, ins.description, ins.severity, JSON.stringify(ins.data), nowISO()],
+          )
+          inserted.push(id)
+        } catch { /* ignore duplicate constraint issues */ }
+      }
+
+      return ok({ generated: detected.length, inserted: inserted.length }, 201, requestId, startMs)
+    }
+
+    // PATCH /api/business-insights/:id/read — mark as read
+    if (segs[0] === 'business-insights' && segs[2] === 'read' && method === 'PATCH') {
+      if (!assertStoreAccess(user, storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      await ensureBusinessInsightTable()
+      const id = segs[1]
+      if (!id) return err('id required', 400, 'MISSING_FIELD', requestId, startMs)
+      const existing = await queryOne(`SELECT id, storeId FROM BusinessInsight WHERE id = ?`, [id]) as any
+      if (!existing) return err('Insight not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (existing.storeId !== storeId) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      await exec(`UPDATE BusinessInsight SET read = 1 WHERE id = ?`, [id])
+      return ok({ id, read: true })
+    }
+
+    // ─── DIGITAL MENU ─────────────────────────────────────────────────────────
+
+    async function ensureMenuCategoryTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS MenuCategory (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          name         TEXT NOT NULL,
+          displayOrder INTEGER NOT NULL DEFAULT 0,
+          imageUrl     TEXT,
+          active       INTEGER NOT NULL DEFAULT 1,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL
+        )
+      `)
+    }
+
+    async function ensureMenuItemTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS MenuItem (
+          id           TEXT PRIMARY KEY,
+          categoryId   TEXT NOT NULL,
+          productId    TEXT NOT NULL,
+          storeId      TEXT NOT NULL,
+          displayOrder INTEGER NOT NULL DEFAULT 0,
+          featured     INTEGER NOT NULL DEFAULT 0,
+          available    INTEGER NOT NULL DEFAULT 1,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL
+        )
+      `)
+    }
+
+    async function ensureKioskOrderTable() {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS KioskOrder (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          tableNumber TEXT,
+          items       TEXT NOT NULL DEFAULT '[]',
+          total       REAL NOT NULL DEFAULT 0,
+          status      TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','CONFIRMED','CANCELLED')),
+          createdAt   TEXT NOT NULL
+        )
+      `)
+    }
+
+    // GET /api/menu/:storeSlug — PUBLIC, no auth required (handled in public block below)
+    // This block handles the authenticated management endpoints:
+
+    // GET /api/menu-categories?storeId=
+    if (segs[0] === 'menu-categories' && !segs[1] && method === 'GET') {
+      await ensureMenuCategoryTable()
+      const sid = sp.get('storeId') ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const cats = await query(
+        `SELECT * FROM MenuCategory WHERE storeId = ? ORDER BY displayOrder ASC`,
+        [sid],
+      ) as any[]
+      return ok({ categories: cats.map(c => ({ ...c, active: Boolean(c.active) })) })
+    }
+
+    // POST /api/menu-categories
+    if (segs[0] === 'menu-categories' && !segs[1] && method === 'POST') {
+      await ensureMenuCategoryTable()
+      const b = await req.json() as Record<string, any>
+      validateRequired(b, ['name'])
+      const sid = b.storeId ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const id = newId()
+      const t = nowISO()
+      await exec(
+        `INSERT INTO MenuCategory (id, storeId, name, displayOrder, imageUrl, active, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+        [id, sid, b.name.trim(), Number(b.displayOrder ?? 0), b.imageUrl ?? null, t, t],
+      )
+      const created = await queryOne(`SELECT * FROM MenuCategory WHERE id = ?`, [id]) as any
+      return ok({ category: { ...created, active: Boolean(created?.active) } }, 201)
+    }
+
+    // PATCH /api/menu-categories/:id
+    if (segs[0] === 'menu-categories' && segs[1] && method === 'PATCH') {
+      await ensureMenuCategoryTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM MenuCategory WHERE id = ?`, [id]) as any
+      if (!existing) return err('Category not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (!assertStoreAccess(user, existing.storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const b = await req.json() as Record<string, any>
+      const fields: string[] = []
+      const vals: any[] = []
+      if (b.name !== undefined)         { fields.push('name = ?');         vals.push(String(b.name).trim()) }
+      if (b.displayOrder !== undefined) { fields.push('displayOrder = ?'); vals.push(Number(b.displayOrder)) }
+      if (b.imageUrl !== undefined)     { fields.push('imageUrl = ?');     vals.push(b.imageUrl) }
+      if (b.active !== undefined)       { fields.push('active = ?');       vals.push(b.active ? 1 : 0) }
+      if (fields.length === 0) return err('No fields to update', 400, 'NO_FIELDS', requestId, startMs)
+      fields.push('updatedAt = ?')
+      vals.push(nowISO())
+      vals.push(id)
+      await exec(`UPDATE MenuCategory SET ${fields.join(', ')} WHERE id = ?`, vals)
+      const updated = await queryOne(`SELECT * FROM MenuCategory WHERE id = ?`, [id]) as any
+      return ok({ category: { ...updated, active: Boolean(updated?.active) } })
+    }
+
+    // DELETE /api/menu-categories/:id
+    if (segs[0] === 'menu-categories' && segs[1] && method === 'DELETE') {
+      await ensureMenuCategoryTable()
+      await ensureMenuItemTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM MenuCategory WHERE id = ?`, [id]) as any
+      if (!existing) return err('Category not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (!assertStoreAccess(user, existing.storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      await exec(`DELETE FROM MenuItem WHERE categoryId = ?`, [id])
+      await exec(`DELETE FROM MenuCategory WHERE id = ?`, [id])
+      return ok({ deleted: true })
+    }
+
+    // GET /api/menu-items?storeId=
+    if (segs[0] === 'menu-items' && !segs[1] && method === 'GET') {
+      await ensureMenuItemTable()
+      const sid = sp.get('storeId') ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const items = await query(
+        `SELECT mi.*, p.name as productName, p.price as productPrice, p.image as productImage
+           FROM MenuItem mi
+           LEFT JOIN Product p ON mi.productId = p.id
+          WHERE mi.storeId = ?
+          ORDER BY mi.displayOrder ASC`,
+        [sid],
+      ) as any[]
+      return ok({ items: items.map(i => ({ ...i, featured: Boolean(i.featured), available: Boolean(i.available) })) })
+    }
+
+    // POST /api/menu-items
+    if (segs[0] === 'menu-items' && !segs[1] && method === 'POST') {
+      await ensureMenuItemTable()
+      const b = await req.json() as Record<string, any>
+      validateRequired(b, ['categoryId', 'productId'])
+      const sid = b.storeId ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const id = newId()
+      const t = nowISO()
+      await exec(
+        `INSERT INTO MenuItem (id, categoryId, productId, storeId, displayOrder, featured, available, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)`,
+        [id, b.categoryId, b.productId, sid, Number(b.displayOrder ?? 0), t, t],
+      )
+      const created = await queryOne(
+        `SELECT mi.*, p.name as productName, p.price as productPrice, p.image as productImage
+           FROM MenuItem mi LEFT JOIN Product p ON mi.productId = p.id WHERE mi.id = ?`,
+        [id],
+      ) as any
+      return ok({ item: { ...created, featured: Boolean(created?.featured), available: Boolean(created?.available) } }, 201)
+    }
+
+    // PATCH /api/menu-items/:id
+    if (segs[0] === 'menu-items' && segs[1] && method === 'PATCH') {
+      await ensureMenuItemTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM MenuItem WHERE id = ?`, [id]) as any
+      if (!existing) return err('Menu item not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (!assertStoreAccess(user, existing.storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const b = await req.json() as Record<string, any>
+      const fields: string[] = []
+      const vals: any[] = []
+      if (b.displayOrder !== undefined) { fields.push('displayOrder = ?'); vals.push(Number(b.displayOrder)) }
+      if (b.featured !== undefined)     { fields.push('featured = ?');     vals.push(b.featured ? 1 : 0) }
+      if (b.available !== undefined)    { fields.push('available = ?');    vals.push(b.available ? 1 : 0) }
+      if (fields.length === 0) return err('No fields to update', 400, 'NO_FIELDS', requestId, startMs)
+      fields.push('updatedAt = ?')
+      vals.push(nowISO())
+      vals.push(id)
+      await exec(`UPDATE MenuItem SET ${fields.join(', ')} WHERE id = ?`, vals)
+      const updated = await queryOne(
+        `SELECT mi.*, p.name as productName, p.price as productPrice, p.image as productImage
+           FROM MenuItem mi LEFT JOIN Product p ON mi.productId = p.id WHERE mi.id = ?`,
+        [id],
+      ) as any
+      return ok({ item: { ...updated, featured: Boolean(updated?.featured), available: Boolean(updated?.available) } })
+    }
+
+    // DELETE /api/menu-items/:id
+    if (segs[0] === 'menu-items' && segs[1] && method === 'DELETE') {
+      await ensureMenuItemTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM MenuItem WHERE id = ?`, [id]) as any
+      if (!existing) return err('Menu item not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (!assertStoreAccess(user, existing.storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      await exec(`DELETE FROM MenuItem WHERE id = ?`, [id])
+      return ok({ deleted: true })
+    }
+
+    // GET /api/kiosk-orders?storeId= — authenticated, list kiosk orders
+    if (segs[0] === 'kiosk-orders' && !segs[1] && method === 'GET') {
+      await ensureKioskOrderTable()
+      const sid = sp.get('storeId') ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const status = sp.get('status') // optional filter
+      const sql = status
+        ? `SELECT * FROM KioskOrder WHERE storeId = ? AND status = ? ORDER BY createdAt DESC LIMIT 100`
+        : `SELECT * FROM KioskOrder WHERE storeId = ? AND status = 'PENDING' ORDER BY createdAt DESC LIMIT 100`
+      const params = status ? [sid, status] : [sid]
+      const orders = await query(sql, params) as any[]
+      return ok({ orders: orders.map(o => ({ ...o, items: JSON.parse(o.items ?? '[]') })) })
+    }
+
+    // PATCH /api/kiosk-orders/:id — confirm or cancel
+    if (segs[0] === 'kiosk-orders' && segs[1] && method === 'PATCH') {
+      await ensureKioskOrderTable()
+      const id = segs[1]
+      const existing = await queryOne(`SELECT * FROM KioskOrder WHERE id = ?`, [id]) as any
+      if (!existing) return err('Kiosk order not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (!assertStoreAccess(user, existing.storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const b = await req.json() as Record<string, any>
+      if (!b.status || !['CONFIRMED', 'CANCELLED', 'PENDING'].includes(b.status)) {
+        throw new ValidationError("status must be 'PENDING', 'CONFIRMED', or 'CANCELLED'", 'INVALID_VALUE')
+      }
+      await exec(`UPDATE KioskOrder SET status = ? WHERE id = ?`, [b.status, id])
+      const updated = await queryOne(`SELECT * FROM KioskOrder WHERE id = ?`, [id]) as any
+      return ok({ order: { ...updated, items: JSON.parse(updated?.items ?? '[]') } })
     }
 
   } catch (e: any) {
