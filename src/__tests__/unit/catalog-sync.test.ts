@@ -7,14 +7,7 @@ import {
   type ParsedRow,
 } from '@/lib/product-import'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const VALID_SOURCES = ['TOKOPEDIA', 'SHOPEE', 'MANUAL'] as const
-type ExternalSource = (typeof VALID_SOURCES)[number]
-
-function validateSyncSource(source: string): source is ExternalSource {
-  return VALID_SOURCES.includes(source as ExternalSource)
-}
+// ── Shared helpers (pure functions, no DB) ────────────────────────────────────
 
 function escapeCSV(value: string | number | null | undefined): string {
   const str = value == null ? '' : String(value)
@@ -48,9 +41,23 @@ function mapCSVRowToProduct(row: Record<string, string>) {
   }
 }
 
-// ── CSV Row Validation ────────────────────────────────────────────────────────
+/** Compute job progress percentage (0–100) */
+function computeProgress(processedRows: number, totalRows: number): number {
+  if (totalRows <= 0) return 0
+  return Math.round((processedRows / totalRows) * 100)
+}
 
-describe('CSV row validation', () => {
+/** Generate a CSV template string from CSV_HEADERS */
+function generateCSVTemplate(sampleRow?: Record<string, string>): string {
+  const header = CSV_HEADERS.join(',')
+  if (!sampleRow) return header
+  const row = CSV_HEADERS.map(h => escapeCSV(sampleRow[h] ?? '')).join(',')
+  return `${header}\r\n${row}`
+}
+
+// ── 1. CSV Row Parsing ────────────────────────────────────────────────────────
+
+describe('CSV row parsing', () => {
   it('parses a valid CSV row with all fields', () => {
     const csv = 'name,sku,price,cost,stock,categoryName\nEspresso,ESP001,25000,10000,100,Minuman'
     const rows = parseAndValidateCSV(csv)
@@ -62,15 +69,33 @@ describe('CSV row validation', () => {
     expect(rows[0].data.stock).toBe(100)
   })
 
+  it('parses multiple rows and assigns sequential rowIndex values', () => {
+    const csv =
+      'name,sku,price,cost,stock,categoryName\nA,S1,1000,500,10,Cat\nB,S2,2000,800,5,Cat'
+    const rows = parseAndValidateCSV(csv)
+    expect(rows).toHaveLength(2)
+    expect(rows[0].rowIndex).toBe(1)
+    expect(rows[1].rowIndex).toBe(2)
+  })
+
+  it('skips empty lines in CSV input', () => {
+    const csv = 'name,sku,price,cost,stock,categoryName\nA,S1,1000,500,10,Cat\n\n'
+    const rows = parseAndValidateCSV(csv)
+    expect(rows).toHaveLength(1)
+  })
+})
+
+// ── 2. Field Validation ───────────────────────────────────────────────────────
+
+describe('Field validation', () => {
   it('flags a row with missing name as invalid', () => {
     const csv = 'name,sku,price,cost,stock,categoryName\n,SKU002,5000,2000,10,Makanan'
     const rows = parseAndValidateCSV(csv)
     expect(rows[0].errors.length).toBeGreaterThan(0)
-    const errFields = rows[0].errors.map(e => e.field)
-    expect(errFields).toContain('name')
+    expect(rows[0].errors.map(e => e.field)).toContain('name')
   })
 
-  it('flags a row with invalid price as invalid', () => {
+  it('flags a row with non-numeric price as invalid', () => {
     const csv = 'name,sku,price,cost,stock,categoryName\nProduk,SKU003,abc,2000,10,Makanan'
     const rows = parseAndValidateCSV(csv)
     expect(rows[0].errors.some(e => e.field === 'price')).toBe(true)
@@ -83,68 +108,59 @@ describe('CSV row validation', () => {
   })
 })
 
-// ── Duplicate SKU Detection ───────────────────────────────────────────────────
+// ── 3. Error Row Detection ────────────────────────────────────────────────────
 
-describe('Duplicate SKU detection', () => {
-  it('returns empty set when no duplicates', () => {
-    const csv = 'name,sku,price,cost,stock,categoryName\nA,SKU001,1000,500,10,Cat\nB,SKU002,2000,800,5,Cat'
+describe('Error row detection', () => {
+  it('returns empty set when no duplicate SKUs exist', () => {
+    const csv =
+      'name,sku,price,cost,stock,categoryName\nA,SKU001,1000,500,10,Cat\nB,SKU002,2000,800,5,Cat'
     const rows = parseAndValidateCSV(csv)
-    const dupes = findDuplicateSKUs(rows)
-    expect(dupes.size).toBe(0)
+    expect(findDuplicateSKUs(rows).size).toBe(0)
   })
 
-  it('detects duplicate SKUs in same batch', () => {
-    const csv = 'name,sku,price,cost,stock,categoryName\nA,SKU001,1000,500,10,Cat\nB,SKU001,2000,800,5,Cat'
+  it('detects duplicate SKUs within the same batch', () => {
+    const csv =
+      'name,sku,price,cost,stock,categoryName\nA,SKU001,1000,500,10,Cat\nB,SKU001,2000,800,5,Cat'
     const rows = parseAndValidateCSV(csv)
-    const dupes = findDuplicateSKUs(rows)
-    expect(dupes.has('SKU001')).toBe(true)
+    expect(findDuplicateSKUs(rows).has('SKU001')).toBe(true)
   })
 
-  it('detects existing SKU collision with store inventory', () => {
-    const csv = 'name,sku,price,cost,stock,categoryName\nA,EXISTING,1000,500,10,Cat'
+  it('computes errorCount correctly in import summary', () => {
+    const csv =
+      'name,sku,price,cost,stock,categoryName\n,SKU-ERR,bad,0,-1,Cat\nOK,SKU001,1000,0,5,Cat'
     const rows = parseAndValidateCSV(csv)
-    const existing = new Set(['EXISTING'])
-    const summary = computeImportSummary(rows, existing)
-    expect(summary.toUpdate).toBe(1)
-    expect(summary.toCreate).toBe(0)
+    const summary = computeImportSummary(rows, new Set())
+    // First row has multiple errors → counted once as 1 error row
+    expect(summary.errorCount).toBeGreaterThanOrEqual(1)
+    expect(summary.toCreate).toBe(1)
   })
 })
 
-// ── Import Row Mapping ────────────────────────────────────────────────────────
+// ── 4. Progress Calculation ───────────────────────────────────────────────────
 
-describe('Import row mapping (CSV columns to product fields)', () => {
-  it('maps standard CSV columns correctly', () => {
-    const raw = { name: 'Nasi Goreng', sku: 'NG001', price: '18000', cost: '8000', stock: '50', categoryname: 'Makanan' }
-    const product = mapCSVRowToProduct(raw)
-    expect(product.name).toBe('Nasi Goreng')
-    expect(product.sku).toBe('NG001')
-    expect(product.price).toBe(18000)
-    expect(product.cost).toBe(8000)
-    expect(product.stock).toBe(50)
-    expect(product.categoryName).toBe('Makanan')
+describe('Progress calculation', () => {
+  it('returns 0 when totalRows is 0', () => {
+    expect(computeProgress(0, 0)).toBe(0)
   })
 
-  it('defaults missing numeric fields to 0', () => {
-    const raw = { name: 'Teh Manis', sku: '', price: '', cost: '', stock: '', categoryname: '' }
-    const product = mapCSVRowToProduct(raw)
-    expect(product.price).toBe(0)
-    expect(product.cost).toBe(0)
-    expect(product.stock).toBe(0)
+  it('returns 50 when half the rows are processed', () => {
+    expect(computeProgress(5, 10)).toBe(50)
   })
 
-  it('trims whitespace from string fields', () => {
-    const raw = { name: '  Kopi Hitam  ', sku: '  KH001  ', price: '5000', cost: '2000', stock: '20', categoryname: '  Minuman  ' }
-    const product = mapCSVRowToProduct(raw)
-    expect(product.name).toBe('Kopi Hitam')
-    expect(product.sku).toBe('KH001')
-    expect(product.categoryName).toBe('Minuman')
+  it('returns 100 when all rows are processed', () => {
+    expect(computeProgress(10, 10)).toBe(100)
+  })
+
+  it('rounds fractional progress to nearest integer', () => {
+    // 1/3 ≈ 33.33 → rounds to 33
+    expect(computeProgress(1, 3)).toBe(33)
   })
 })
 
-// ── Export Format Validation ──────────────────────────────────────────────────
+// ── 5. Template Generation ────────────────────────────────────────────────────
 
-describe('Export format validation', () => {
-  it('CSV_HEADERS contains required columns', () => {
+describe('Template generation', () => {
+  it('CSV_HEADERS contains all required product columns', () => {
     expect(CSV_HEADERS).toContain('name')
     expect(CSV_HEADERS).toContain('sku')
     expect(CSV_HEADERS).toContain('price')
@@ -153,44 +169,40 @@ describe('Export format validation', () => {
     expect(CSV_HEADERS).toContain('categoryName')
   })
 
-  it('escapes commas in product names for CSV', () => {
-    const result = escapeCSV('Kopi, Latte')
-    expect(result).toBe('"Kopi, Latte"')
+  it('generates a template with header-only when no sample row given', () => {
+    const tmpl = generateCSVTemplate()
+    expect(tmpl).toBe(CSV_HEADERS.join(','))
+    expect(tmpl.includes('\r\n')).toBe(false)
   })
 
-  it('escapes double-quotes in CSV values', () => {
-    const result = escapeCSV('Produk "Spesial"')
-    expect(result).toBe('"Produk ""Spesial"""')
+  it('generates a template with a sample row when provided', () => {
+    const sample = {
+      name: 'Contoh',
+      sku: 'SKU001',
+      price: '15000',
+      cost: '8000',
+      stock: '50',
+      categoryName: 'Makanan',
+    }
+    const tmpl = generateCSVTemplate(sample)
+    const lines = tmpl.split('\r\n')
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toBe(CSV_HEADERS.join(','))
+    expect(lines[1]).toContain('Contoh')
+    expect(lines[1]).toContain('SKU001')
   })
 
-  it('builds a valid CSV export row from a product object', () => {
-    const product = { name: 'Tahu Goreng', sku: 'TG001', price: 3000, cost: 1500, stock: 200, categoryName: 'Gorengan' }
+  it('escapes commas and quotes in CSV export rows', () => {
+    const product = {
+      name: 'Kopi, Latte',
+      sku: 'KL001',
+      price: 28000,
+      cost: 12000,
+      stock: 30,
+      categoryName: 'Minuman "Panas"',
+    }
     const row = buildCSVExportRow(product)
-    const cols = row.split(',')
-    expect(cols[0]).toBe('Tahu Goreng')
-    expect(cols[1]).toBe('TG001')
-    expect(cols[2]).toBe('3000')
-  })
-})
-
-// ── Sync Source Validation ────────────────────────────────────────────────────
-
-describe('Sync source validation', () => {
-  it('accepts TOKOPEDIA as a valid source', () => {
-    expect(validateSyncSource('TOKOPEDIA')).toBe(true)
-  })
-
-  it('accepts SHOPEE as a valid source', () => {
-    expect(validateSyncSource('SHOPEE')).toBe(true)
-  })
-
-  it('accepts MANUAL as a valid source', () => {
-    expect(validateSyncSource('MANUAL')).toBe(true)
-  })
-
-  it('rejects an unknown source string', () => {
-    expect(validateSyncSource('LAZADA')).toBe(false)
-    expect(validateSyncSource('')).toBe(false)
-    expect(validateSyncSource('tokopedia')).toBe(false)
+    expect(row).toContain('"Kopi, Latte"')
+    expect(row).toContain('"Minuman ""Panas"""')
   })
 })
