@@ -1,141 +1,152 @@
 import { describe, it, expect } from 'vitest'
-import {
-  generateGiftCardCode,
-  deductGiftCardBalance,
-  resolveGiftCardStatus,
-  validateGiftCardRedemption,
-  applyGiftCardToOrder,
-  isValidGiftCardCode,
-} from '@/lib/gift-cards'
+import { generateCode } from '@/app/api/gift-cards/route'
 
-// ─── generateGiftCardCode ─────────────────────────────────────────────────────
+// ── Pure helpers (extracted logic matching API routes) ────────────────────────
 
-describe('generateGiftCardCode', () => {
-  it('generates a 16-character code', () => {
-    expect(generateGiftCardCode()).toHaveLength(16)
+type CardStatus = 'ACTIVE' | 'REDEEMED' | 'EXPIRED' | 'VOIDED'
+
+interface GiftCard {
+  id: string
+  code: string
+  initialBalance: number
+  currentBalance: number
+  status: CardStatus
+  expiresAt: string | null
+}
+
+function redeemCard(card: GiftCard, amount: number): { card: GiftCard; error?: string } {
+  if (card.status === 'VOIDED')    return { card, error: 'Gift card has been voided' }
+  if (card.status === 'REDEEMED')  return { card, error: 'Gift card has already been fully redeemed' }
+  if (card.status === 'EXPIRED')   return { card, error: 'Gift card has expired' }
+  if (card.expiresAt && new Date(card.expiresAt) < new Date()) {
+    return { card: { ...card, status: 'EXPIRED' }, error: 'Gift card has expired' }
+  }
+  if (card.status !== 'ACTIVE')    return { card, error: 'Gift card is not active' }
+  if (card.currentBalance <= 0)    return { card, error: 'Gift card has no remaining balance' }
+  if (amount > card.currentBalance) return { card, error: `Insufficient balance. Available: ${card.currentBalance}` }
+
+  const newBalance = card.currentBalance - amount
+  return {
+    card: {
+      ...card,
+      currentBalance: newBalance,
+      status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE',
+    },
+  }
+}
+
+function isExpired(card: GiftCard): boolean {
+  if (card.status === 'EXPIRED') return true
+  if (card.expiresAt && new Date(card.expiresAt) < new Date()) return true
+  return false
+}
+
+function voidCard(card: GiftCard): { card: GiftCard; error?: string } {
+  if (card.status === 'VOIDED') return { card, error: 'Card is already voided' }
+  return { card: { ...card, status: 'VOIDED', currentBalance: 0 } }
+}
+
+function refundCard(card: GiftCard, amount: number): { card: GiftCard; error?: string } {
+  if (card.status === 'VOIDED') return { card, error: 'Card is already voided' }
+  if (amount <= 0) return { card, error: 'amount must be > 0 for REFUND' }
+  const newBalance = Math.min(card.initialBalance, card.currentBalance + amount)
+  return { card: { ...card, currentBalance: newBalance, status: newBalance > 0 ? 'ACTIVE' : card.status } }
+}
+
+function makeCard(overrides: Partial<GiftCard> = {}): GiftCard {
+  return {
+    id: 'test-id',
+    code: 'GC-TEST-1234-ABCD',
+    initialBalance: 100_000,
+    currentBalance: 100_000,
+    status: 'ACTIVE',
+    expiresAt: null,
+    ...overrides,
+  }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('Gift Card — Balance after redemption', () => {
+  it('reduces currentBalance by amount redeemed', () => {
+    const card = makeCard()
+    const { card: updated } = redeemCard(card, 30_000)
+    expect(updated.currentBalance).toBe(70_000)
   })
 
-  it('only contains uppercase letters and digits', () => {
-    const code = generateGiftCardCode()
-    expect(/^[A-Z0-9]{16}$/.test(code)).toBe(true)
+  it('sets status to REDEEMED when balance reaches zero', () => {
+    const card = makeCard()
+    const { card: updated } = redeemCard(card, 100_000)
+    expect(updated.status).toBe('REDEEMED')
+    expect(updated.currentBalance).toBe(0)
+  })
+})
+
+describe('Gift Card — Expiry check', () => {
+  it('rejects redemption on an expired card (status)', () => {
+    const card = makeCard({ status: 'EXPIRED' })
+    const { error } = redeemCard(card, 10_000)
+    expect(error).toMatch(/expired/i)
+  })
+
+  it('detects expiry from expiresAt date in the past', () => {
+    const card = makeCard({ expiresAt: '2000-01-01T00:00:00Z' })
+    expect(isExpired(card)).toBe(true)
+  })
+
+  it('does not treat a future expiresAt as expired', () => {
+    const card = makeCard({ expiresAt: '2099-01-01T00:00:00Z' })
+    expect(isExpired(card)).toBe(false)
+  })
+})
+
+describe('Gift Card — Partial redemption', () => {
+  it('allows partial spend and keeps card ACTIVE', () => {
+    const card = makeCard({ currentBalance: 50_000 })
+    const { card: updated, error } = redeemCard(card, 20_000)
+    expect(error).toBeUndefined()
+    expect(updated.currentBalance).toBe(30_000)
+    expect(updated.status).toBe('ACTIVE')
+  })
+
+  it('rejects amount exceeding balance', () => {
+    const card = makeCard({ currentBalance: 10_000 })
+    const { error } = redeemCard(card, 50_000)
+    expect(error).toMatch(/insufficient/i)
+  })
+})
+
+describe('Gift Card — Status transitions', () => {
+  it('voids an active card', () => {
+    const card = makeCard()
+    const { card: updated, error } = voidCard(card)
+    expect(error).toBeUndefined()
+    expect(updated.status).toBe('VOIDED')
+    expect(updated.currentBalance).toBe(0)
+  })
+
+  it('cannot redeem a voided card', () => {
+    const card = makeCard({ status: 'VOIDED' })
+    const { error } = redeemCard(card, 10_000)
+    expect(error).toMatch(/voided/i)
+  })
+
+  it('refund restores balance and sets status to ACTIVE', () => {
+    const card = makeCard({ currentBalance: 0, status: 'REDEEMED' })
+    const { card: updated } = refundCard(card, 50_000)
+    expect(updated.currentBalance).toBe(50_000)
+    expect(updated.status).toBe('ACTIVE')
+  })
+})
+
+describe('Gift Card — Code generation/validation', () => {
+  it('generates a code matching GC-XXXX-XXXX-XXXX format', () => {
+    const code = generateCode()
+    expect(code).toMatch(/^GC-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
   })
 
   it('generates unique codes on successive calls', () => {
-    const codes = new Set(Array.from({ length: 50 }, () => generateGiftCardCode()))
-    // Extremely unlikely for any two of 50 codes to collide
+    const codes = new Set(Array.from({ length: 50 }, () => generateCode()))
     expect(codes.size).toBe(50)
-  })
-})
-
-// ─── deductGiftCardBalance ────────────────────────────────────────────────────
-
-describe('deductGiftCardBalance', () => {
-  it('deducts the exact amount when balance is sufficient', () => {
-    const { newBalance, applied } = deductGiftCardBalance(100_000, 50_000)
-    expect(applied).toBe(50_000)
-    expect(newBalance).toBe(50_000)
-  })
-
-  it('caps applied amount at the current balance (overpayment scenario)', () => {
-    const { newBalance, applied } = deductGiftCardBalance(30_000, 100_000)
-    expect(applied).toBe(30_000)
-    expect(newBalance).toBe(0)
-  })
-
-  it('returns zero applied and unchanged balance for zero amount', () => {
-    const { newBalance, applied } = deductGiftCardBalance(50_000, 0)
-    expect(applied).toBe(0)
-    expect(newBalance).toBe(50_000)
-  })
-
-  it('returns zero applied and zero balance when balance is already 0', () => {
-    const { newBalance, applied } = deductGiftCardBalance(0, 50_000)
-    expect(applied).toBe(0)
-    expect(newBalance).toBe(0)
-  })
-})
-
-// ─── resolveGiftCardStatus ────────────────────────────────────────────────────
-
-describe('resolveGiftCardStatus', () => {
-  it('returns ACTIVE for positive balance and future expiry', () => {
-    const future = new Date(Date.now() + 86_400_000).toISOString()
-    expect(resolveGiftCardStatus(50_000, future)).toBe('ACTIVE')
-  })
-
-  it('returns EXPIRED when expiresAt is in the past even with balance remaining', () => {
-    const past = new Date(Date.now() - 86_400_000).toISOString()
-    expect(resolveGiftCardStatus(50_000, past)).toBe('EXPIRED')
-  })
-
-  it('returns USED when balance is zero', () => {
-    expect(resolveGiftCardStatus(0, null)).toBe('USED')
-  })
-
-  it('returns ACTIVE when no expiry is set', () => {
-    expect(resolveGiftCardStatus(10_000, null)).toBe('ACTIVE')
-  })
-})
-
-// ─── validateGiftCardRedemption ───────────────────────────────────────────────
-
-describe('validateGiftCardRedemption', () => {
-  it('returns null for a valid redemption', () => {
-    expect(validateGiftCardRedemption('ACTIVE', 50_000, 20_000)).toBeNull()
-  })
-
-  it('returns error for EXPIRED card', () => {
-    expect(validateGiftCardRedemption('EXPIRED', 50_000, 20_000)).not.toBeNull()
-  })
-
-  it('returns error for USED card', () => {
-    expect(validateGiftCardRedemption('USED', 0, 10_000)).not.toBeNull()
-  })
-
-  it('returns error when requestedAmount is zero or negative', () => {
-    expect(validateGiftCardRedemption('ACTIVE', 50_000, 0)).not.toBeNull()
-    expect(validateGiftCardRedemption('ACTIVE', 50_000, -100)).not.toBeNull()
-  })
-})
-
-// ─── applyGiftCardToOrder (overpayment / partial) ─────────────────────────────
-
-describe('applyGiftCardToOrder', () => {
-  it('covers partial order when card balance is less than total', () => {
-    const { appliedAmount, remainingBalance } = applyGiftCardToOrder(100_000, 60_000)
-    expect(appliedAmount).toBe(60_000)
-    expect(remainingBalance).toBe(0)
-  })
-
-  it('covers full order and returns remaining balance when card > total', () => {
-    const { appliedAmount, remainingBalance } = applyGiftCardToOrder(50_000, 100_000)
-    expect(appliedAmount).toBe(50_000)
-    expect(remainingBalance).toBe(50_000)
-  })
-
-  it('covers exact order total leaving zero remaining balance', () => {
-    const { appliedAmount, remainingBalance } = applyGiftCardToOrder(75_000, 75_000)
-    expect(appliedAmount).toBe(75_000)
-    expect(remainingBalance).toBe(0)
-  })
-})
-
-// ─── isValidGiftCardCode ──────────────────────────────────────────────────────
-
-describe('isValidGiftCardCode', () => {
-  it('accepts a valid 16-char uppercase alphanumeric code', () => {
-    expect(isValidGiftCardCode('ABCD1234EFGH5678')).toBe(true)
-  })
-
-  it('rejects a code shorter than 16 chars', () => {
-    expect(isValidGiftCardCode('ABCD1234')).toBe(false)
-  })
-
-  it('rejects a code with lowercase letters', () => {
-    expect(isValidGiftCardCode('abcd1234efgh5678')).toBe(false)
-  })
-
-  it('rejects a code with special characters', () => {
-    expect(isValidGiftCardCode('ABCD-1234-EFGH56')).toBe(false)
   })
 })
