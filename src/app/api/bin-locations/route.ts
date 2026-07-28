@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, exec, newId, nowISO } from '@/lib/db'
+import { generateBinCode, calcAvailableSpace, validateTransfer } from '@/lib/bin-locations'
 
 function err(msg: string, status = 400, code = 'ERROR') {
   return NextResponse.json({ error: msg, code }, { status })
@@ -39,30 +40,6 @@ export async function ensureBinLocationTables() {
     note      TEXT,
     createdAt TEXT NOT NULL
   )`)
-}
-
-export function generateBinCode(aisle: string, rack: string, shelf: string, bin: string): string {
-  return `${aisle.toUpperCase()}-${rack.toUpperCase()}-${shelf.toUpperCase()}-${bin.toUpperCase()}`
-}
-
-export function calcCapacityUtilization(currentQty: number, capacity: number): number {
-  if (capacity <= 0) return 0
-  return Math.min(100, Math.round((currentQty / capacity) * 100))
-}
-
-export function calcAvailableSpace(currentQty: number, capacity: number): number {
-  return Math.max(0, capacity - currentQty)
-}
-
-export function validateTransfer(
-  qty: number,
-  fromBinCurrentQty: number,
-  toBinAvailableSpace: number,
-): { valid: boolean; error?: string } {
-  if (qty <= 0) return { valid: false, error: 'Qty must be greater than 0' }
-  if (qty > fromBinCurrentQty) return { valid: false, error: 'Insufficient stock in source bin' }
-  if (qty > toBinAvailableSpace) return { valid: false, error: 'Insufficient space in destination bin' }
-  return { valid: true }
 }
 
 export async function GET(req: NextRequest) {

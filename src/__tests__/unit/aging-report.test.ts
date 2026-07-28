@@ -61,16 +61,16 @@ function isOverdue(dueDate: string, asOf: Date = new Date()): boolean {
 function calcAgingSummary(rows: Array<{
   current: number; d31_60: number; d61_90: number; d91_120: number; d120plus: number; total?: number
 }>): AgingSummary {
-  const acc = rows.reduce(
+  const acc = rows.reduce<AgingSummary>(
     (a, r) => ({
-      current:  a.current  + r.current,
-      d31_60:   a.d31_60   + r.d31_60,
-      d61_90:   a.d61_90   + r.d61_90,
-      d91_120:  a.d91_120  + r.d91_120,
+      current: a.current + r.current,
+      d31_60: a.d31_60 + r.d31_60,
+      d61_90: a.d61_90 + r.d61_90,
+      d91_120: a.d91_120 + r.d91_120,
       d120plus: a.d120plus + r.d120plus,
-      total:    0,
+      total: 0,
     }),
-    { current: 0, d31_60: 0, d61_90: 0, d91_120: 0, d120plus: 0, total: 0 } as AgingSummary
+    { current: 0, d31_60: 0, d61_90: 0, d91_120: 0, d120plus: 0, total: 0 }
   )
   acc.total = acc.current + acc.d31_60 + acc.d61_90 + acc.d91_120 + acc.d120plus
   return acc

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { query, exec, newId, nowISO } from '@/lib/db'
-import { ensureBinLocationTables, validateTransfer, calcAvailableSpace } from '../bin-locations/route'
+import { calcAvailableSpace, validateTransfer } from '@/lib/bin-locations'
+import { ensureBinLocationTables } from '../bin-locations/route'
 
 function err(msg: string, status = 400, code = 'ERROR') {
   return NextResponse.json({ error: msg, code }, { status })
@@ -68,11 +69,9 @@ export async function POST(req: NextRequest) {
     [id, storeId, fromBinId, toBinId, productId, qty, note ?? null, createdAt],
   )
 
-  // Update bin quantities
   await exec(`UPDATE BinLocation SET currentQty = currentQty - ? WHERE id = ?`, [qty, fromBinId])
   await exec(`UPDATE BinLocation SET currentQty = currentQty + ? WHERE id = ?`, [qty, toBinId])
 
-  // Update or insert BinProduct for destination
   const destProduct = await query(
     `SELECT * FROM BinProduct WHERE binId = ? AND productId = ?`,
     [toBinId, productId],
@@ -89,7 +88,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Reduce BinProduct on source
   await exec(
     `UPDATE BinProduct SET qty = qty - ? WHERE binId = ? AND productId = ?`,
     [qty, fromBinId, productId],
