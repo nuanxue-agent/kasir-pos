@@ -1,216 +1,145 @@
 import { describe, it, expect } from 'vitest'
+import {
+  aggregateScores,
+  calcDimensionAverage,
+  calcCompletionRate,
+  isValidCycleTransition,
+  type PeerReview,
+} from '@/lib/performance-review'
 
-// ── Performance Review — pure business logic ───────────────────────────────────
+type ReviewOverrides = Partial<PeerReview> & { reviewerId: string; revieweeId: string }
 
-type ScoreDimension = 'attendance' | 'sales' | 'teamwork' | 'punctuality'
-type ReviewStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED'
-type CyclePeriod = 'QUARTERLY' | 'ANNUAL'
-
-interface Scores {
-  attendance: number
-  sales: number
-  teamwork: number
-  punctuality: number
-}
-
-interface ReviewCycle {
-  id: string
-  storeId: string
-  name: string
-  period: CyclePeriod
-  year: number
-  startDate: string
-  endDate: string
-  status: 'DRAFT' | 'ACTIVE' | 'CLOSED'
-}
-
-interface PerformanceReview {
-  id: string
-  cycleId: string
-  employeeId: string
-  reviewerId?: string
-  scores: Scores
-  overallScore: number
-  comments?: string
-  selfAssessment?: string
-  status: ReviewStatus
-}
-
-// ── Business logic functions ──────────────────────────────────────────────────
-
-function calcOverallScore(scores: Scores): number {
-  const dims: ScoreDimension[] = ['attendance', 'sales', 'teamwork', 'punctuality']
-  const total = dims.reduce((sum, d) => sum + (scores[d] ?? 0), 0)
-  return Math.round((total / dims.length) * 10) / 10
-}
-
-function validateScores(scores: Scores): boolean {
-  const dims: ScoreDimension[] = ['attendance', 'sales', 'teamwork', 'punctuality']
-  return dims.every(d => {
-    const v = scores[d]
-    return Number.isInteger(v) && v >= 1 && v <= 5
-  })
-}
-
-function canApprove(review: PerformanceReview, userRole: string): boolean {
-  return (userRole === 'OWNER' || userRole === 'MANAGER') && review.status === 'SUBMITTED'
-}
-
-function canSubmit(review: PerformanceReview): boolean {
-  return review.status === 'DRAFT'
-}
-
-function getPerformanceLabel(score: number): string {
-  if (score >= 4.5) return 'Luar Biasa'
-  if (score >= 3.5) return 'Melampaui Ekspektasi'
-  if (score >= 2.5) return 'Memenuhi Ekspektasi'
-  if (score >= 1.5) return 'Di Bawah Ekspektasi'
-  return 'Perlu Perbaikan'
-}
-
-function getCycleQuarter(cycle: ReviewCycle): number | null {
-  if (cycle.period !== 'QUARTERLY') return null
-  const month = new Date(cycle.startDate).getMonth() + 1
-  return Math.ceil(month / 3)
-}
-
-function filterReviewsByStatus(
-  reviews: PerformanceReview[],
-  status: ReviewStatus,
-): PerformanceReview[] {
-  return reviews.filter(r => r.status === status)
-}
-
-function averageScoreByDimension(reviews: PerformanceReview[]): Partial<Record<ScoreDimension, number>> {
-  if (reviews.length === 0) return {}
-  const dims: ScoreDimension[] = ['attendance', 'sales', 'teamwork', 'punctuality']
-  const result: Partial<Record<ScoreDimension, number>> = {}
-  for (const d of dims) {
-    const avg = reviews.reduce((sum, r) => sum + (r.scores[d] ?? 0), 0) / reviews.length
-    result[d] = Math.round(avg * 10) / 10
+function makeReview(overrides: ReviewOverrides): PeerReview {
+  const now = new Date().toISOString()
+  return {
+    id: overrides.id ?? 'r-1',
+    cycleId: overrides.cycleId ?? 'cycle-1',
+    storeId: overrides.storeId ?? 'store-1',
+    reviewerId: overrides.reviewerId,
+    revieweeId: overrides.revieweeId,
+    scores: overrides.scores ?? { communication: 3, teamwork: 3, skills: 3, attitude: 3 },
+    comments: overrides.comments ?? null,
+    submittedAt: overrides.submittedAt !== undefined ? overrides.submittedAt : now,
+    createdAt: overrides.createdAt ?? now,
+    updatedAt: overrides.updatedAt ?? now,
   }
-  return result
 }
 
-function normalizeCyclePeriod(input: string): CyclePeriod {
-  const upper = input.toUpperCase()
-  if (upper === 'QUARTERLY' || upper === 'Q') return 'QUARTERLY'
-  if (upper === 'ANNUAL' || upper === 'YEARLY' || upper === 'Y') return 'ANNUAL'
-  throw new Error(`Unknown period: ${input}`)
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-describe('Performance Review — calcOverallScore', () => {
-  it('calculates average of four dimensions', () => {
-    expect(calcOverallScore({ attendance: 4, sales: 3, teamwork: 5, punctuality: 4 })).toBe(4)
-  })
-
-  it('rounds to 1 decimal place', () => {
-    expect(calcOverallScore({ attendance: 3, sales: 4, teamwork: 3, punctuality: 4 })).toBe(3.5)
-  })
-
-  it('handles all-1 scores', () => {
-    expect(calcOverallScore({ attendance: 1, sales: 1, teamwork: 1, punctuality: 1 })).toBe(1)
-  })
-
-  it('handles all-5 scores', () => {
-    expect(calcOverallScore({ attendance: 5, sales: 5, teamwork: 5, punctuality: 5 })).toBe(5)
-  })
-})
-
-describe('Performance Review — validateScores', () => {
-  it('accepts valid 1-5 integer scores', () => {
-    expect(validateScores({ attendance: 3, sales: 2, teamwork: 5, punctuality: 1 })).toBe(true)
-  })
-
-  it('rejects score of 0', () => {
-    expect(validateScores({ attendance: 0, sales: 3, teamwork: 3, punctuality: 3 })).toBe(false)
-  })
-
-  it('rejects score of 6', () => {
-    expect(validateScores({ attendance: 6, sales: 3, teamwork: 3, punctuality: 3 })).toBe(false)
-  })
-
-  it('rejects non-integer score', () => {
-    expect(validateScores({ attendance: 3.5, sales: 3, teamwork: 3, punctuality: 3 })).toBe(false)
-  })
-})
-
-describe('Performance Review — status transitions', () => {
-  const draft: PerformanceReview = {
-    id: '1', cycleId: 'c1', employeeId: 'e1',
-    scores: { attendance: 4, sales: 4, teamwork: 4, punctuality: 4 },
-    overallScore: 4, status: 'DRAFT',
-  }
-
-  it('allows DRAFT to be submitted', () => {
-    expect(canSubmit(draft)).toBe(true)
-  })
-
-  it('does not allow SUBMITTED to be submitted again', () => {
-    expect(canSubmit({ ...draft, status: 'SUBMITTED' })).toBe(false)
-  })
-
-  it('allows OWNER to approve SUBMITTED review', () => {
-    expect(canApprove({ ...draft, status: 'SUBMITTED' }, 'OWNER')).toBe(true)
-  })
-
-  it('does not allow STAFF to approve', () => {
-    expect(canApprove({ ...draft, status: 'SUBMITTED' }, 'STAFF')).toBe(false)
-  })
-})
-
-describe('Performance Review — helpers', () => {
-  it('labels score 4.8 as Luar Biasa', () => {
-    expect(getPerformanceLabel(4.8)).toBe('Luar Biasa')
-  })
-
-  it('labels score 2.0 as Di Bawah Ekspektasi', () => {
-    expect(getPerformanceLabel(2.0)).toBe('Di Bawah Ekspektasi')
-  })
-
-  it('gets quarter 1 for Q1 cycle', () => {
-    const cycle: ReviewCycle = {
-      id: 'c1', storeId: 's1', name: 'Q1', period: 'QUARTERLY', year: 2025,
-      startDate: '2025-01-01', endDate: '2025-03-31', status: 'ACTIVE',
-    }
-    expect(getCycleQuarter(cycle)).toBe(1)
-  })
-
-  it('returns null quarter for ANNUAL cycle', () => {
-    const cycle: ReviewCycle = {
-      id: 'c1', storeId: 's1', name: 'Annual', period: 'ANNUAL', year: 2025,
-      startDate: '2025-01-01', endDate: '2025-12-31', status: 'ACTIVE',
-    }
-    expect(getCycleQuarter(cycle)).toBeNull()
-  })
-
-  it('filters reviews by status', () => {
-    const reviews: PerformanceReview[] = [
-      { id: '1', cycleId: 'c1', employeeId: 'e1', scores: { attendance: 3, sales: 3, teamwork: 3, punctuality: 3 }, overallScore: 3, status: 'DRAFT' },
-      { id: '2', cycleId: 'c1', employeeId: 'e2', scores: { attendance: 4, sales: 4, teamwork: 4, punctuality: 4 }, overallScore: 4, status: 'APPROVED' },
+describe('aggregateScores', () => {
+  it('averages scores from multiple reviewers', () => {
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2', scores: { communication: 4, teamwork: 4, skills: 4, attitude: 4 } }),
+      makeReview({ id: 'r2', reviewerId: 'emp-3', revieweeId: 'emp-2', scores: { communication: 2, teamwork: 2, skills: 2, attitude: 2 } }),
     ]
-    expect(filterReviewsByStatus(reviews, 'DRAFT')).toHaveLength(1)
+    const [result] = aggregateScores(reviews)
+    expect(result.revieweeId).toBe('emp-2')
+    expect(result.communication).toBe(3)
+    expect(result.overall).toBe(3)
   })
 
-  it('averages scores by dimension', () => {
-    const reviews: PerformanceReview[] = [
-      { id: '1', cycleId: 'c1', employeeId: 'e1', scores: { attendance: 4, sales: 2, teamwork: 3, punctuality: 5 }, overallScore: 3.5, status: 'APPROVED' },
-      { id: '2', cycleId: 'c1', employeeId: 'e2', scores: { attendance: 2, sales: 4, teamwork: 3, punctuality: 3 }, overallScore: 3, status: 'APPROVED' },
+  it('excludes reviews without submittedAt', () => {
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2', scores: { communication: 5, teamwork: 5, skills: 5, attitude: 5 } }),
+      makeReview({ id: 'r2', reviewerId: 'emp-3', revieweeId: 'emp-2', submittedAt: null }),
     ]
-    const avg = averageScoreByDimension(reviews)
-    expect(avg.attendance).toBe(3)
-    expect(avg.sales).toBe(3)
+    const [result] = aggregateScores(reviews)
+    expect(result.reviewerCount).toBe(1)
+    expect(result.communication).toBe(5)
   })
 
-  it('normalizes QUARTERLY period aliases', () => {
-    expect(normalizeCyclePeriod('Q')).toBe('QUARTERLY')
-    expect(normalizeCyclePeriod('quarterly')).toBe('QUARTERLY')
+  it('returns empty array when no reviews', () => {
+    expect(aggregateScores([])).toHaveLength(0)
   })
 
-  it('normalizes ANNUAL period aliases', () => {
-    expect(normalizeCyclePeriod('YEARLY')).toBe('ANNUAL')
-    expect(normalizeCyclePeriod('y')).toBe('ANNUAL')
+  it('aggregates separately for each reviewee', () => {
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2', scores: { communication: 4, teamwork: 4, skills: 4, attitude: 4 } }),
+      makeReview({ id: 'r2', reviewerId: 'emp-1', revieweeId: 'emp-3', scores: { communication: 2, teamwork: 2, skills: 2, attitude: 2 } }),
+    ]
+    const results = aggregateScores(reviews)
+    expect(results).toHaveLength(2)
+    const emp2 = results.find(r => r.revieweeId === 'emp-2')!
+    const emp3 = results.find(r => r.revieweeId === 'emp-3')!
+    expect(emp2.overall).toBe(4)
+    expect(emp3.overall).toBe(2)
+  })
+})
+
+describe('aggregateScores self-assessment weight', () => {
+  it('applies 0.5x weight to self-assessment by default', () => {
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2', scores: { communication: 4, teamwork: 4, skills: 4, attitude: 4 } }),
+      makeReview({ id: 'r2', reviewerId: 'emp-2', revieweeId: 'emp-2', scores: { communication: 2, teamwork: 2, skills: 2, attitude: 2 } }),
+    ]
+    const [result] = aggregateScores(reviews)
+    expect(result.communication).toBeCloseTo(3.33, 1)
+  })
+
+  it('applies custom selfWeight of 1 equal weight', () => {
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2', scores: { communication: 4, teamwork: 4, skills: 4, attitude: 4 } }),
+      makeReview({ id: 'r2', reviewerId: 'emp-2', revieweeId: 'emp-2', scores: { communication: 2, teamwork: 2, skills: 2, attitude: 2 } }),
+    ]
+    const [result] = aggregateScores(reviews, 1)
+    expect(result.communication).toBe(3)
+  })
+})
+
+describe('calcDimensionAverage', () => {
+  it('returns correct average', () => {
+    expect(calcDimensionAverage([4, 2, 3])).toBeCloseTo(3, 2)
+  })
+
+  it('returns 0 for empty array', () => {
+    expect(calcDimensionAverage([])).toBe(0)
+  })
+
+  it('handles single value', () => {
+    expect(calcDimensionAverage([5])).toBe(5)
+  })
+})
+
+describe('isValidCycleTransition', () => {
+  it('allows DRAFT to ACTIVE', () => {
+    expect(isValidCycleTransition('DRAFT', 'ACTIVE')).toBe(true)
+  })
+
+  it('allows ACTIVE to CLOSED', () => {
+    expect(isValidCycleTransition('ACTIVE', 'CLOSED')).toBe(true)
+  })
+
+  it('allows CLOSED to DRAFT re-open', () => {
+    expect(isValidCycleTransition('CLOSED', 'DRAFT')).toBe(true)
+  })
+
+  it('rejects DRAFT to CLOSED skips ACTIVE', () => {
+    expect(isValidCycleTransition('DRAFT', 'CLOSED')).toBe(false)
+  })
+
+  it('rejects ACTIVE to DRAFT backwards', () => {
+    expect(isValidCycleTransition('ACTIVE', 'DRAFT')).toBe(false)
+  })
+})
+
+describe('calcCompletionRate', () => {
+  it('returns 1 when all reviews submitted', () => {
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2' }),
+      makeReview({ id: 'r2', reviewerId: 'emp-3', revieweeId: 'emp-2' }),
+    ]
+    expect(calcCompletionRate(reviews)).toBe(1)
+  })
+
+  it('returns 0.5 when half submitted', () => {
+    const now = new Date().toISOString()
+    const reviews: PeerReview[] = [
+      makeReview({ id: 'r1', reviewerId: 'emp-1', revieweeId: 'emp-2', submittedAt: now }),
+      makeReview({ id: 'r2', reviewerId: 'emp-3', revieweeId: 'emp-2', submittedAt: null }),
+    ]
+    expect(calcCompletionRate(reviews)).toBe(0.5)
+  })
+
+  it('returns 0 for empty array', () => {
+    expect(calcCompletionRate([])).toBe(0)
   })
 })
