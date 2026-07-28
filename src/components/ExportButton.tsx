@@ -69,7 +69,7 @@ export function ExportButton({
         ],
         // Excel variant — stone outline
         !isPdf && [
-          'border border-stone-300 bg-white text-stone-700',
+          'border border-stone-300 bg-[var(--bg-card)] text-stone-700',
           'hover:bg-stone-50 active:bg-stone-100',
           'disabled:border-stone-200 disabled:text-stone-400',
         ],

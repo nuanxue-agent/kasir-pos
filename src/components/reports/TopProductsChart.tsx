@@ -51,7 +51,7 @@ export function TopProductsChart({ data, currency }: TopProductsChartProps) {
     const payload = props.payload as Array<{ value: number; payload: { qty: number } }> | undefined
     if (!active || !payload?.length) return null
     return (
-      <div className="bg-white border border-stone-200 rounded-lg p-3 shadow-xl">
+      <div className="bg-[var(--bg-card)] border border-stone-200 rounded-lg p-3 shadow-xl">
         <p className="text-stone-800 font-semibold">{formatCurrency(payload[0].value, currency)}</p>
         <p className="text-stone-500 text-xs mt-0.5">{payload[0].payload.qty} units sold</p>
       </div>

@@ -41,10 +41,10 @@ const ICONS: Record<ToastType, React.ComponentType<{ className?: string }>> = {
 }
 
 const STYLES: Record<ToastType, { wrapper: string; icon: string }> = {
-  success: { wrapper: 'border-emerald-200 bg-white', icon: 'text-emerald-500' },
-  error:   { wrapper: 'border-red-200 bg-white',     icon: 'text-red-500' },
-  warning: { wrapper: 'border-amber-200 bg-white',   icon: 'text-amber-500' },
-  info:    { wrapper: 'border-blue-200 bg-white',    icon: 'text-blue-500' },
+  success: { wrapper: 'border-emerald-200 bg-[var(--bg-card)]', icon: 'text-emerald-500' },
+  error:   { wrapper: 'border-red-200 bg-[var(--bg-card)]',     icon: 'text-red-500' },
+  warning: { wrapper: 'border-amber-200 bg-[var(--bg-card)]',   icon: 'text-amber-500' },
+  info:    { wrapper: 'border-blue-200 bg-[var(--bg-card)]',    icon: 'text-blue-500' },
 }
 
 export function Toaster() {

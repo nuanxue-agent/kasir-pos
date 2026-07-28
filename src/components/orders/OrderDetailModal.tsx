@@ -92,7 +92,7 @@ function OrderTimeline({ order }: { order: Order }) {
                 className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
                   ev.active
                     ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
-                    : 'border-stone-200 bg-white text-stone-300'
+                    : 'border-stone-200 bg-[var(--bg-card)] text-stone-300'
                 }`}
               >
                 {ev.icon}
@@ -200,7 +200,7 @@ function RefundPanel({ order, currency, onRefunded, onCancel }: RefundPanelProps
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === m
                 ? 'bg-amber-500 text-white'
-                : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-100'
+                : 'bg-[var(--bg-card)] border border-amber-200 text-amber-700 hover:bg-amber-100'
             }`}
           >
             {m === 'full' ? 'Full refund' : 'Partial refund'}
@@ -210,7 +210,7 @@ function RefundPanel({ order, currency, onRefunded, onCancel }: RefundPanelProps
 
       {/* Partial item qty editor */}
       {mode === 'partial' && (
-        <div className="rounded-lg border border-amber-200 bg-white divide-y divide-stone-50 text-sm">
+        <div className="rounded-lg border border-amber-200 bg-[var(--bg-card)] divide-y divide-stone-50 text-sm">
           {order.items.map(item => (
             <div key={item.id} className="flex items-center justify-between px-3 py-2">
               <span className="text-stone-700 flex-1 truncate pr-2">
@@ -361,7 +361,7 @@ export function OrderDetailModal({
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div
-          className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+          className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--bg-card)] shadow-2xl"
           onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}

@@ -183,7 +183,7 @@ export default function ProductFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-[var(--bg-card)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
           <h2 className="text-lg font-semibold text-stone-800">
@@ -318,7 +318,7 @@ export default function ProductFormModal({
               <select
                 id="categoryId"
                 {...register('categoryId')}
-                className="w-full appearance-none rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none"
+                className="w-full appearance-none rounded-lg border border-stone-200 bg-[var(--bg-card)] px-3 py-2 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none"
               >
                 <option value="">Tanpa Kategori</option>
                 {categories.map(cat => (

@@ -84,7 +84,7 @@ function LowStockBanner({ lowStockProducts, onDismiss, onAdjust }: LowStockBanne
         {lowStockProducts.map(p => (
           <li
             key={p.id}
-            className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs"
+            className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-[var(--bg-card)] px-2.5 py-1.5 text-xs"
           >
             <span className="font-medium text-amber-900">{p.name}</span>
             <span className="text-amber-600">({p.stock} sisa)</span>

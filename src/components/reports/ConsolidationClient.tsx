@@ -220,8 +220,8 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Laporan Konsolidasi</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">Laporan Konsolidasi</h1>
+          <p className="mt-1 text-sm text-[var(--text-3)]">
             Laba/Rugi konsolidasi grup & transfer antar perusahaan
           </p>
         </div>
@@ -230,7 +230,7 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
           <select
             value={period}
             onChange={e => setPeriod(e.target.value as PeriodType)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="month">Bulan Ini</option>
             <option value="quarter">Kuartal Ini</option>
@@ -243,14 +243,14 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                 type="date"
                 value={customFrom}
                 onChange={e => setCustomFrom(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm shadow-sm"
               />
-              <span className="text-gray-400">–</span>
+              <span className="text-[var(--text-3)]">–</span>
               <input
                 type="date"
                 value={customTo}
                 onChange={e => setCustomTo(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm shadow-sm"
               />
             </>
           )}
@@ -259,15 +259,15 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
               qc.invalidateQueries({ queryKey: ['consolidated-pnl'] })
               qc.invalidateQueries({ queryKey: ['intercompany-transfers'] })
             }}
-            className="rounded-lg border border-gray-200 bg-white p-2 shadow-sm hover:bg-gray-50"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-2 shadow-sm hover:bg-[var(--bg-subtle)]"
           >
-            <RefreshCw className="h-4 w-4 text-gray-500" />
+            <RefreshCw className="h-4 w-4 text-[var(--text-3)]" />
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-[var(--border)]">
         <nav className="-mb-px flex gap-6">
           {[
             { id: 'pnl', label: 'L/R Konsolidasi', icon: TrendingUp },
@@ -280,7 +280,7 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                 'flex items-center gap-2 border-b-2 pb-3 text-sm font-medium transition-colors',
                 tab === id
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700',
+                  : 'border-transparent text-[var(--text-3)] hover:text-[var(--text-2)]',
               ].join(' ')}
             >
               <Icon className="h-4 w-4" />
@@ -314,9 +314,9 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                   { label: 'Beban Operasional', value: c.operatingExpenses, positive: false },
                   { label: 'Laba Bersih (Grup)', value: c.netProfitAttributableToParent, positive: c.netProfitAttributableToParent >= 0 },
                 ].map(({ label, value, positive }) => (
-                  <div key={label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                    <p className="text-xs text-gray-500">{label}</p>
-                    <p className={['mt-1 text-lg font-bold', positive ? 'text-gray-900' : 'text-red-600'].join(' ')}>
+                  <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+                    <p className="text-xs text-[var(--text-3)]">{label}</p>
+                    <p className={['mt-1 text-lg font-bold', positive ? 'text-[var(--text-1)]' : 'text-red-600'].join(' ')}>
                       {fmt(value)}
                     </p>
                   </div>
@@ -354,30 +354,30 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
               )}
 
               {/* Per-store breakdown */}
-              <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-gray-700">Rincian Per Toko</h3>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <h3 className="text-sm font-semibold text-[var(--text-2)]">Rincian Per Toko</h3>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {pnl.stores.map(s => (
                     <div key={s.storeId} className="flex flex-wrap items-center gap-4 px-4 py-3 text-sm">
                       <div className="flex min-w-[160px] items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium text-gray-800">{s.storeName}</span>
+                        <Building2 className="h-4 w-4 text-[var(--text-3)]" />
+                        <span className="font-medium text-[var(--text-1)]">{s.storeName}</span>
                       </div>
                       <div className="ml-auto flex flex-wrap gap-6 text-right">
                         <div>
-                          <p className="text-xs text-gray-400">Pendapatan</p>
+                          <p className="text-xs text-[var(--text-3)]">Pendapatan</p>
                           <p className="font-medium">{fmt(s.revenue)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-400">Laba Kotor</p>
+                          <p className="text-xs text-[var(--text-3)]">Laba Kotor</p>
                           <p className={['font-medium', s.grossProfit < 0 ? 'text-red-600' : ''].join(' ')}>
                             {fmt(s.grossProfit)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-400">Laba Bersih</p>
+                          <p className="text-xs text-[var(--text-3)]">Laba Bersih</p>
                           <p className={['font-medium', s.netProfit < 0 ? 'text-red-600' : ''].join(' ')}>
                             {fmt(s.netProfit)}
                           </p>
@@ -395,10 +395,10 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
               </div>
 
               {/* Consolidated P&L statement */}
-              <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-gray-700">Laporan L/R Konsolidasi</h3>
-                  <p className="text-xs text-gray-400">{from} s.d. {to}</p>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <h3 className="text-sm font-semibold text-[var(--text-2)]">Laporan L/R Konsolidasi</h3>
+                  <p className="text-xs text-[var(--text-3)]">{from} s.d. {to}</p>
                 </div>
                 <table className="w-full text-sm">
                   <tbody>
@@ -411,9 +411,9 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                       { label: 'Kepentingan Non-Pengendali', value: -c.minorityInterest, bold: false },
                       { label: 'Laba Bersih – Entitas Induk', value: c.netProfitAttributableToParent, bold: true },
                     ].map(({ label, value, bold }) => (
-                      <tr key={label} className={bold ? 'bg-gray-50 font-semibold' : ''}>
-                        <td className="px-4 py-2 text-gray-700">{label}</td>
-                        <td className={['px-4 py-2 text-right', value < 0 ? 'text-red-600' : 'text-gray-900'].join(' ')}>
+                      <tr key={label} className={bold ? 'bg-[var(--bg-subtle)] font-semibold' : ''}>
+                        <td className="px-4 py-2 text-[var(--text-2)]">{label}</td>
+                        <td className={['px-4 py-2 text-right', value < 0 ? 'text-red-600' : 'text-[var(--text-1)]'].join(' ')}>
                           {value < 0 ? `(${fmt(Math.abs(value))})` : fmt(value)}
                         </td>
                       </tr>
@@ -430,7 +430,7 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
       {tab === 'transfers' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-800">Transfer Antar Toko</h2>
+            <h2 className="text-base font-semibold text-[var(--text-1)]">Transfer Antar Toko</h2>
             <button
               onClick={() => setShowNewTransfer(v => !v)}
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -446,58 +446,58 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
               <h3 className="mb-4 text-sm font-semibold text-blue-800">Transfer Baru</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="mb-1 block text-xs text-gray-600">Tipe</label>
+                  <label className="mb-1 block text-xs text-[var(--text-2)]">Tipe</label>
                   <select
                     value={tfForm.type}
                     onChange={e => setTfForm(f => ({ ...f, type: e.target.value as TransferType }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
                   >
                     <option value="CASH">Kas</option>
                     <option value="STOCK">Stok</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-600">Toko Tujuan (ID)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-2)]">Toko Tujuan (ID)</label>
                   <input
                     type="text"
                     value={tfForm.toStoreId}
                     onChange={e => setTfForm(f => ({ ...f, toStoreId: e.target.value }))}
                     placeholder="store_xxx"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-600">Jumlah (Rp)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-2)]">Jumlah (Rp)</label>
                   <input
                     type="number"
                     value={tfForm.amount}
                     onChange={e => setTfForm(f => ({ ...f, amount: e.target.value }))}
                     placeholder="0"
                     min="0"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
                   />
                 </div>
                 {tfForm.type === 'STOCK' && (
                   <>
                     <div>
-                      <label className="mb-1 block text-xs text-gray-600">ID Produk</label>
+                      <label className="mb-1 block text-xs text-[var(--text-2)]">ID Produk</label>
                       <input
                         type="text"
                         value={tfForm.productId}
                         onChange={e => setTfForm(f => ({ ...f, productId: e.target.value }))}
                         placeholder="prod_xxx"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-gray-600">Qty</label>
+                      <label className="mb-1 block text-xs text-[var(--text-2)]">Qty</label>
                       <input
                         type="number"
                         value={tfForm.qty}
                         onChange={e => setTfForm(f => ({ ...f, qty: e.target.value }))}
                         placeholder="0"
                         min="1"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
                       />
                     </div>
                   </>
@@ -513,7 +513,7 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                 </button>
                 <button
                   onClick={() => setShowNewTransfer(false)}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
                 >
                   Batal
                 </button>
@@ -531,15 +531,15 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
             </div>
           )}
           {transfers.length === 0 && !transfersQuery.isLoading && (
-            <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
+            <div className="rounded-xl border border-dashed border-[var(--border)] py-12 text-center text-sm text-[var(--text-3)]">
               Belum ada transfer antar toko
             </div>
           )}
           {transfers.length > 0 && (
-            <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 text-xs text-gray-500">
+                  <tr className="border-b border-[var(--border)] text-xs text-[var(--text-3)]">
                     <th className="px-4 py-3 text-left">Dari</th>
                     <th className="px-4 py-3 text-left">Ke</th>
                     <th className="px-4 py-3 text-left">Tipe</th>
@@ -552,9 +552,9 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {transfers.map(t => (
-                    <tr key={t.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-700">{t.fromStoreName ?? t.fromStoreId}</td>
-                      <td className="px-4 py-3 text-gray-700">{t.toStoreName ?? t.toStoreId}</td>
+                    <tr key={t.id} className="hover:bg-[var(--bg-subtle)]">
+                      <td className="px-4 py-3 text-[var(--text-2)]">{t.fromStoreName ?? t.fromStoreId}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{t.toStoreName ?? t.toStoreId}</td>
                       <td className="px-4 py-3">
                         <span className={[
                           'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
@@ -566,12 +566,12 @@ export function ConsolidationClient({ storeId, currency }: ConsolidationClientPr
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(t.amount)}</td>
-                      <td className="px-4 py-3 text-gray-500">
+                      <td className="px-4 py-3 text-[var(--text-3)]">
                         {t.productName ?? (t.productId ? t.productId : '–')}
                         {t.qty ? ` ×${t.qty}` : ''}
                       </td>
                       <td className="px-4 py-3">{statusBadge(t.status)}</td>
-                      <td className="px-4 py-3 text-gray-400">
+                      <td className="px-4 py-3 text-[var(--text-3)]">
                         {new Date(t.createdAt).toLocaleDateString('id-ID')}
                       </td>
                       <td className="px-4 py-3">

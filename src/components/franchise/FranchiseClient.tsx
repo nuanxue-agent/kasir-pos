@@ -106,14 +106,14 @@ function StatCard({
   sub?: string
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
       <div className="rounded-lg bg-indigo-50 p-2">
         <Icon className="h-5 w-5 text-indigo-600" />
       </div>
       <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-lg font-semibold text-gray-900">{value}</p>
-        {sub && <p className="text-xs text-gray-400">{sub}</p>}
+        <p className="text-xs text-[var(--text-3)]">{label}</p>
+        <p className="text-lg font-semibold text-[var(--text-1)]">{value}</p>
+        {sub && <p className="text-xs text-[var(--text-3)]">{sub}</p>}
       </div>
     </div>
   )
@@ -193,9 +193,9 @@ function TransferRequestForm({
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">Dari Toko</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-2)]">Dari Toko</label>
         <select
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
           value={fromStoreId}
           onChange={e => {
             setFromStoreId(e.target.value)
@@ -210,9 +210,9 @@ function TransferRequestForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">Ke Toko</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-2)]">Ke Toko</label>
         <select
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
           value={toStoreId}
           onChange={e => setToStoreId(e.target.value)}
         >
@@ -227,9 +227,9 @@ function TransferRequestForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">Produk</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-2)]">Produk</label>
         <select
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
           value={productId}
           onChange={e => setProductId(e.target.value)}
         >
@@ -242,13 +242,13 @@ function TransferRequestForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">Jumlah</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-2)]">Jumlah</label>
         <input
           type="number"
           min={1}
           value={qty}
           onChange={e => setQty(parseInt(e.target.value) || 1)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
         />
       </div>
       <div className="flex justify-end sm:col-span-2">
@@ -354,8 +354,8 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
             <Building2 className="h-6 w-6 text-indigo-700" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Manajemen Franchise</h1>
-            <p className="text-sm text-gray-500">Pantau semua lokasi franchise Anda</p>
+            <h1 className="text-xl font-bold text-[var(--text-1)]">Manajemen Franchise</h1>
+            <p className="text-sm text-[var(--text-3)]">Pantau semua lokasi franchise Anda</p>
           </div>
         </div>
         <button
@@ -363,22 +363,22 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
             refetchReport()
             refetchTransfers()
           }}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Perbarui
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1">
+      <div className="flex w-fit gap-1 rounded-xl bg-[var(--bg-subtle)] p-1">
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
               activeTab === t.id
-                ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-[var(--bg-card)] text-indigo-700 shadow-sm'
+                : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
             }`}
           >
             {t.label}
@@ -393,7 +393,7 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
           {reportLoading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100" />
+                <div key={i} className="h-20 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
               ))}
             </div>
           ) : (
@@ -427,8 +427,8 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
 
           {/* Revenue comparison chart */}
           {chartData.length > 0 && (
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-              <h2 className="mb-4 text-sm font-semibold text-gray-700">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+              <h2 className="mb-4 text-sm font-semibold text-[var(--text-2)]">
                 Perbandingan Pendapatan per Lokasi
               </h2>
               <ResponsiveContainer width="100%" height={240}>
@@ -448,24 +448,24 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
           )}
 
           {/* Franchise locations table */}
-          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-gray-700">Lokasi Franchise</h2>
-              <span className="text-xs text-gray-400">{locations.length} lokasi</span>
+          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[var(--text-2)]">Lokasi Franchise</h2>
+              <span className="text-xs text-[var(--text-3)]">{locations.length} lokasi</span>
             </div>
             {reportLoading ? (
               <div className="flex justify-center p-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                <RefreshCw className="h-6 w-6 animate-spin text-[var(--text-3)]" />
               </div>
             ) : locations.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-400">
+              <div className="p-8 text-center text-sm text-[var(--text-3)]">
                 Belum ada lokasi franchise yang terdaftar
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-xs tracking-wide text-gray-500 uppercase">
+                    <tr className="bg-[var(--bg-subtle)] text-xs tracking-wide text-[var(--text-3)] uppercase">
                       <th className="px-4 py-2.5 text-left">Lokasi</th>
                       <th className="px-4 py-2.5 text-right">Pendapatan</th>
                       <th className="px-4 py-2.5 text-right">Pesanan</th>
@@ -482,26 +482,26 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
                       const expiring = isExpiringSoon(loc.contractEnd)
                       const expired = isExpired(loc.contractEnd)
                       return (
-                        <tr key={loc.id} className="transition-colors hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">
+                        <tr key={loc.id} className="transition-colors hover:bg-[var(--bg-subtle)]">
+                          <td className="px-4 py-3 font-medium text-[var(--text-1)]">
                             <div className="flex items-center gap-2">
                               <Building2 className="h-4 w-4 flex-shrink-0 text-indigo-400" />
                               {loc.name}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right text-gray-700">
+                          <td className="px-4 py-3 text-right text-[var(--text-2)]">
                             {formatCurrency(loc.revenue, currency)}
                           </td>
-                          <td className="px-4 py-3 text-right text-gray-700">
+                          <td className="px-4 py-3 text-right text-[var(--text-2)]">
                             {loc.orders.toLocaleString()}
                           </td>
-                          <td className="px-4 py-3 text-right text-gray-700">
+                          <td className="px-4 py-3 text-right text-[var(--text-2)]">
                             <span className="inline-flex items-center gap-1">
-                              <Users className="h-3.5 w-3.5 text-gray-400" />
+                              <Users className="h-3.5 w-3.5 text-[var(--text-3)]" />
                               {loc.staffCount}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right text-gray-700">{loc.royaltyRate}%</td>
+                          <td className="px-4 py-3 text-right text-[var(--text-2)]">{loc.royaltyRate}%</td>
                           <td className="px-4 py-3 text-right font-medium text-indigo-700">
                             {formatCurrency(royaltyFee, currency)}
                           </td>
@@ -523,7 +523,7 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
                                     : loc.contractEnd.slice(0, 10)}
                               </span>
                             ) : (
-                              <span className="text-xs text-gray-400">—</span>
+                              <span className="text-xs text-[var(--text-3)]">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -576,8 +576,8 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
         <div className="space-y-6">
           {/* Request form */}
           {stores.length > 1 && (
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[var(--text-2)]">
                 <Plus className="h-4 w-4 text-indigo-500" /> Permintaan Transfer Stok
               </h2>
               <TransferRequestForm
@@ -589,21 +589,21 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
           )}
 
           {/* Transfers list */}
-          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-            <div className="border-b border-gray-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-gray-700">Riwayat Transfer Stok</h2>
+          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+            <div className="border-b border-[var(--border)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[var(--text-2)]">Riwayat Transfer Stok</h2>
             </div>
             {transfersLoading ? (
               <div className="flex justify-center p-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                <RefreshCw className="h-6 w-6 animate-spin text-[var(--text-3)]" />
               </div>
             ) : !transfers || transfers.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-400">Belum ada transfer stok</div>
+              <div className="p-8 text-center text-sm text-[var(--text-3)]">Belum ada transfer stok</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-xs tracking-wide text-gray-500 uppercase">
+                    <tr className="bg-[var(--bg-subtle)] text-xs tracking-wide text-[var(--text-3)] uppercase">
                       <th className="px-4 py-2.5 text-left">Produk</th>
                       <th className="px-4 py-2.5 text-left">Dari</th>
                       <th className="px-4 py-2.5 text-left">Ke</th>
@@ -615,15 +615,15 @@ export function FranchiseClient({ storeId, currency, stores }: FranchiseClientPr
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {transfers.map(tr => (
-                      <tr key={tr.id} className="transition-colors hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{tr.productName}</td>
-                        <td className="px-4 py-3 text-gray-600">{tr.fromStoreName}</td>
-                        <td className="px-4 py-3 text-gray-600">{tr.toStoreName}</td>
+                      <tr key={tr.id} className="transition-colors hover:bg-[var(--bg-subtle)]">
+                        <td className="px-4 py-3 font-medium text-[var(--text-1)]">{tr.productName}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">{tr.fromStoreName}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">{tr.toStoreName}</td>
                         <td className="px-4 py-3 text-right font-medium">{tr.qty}</td>
                         <td className="px-4 py-3 text-center">
                           <StatusBadge status={tr.status} />
                         </td>
-                        <td className="px-4 py-3 text-right text-xs text-gray-500">
+                        <td className="px-4 py-3 text-right text-xs text-[var(--text-3)]">
                           {new Date(tr.requestedAt).toLocaleDateString('id-ID')}
                         </td>
                         <td className="px-4 py-3 text-center">

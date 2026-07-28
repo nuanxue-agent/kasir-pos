@@ -492,7 +492,7 @@ export default function GoodsReceiptClient({ storeId, currency }: GoodsReceiptCl
             className={cn(
               'px-4 py-2 rounded-lg text-sm font-medium transition-all',
               tab === t.key
-                ? 'bg-white text-[var(--text-1)] shadow-sm border border-[var(--border)]'
+                ? 'bg-[var(--bg-card)] text-[var(--text-1)] shadow-sm border border-[var(--border)]'
                 : 'text-[var(--text-3)] hover:text-[var(--text-2)]',
             )}
           >

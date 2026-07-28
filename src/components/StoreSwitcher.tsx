@@ -55,7 +55,7 @@ export default function StoreSwitcher({ stores, currentStoreId, onSwitch, onAddS
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--bg-card)] border border-stone-200 rounded-2xl shadow-xl z-50 overflow-hidden">
           <div className="p-2 space-y-0.5">
             {stores.map(store => (
               <button

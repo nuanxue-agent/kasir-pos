@@ -58,7 +58,7 @@ interface StockTakeClientProps {
 function statusBadge(status: StockTakeStatus) {
   switch (status) {
     case 'DRAFT':
-      return 'bg-gray-500/20 text-gray-400'
+      return 'bg-gray-500/20 text-[var(--text-3)]'
     case 'IN_PROGRESS':
       return 'bg-blue-500/20 text-blue-400'
     case 'COMPLETED':

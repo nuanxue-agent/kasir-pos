@@ -134,7 +134,7 @@ function BundleFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+      <div className="bg-[var(--bg-card)] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
           <h2 className="text-base font-semibold text-stone-800">{isEdit ? 'Edit Bundle' : 'New Bundle'}</h2>
@@ -291,7 +291,7 @@ function BundleCard({
   const savings = Math.max(0, compTotal - bundle.price)
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white overflow-hidden hover:border-amber-300 transition-colors">
+    <div className="rounded-xl border border-stone-200 bg-[var(--bg-card)] overflow-hidden hover:border-amber-300 transition-colors">
       <div className="p-4">
         {/* Header row */}
         <div className="flex items-start justify-between gap-3">

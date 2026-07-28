@@ -167,7 +167,7 @@ function Tooltip({ step, stepIndex, total, rect, onNext, onSkip }: TooltipProps)
   return (
     <div
       role="tooltip"
-      className="w-72 rounded-2xl border border-amber-200 bg-white p-4 shadow-2xl shadow-amber-200/40"
+      className="w-72 rounded-2xl border border-amber-200 bg-[var(--bg-card)] p-4 shadow-2xl shadow-amber-200/40"
       style={style}
     >
       {/* Step counter */}

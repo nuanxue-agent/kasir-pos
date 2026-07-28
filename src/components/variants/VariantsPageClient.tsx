@@ -99,7 +99,7 @@ export default function VariantsPageClient({ storeId, currency }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* Product selector */}
         <div className="lg:col-span-2">
-          <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
             <div className="px-4 py-3.5 border-b border-stone-100">
               <h2 className="text-sm font-semibold text-stone-800 mb-2">Pilih Produk</h2>
               <input
@@ -134,7 +134,7 @@ export default function VariantsPageClient({ storeId, currency }: Props) {
         {/* Variants panel */}
         <div className="lg:col-span-3 space-y-4">
           {!selectedProduct ? (
-            <div className="bg-white border border-stone-100 rounded-2xl flex flex-col items-center justify-center py-16 shadow-sm">
+            <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl flex flex-col items-center justify-center py-16 shadow-sm">
               <GitFork className="h-10 w-10 text-stone-200 mb-3" />
               <p className="text-stone-400 text-sm">Pilih produk untuk melihat variannya</p>
             </div>
@@ -155,7 +155,7 @@ export default function VariantsPageClient({ storeId, currency }: Props) {
 
               {/* Add/Edit form */}
               {showForm && (
-                <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="bg-[var(--bg-card)] border border-stone-200 rounded-2xl p-5 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-stone-800 text-sm">{editItem ? 'Edit Varian' : 'Varian Baru'}</h3>
                     <button onClick={resetForm} className="text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition-colors"><X className="h-4 w-4" /></button>
@@ -193,7 +193,7 @@ export default function VariantsPageClient({ storeId, currency }: Props) {
               )}
 
               {/* Variant list */}
-              <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
                 {isLoading ? (
                   <div className="p-4 space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-12 bg-stone-50 animate-pulse rounded-xl" />)}</div>
                 ) : (variants as Variant[]).length === 0 ? (

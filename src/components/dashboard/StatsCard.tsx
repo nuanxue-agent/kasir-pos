@@ -35,7 +35,7 @@ export function StatsCard({ icon: Icon, label, value, color, variant, trend, cha
 
   if (loading) {
     return (
-      <div className="bg-white border border-stone-100 rounded-2xl p-4 animate-pulse shadow-sm">
+      <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl p-4 animate-pulse shadow-sm">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-stone-100 shrink-0" />
           <div className="flex-1 space-y-2 pt-1">
@@ -48,7 +48,7 @@ export function StatsCard({ icon: Icon, label, value, color, variant, trend, cha
   }
 
   return (
-    <div className="bg-white border border-stone-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-stone-200 transition-all">
+    <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-stone-200 transition-all">
       <div className="flex items-start justify-between gap-2">
         <div className={cn('rounded-xl p-2 shrink-0', iconBg)}>
           <Icon className={cn('h-4 w-4', iconText)} />

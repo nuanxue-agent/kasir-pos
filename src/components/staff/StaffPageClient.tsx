@@ -214,7 +214,7 @@ function StaffFormModal({ storeId, staff, onClose, onSuccess }: {
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-md border border-stone-200 p-6 space-y-4">
+      <div className="bg-[var(--bg-card)] rounded-xl w-full max-w-md border border-stone-200 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-stone-800 flex items-center gap-2">
           <UserCog size={20} />
           {staff ? 'Edit Staff Member' : 'Add Staff Member'}

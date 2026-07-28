@@ -276,8 +276,8 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Perbandingan Toko</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">Perbandingan Toko</h1>
+          <p className="text-sm text-[var(--text-3)] mt-0.5">
             Bandingkan performa hingga 4 toko secara bersamaan
           </p>
         </div>
@@ -293,10 +293,10 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
           )}
           <button
             onClick={() => refetch()}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="p-2 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-subtle)] transition-colors"
             title="Refresh"
           >
-            <RefreshCw className="w-4 h-4 text-gray-500" />
+            <RefreshCw className="w-4 h-4 text-[var(--text-3)]" />
           </button>
         </div>
       </div>
@@ -320,8 +320,8 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
       )}
 
       {/* Store selector */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--text-2)] mb-3">
           Pilih Toko (maks. 4)
         </h2>
         <div className="flex flex-wrap gap-2">
@@ -344,7 +344,7 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
                   selected
                     ? ''
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    : 'border-[var(--border)] text-[var(--text-2)] hover:border-[var(--border-mid)] hover:bg-[var(--bg-subtle)]'
                 }`}
               >
                 {store.name}
@@ -356,15 +356,15 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
 
       {/* Period selector */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+        <div className="flex items-center bg-[var(--bg-subtle)] rounded-lg p-0.5">
           {RANGE_BTNS.map(btn => (
             <button
               key={btn.value}
               onClick={() => setDateRange(btn.value)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                 dateRange === btn.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-[var(--bg-card)] text-[var(--text-1)] shadow-sm'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-2)]'
               }`}
             >
               {btn.label}
@@ -377,14 +377,14 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
               type="date"
               value={customFrom}
               onChange={e => setCustomFrom(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg"
+              className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg"
             />
-            <span className="text-gray-400">—</span>
+            <span className="text-[var(--text-3)]">—</span>
             <input
               type="date"
               value={customTo}
               onChange={e => setCustomTo(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg"
+              className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg"
             />
           </div>
         )}
@@ -399,7 +399,7 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
               activeMetric === m.key
                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                : 'border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--bg-subtle)]'
             }`}
           >
             {m.icon}
@@ -410,7 +410,7 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
 
       {/* Loading / error states */}
       {isLoading && (
-        <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+        <div className="flex items-center justify-center h-48 text-[var(--text-3)] text-sm">
           Memuat data...
         </div>
       )}
@@ -423,8 +423,8 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
       {!isLoading && !error && stores.length > 0 && (
         <>
           {/* Bar chart */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5">
+            <h2 className="text-sm font-semibold text-[var(--text-2)] mb-4">
               {activeMetricDef.label} — Perbandingan Toko
             </h2>
             <ResponsiveContainer width="100%" height={280}>
@@ -466,9 +466,9 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
               return (
                 <div
                   key={metric.key}
-                  className="bg-white rounded-xl border border-gray-200 p-4 space-y-3"
+                  className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 space-y-3"
                 >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-2)]">
                     {metric.icon}
                     {metric.label}
                   </div>
@@ -483,7 +483,7 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
                               className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                               style={{ backgroundColor: METRIC_COLORS[idx % METRIC_COLORS.length] }}
                             />
-                            <span className="text-sm text-gray-600 truncate">{store.storeName}</span>
+                            <span className="text-sm text-[var(--text-2)] truncate">{store.storeName}</span>
                             {isBest && (
                               <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full border border-amber-200 flex-shrink-0">
                                 <Award className="w-3 h-3" />
@@ -491,7 +491,7 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
                               </span>
                             )}
                           </div>
-                          <span className="text-sm font-semibold text-gray-900 ml-2 flex-shrink-0">
+                          <span className="text-sm font-semibold text-[var(--text-1)] ml-2 flex-shrink-0">
                             {metric.format(value, currency)}
                           </span>
                         </div>
@@ -504,8 +504,8 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
           </div>
 
           {/* Percentile ranking */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5">
+            <h2 className="text-sm font-semibold text-[var(--text-2)] mb-4">
               Peringkat Persentil (Pendapatan — di antara semua toko)
             </h2>
             <div className="space-y-3">
@@ -517,13 +517,13 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
                         className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: METRIC_COLORS[idx % METRIC_COLORS.length] }}
                       />
-                      <span className="text-sm text-gray-700">{store.storeName}</span>
+                      <span className="text-sm text-[var(--text-2)]">{store.storeName}</span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900">
+                    <span className="text-sm font-semibold text-[var(--text-1)]">
                       P{store.percentileRank}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className="w-full bg-[var(--bg-subtle)] rounded-full h-2">
                     <div
                       className="h-2 rounded-full transition-all duration-500"
                       style={{
@@ -538,15 +538,15 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
           </div>
 
           {/* Side-by-side summary table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-700">Ringkasan Lengkap</h2>
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+            <div className="p-4 border-b border-[var(--border)]">
+              <h2 className="text-sm font-semibold text-[var(--text-2)]">Ringkasan Lengkap</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Metrik</th>
+                  <tr className="bg-[var(--bg-subtle)]">
+                    <th className="text-left px-4 py-3 text-[var(--text-3)] font-medium">Metrik</th>
                     {stores.map((store, idx) => (
                       <th
                         key={store.storeId}
@@ -562,15 +562,15 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
                   {METRICS.map(metric => {
                     const bestId = findBestPerformer(stores, metric.key)
                     return (
-                      <tr key={metric.key} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-gray-600">{metric.label}</td>
+                      <tr key={metric.key} className="hover:bg-[var(--bg-subtle)] transition-colors">
+                        <td className="px-4 py-3 text-[var(--text-2)]">{metric.label}</td>
                         {stores.map(store => {
                           const isBest = store.storeId === bestId
                           return (
                             <td
                               key={store.storeId}
                               className={`px-4 py-3 text-right font-medium ${
-                                isBest ? 'text-amber-700' : 'text-gray-900'
+                                isBest ? 'text-amber-700' : 'text-[var(--text-1)]'
                               }`}
                             >
                               {metric.format(store[metric.key] as number, currency)}
@@ -583,8 +583,8 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
                       </tr>
                     )
                   })}
-                  <tr className="bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">Persentil</td>
+                  <tr className="bg-[var(--bg-subtle)]">
+                    <td className="px-4 py-3 text-[var(--text-2)]">Persentil</td>
                     {stores.map(store => (
                       <td key={store.storeId} className="px-4 py-3 text-right font-medium text-indigo-600">
                         P{store.percentileRank}
@@ -599,7 +599,7 @@ export function StoreComparisonClient({ availableStores, currency }: StoreCompar
       )}
 
       {!isLoading && !error && stores.length === 0 && selectedStoreIds.length > 0 && (
-        <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+        <div className="flex items-center justify-center h-48 text-[var(--text-3)] text-sm">
           Tidak ada data untuk periode yang dipilih.
         </div>
       )}

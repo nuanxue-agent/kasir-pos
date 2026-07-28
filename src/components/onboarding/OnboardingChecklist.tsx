@@ -121,7 +121,7 @@ function TourOverlay({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onSkip} />
 
       {/* Card */}
-      <div className="relative w-full max-w-sm rounded-2xl border border-[var(--border,#e7e5e4)] bg-white p-5 shadow-2xl">
+      <div className="relative w-full max-w-sm rounded-2xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] p-5 shadow-2xl">
         {/* Progress */}
         <div className="mb-4 flex items-center justify-between">
           <span className="text-xs font-medium text-stone-400">

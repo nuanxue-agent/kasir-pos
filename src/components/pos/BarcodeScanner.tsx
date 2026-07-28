@@ -291,7 +291,7 @@ export default function BarcodeScanner({
             <div className="relative">
               <button
                 onClick={() => setShowCameraSelect(v => !v)}
-                className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/20"
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--bg-card)]/10 px-3 py-1.5 text-xs text-white transition-colors hover:bg-[var(--bg-card)]/20"
               >
                 <Camera className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">
@@ -309,7 +309,7 @@ export default function BarcodeScanner({
                         'w-full px-4 py-2.5 text-left text-xs transition-colors',
                         cam.deviceId === selectedCamera
                           ? 'bg-amber-500/20 text-amber-300'
-                          : 'text-white/80 hover:bg-white/10',
+                          : 'text-white/80 hover:bg-[var(--bg-card)]/10',
                       )}
                     >
                       {cam.label}
@@ -327,7 +327,7 @@ export default function BarcodeScanner({
                 'rounded-full p-2 transition-colors',
                 torchOn
                   ? 'bg-amber-500/30 text-amber-300 hover:bg-amber-500/40'
-                  : 'bg-white/10 text-white hover:bg-white/20',
+                  : 'bg-[var(--bg-card)]/10 text-white hover:bg-[var(--bg-card)]/20',
               )}
               aria-label={torchOn ? 'Matikan senter' : 'Nyalakan senter'}
               title={torchOn ? 'Matikan senter' : 'Nyalakan senter'}
@@ -337,7 +337,7 @@ export default function BarcodeScanner({
           )}
           <button
             onClick={onClose}
-            className="rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+            className="rounded-full bg-[var(--bg-card)]/10 p-2 text-white transition-colors hover:bg-[var(--bg-card)]/20"
             aria-label="Close scanner"
           >
             <X className="h-5 w-5" />
@@ -434,7 +434,7 @@ export default function BarcodeScanner({
               autoCorrect="off"
               spellCheck={false}
               aria-label="atau ketik/scan barcode"
-              className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder-white/40 transition-colors focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/20 focus:outline-none"
+              className="w-full rounded-xl border border-white/15 bg-[var(--bg-card)]/10 px-4 py-3 text-sm text-white placeholder-white/40 transition-colors focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/20 focus:outline-none"
             />
             {manualValue && (
               <button
@@ -448,7 +448,7 @@ export default function BarcodeScanner({
         </div>
 
         {/* HID hint */}
-        <div className="mt-3 flex w-full max-w-sm items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5">
+        <div className="mt-3 flex w-full max-w-sm items-center gap-2 rounded-xl border border-white/10 bg-[var(--bg-card)]/5 px-4 py-2.5">
           <Scan className="h-4 w-4 shrink-0 text-amber-400" />
           <p className="text-xs text-white/60">
             {status === 'camera-denied' || status === 'no-camera'

@@ -207,7 +207,7 @@ export function CustomerDetailClient({
       </button>
 
       {/* Profile header */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6 shadow-sm">
+      <div className="bg-[var(--bg-card)] border border-stone-200 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           {/* Avatar + info */}
           <div className="flex items-start gap-4">
@@ -292,7 +292,7 @@ export function CustomerDetailClient({
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-stone-200 rounded-xl shadow-sm overflow-hidden">
         <div className="flex border-b border-stone-200">
           <button
             onClick={() => setTab('purchases')}

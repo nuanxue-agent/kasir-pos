@@ -24,7 +24,7 @@ export default function DashboardLoading() {
       <div className="bg-stone-50 rounded-2xl p-4 space-y-3">
         <div className="h-5 w-32 bg-stone-100 rounded-lg" />
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-12 bg-white rounded-xl" />
+          <div key={i} className="h-12 bg-[var(--bg-card)] rounded-xl" />
         ))}
       </div>
     </div>

@@ -217,7 +217,7 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
   return (
     <div className="flex min-h-screen flex-col bg-[#fffdf7]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-stone-100 bg-white px-6 py-4">
+      <div className="flex items-center justify-between border-b border-stone-100 bg-[var(--bg-card)] px-6 py-4">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm">
             <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
@@ -540,7 +540,7 @@ export default function OnboardingWizard({ userName, storeName, storeId }: Props
                   >
                     <span
                       className={cn(
-                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-transform',
+                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[var(--bg-card)] shadow-md ring-0 transition-transform',
                         seedProducts ? 'translate-x-5' : 'translate-x-0',
                       )}
                     />

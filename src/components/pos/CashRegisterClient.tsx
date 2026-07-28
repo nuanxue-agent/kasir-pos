@@ -276,7 +276,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
           <p className="text-sm text-stone-500 mt-1">{fmtTime(closeResult.closedAt)}</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-stone-200 divide-y divide-stone-100">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-stone-200 divide-y divide-stone-100">
           <div className="px-4 py-3 flex justify-between text-sm">
             <span className="text-stone-500">Total Transaksi</span>
             <span className="font-medium">{closeResult.summary.totalOrders} trx</span>
@@ -347,7 +347,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
           <p className="text-sm text-stone-500 mt-1">Masukkan modal awal untuk memulai shift</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-stone-200 p-4 space-y-3">
           <label className="text-sm font-medium text-stone-700">Modal Awal (Rp)</label>
           <input
             type="number"
@@ -392,7 +392,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
       </div>
 
       {/* Cash summary */}
-      <div className="bg-white rounded-2xl border border-stone-200 divide-y divide-stone-100">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-stone-200 divide-y divide-stone-100">
         <div className="px-4 py-3 flex justify-between text-sm">
           <span className="text-stone-500">Modal Awal</span>
           <span className="font-medium">{fmt(register.openingFloat)}</span>
@@ -427,7 +427,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
 
       {/* Movement history */}
       {register.movements.length > 0 && (
-        <div className="bg-white rounded-2xl border border-stone-200">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-stone-200">
           <div className="px-4 py-3 border-b border-stone-100">
             <h3 className="text-sm font-semibold text-stone-700">Mutasi Kas</h3>
           </div>
@@ -453,7 +453,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
 
       {/* Add movement */}
       {showMovement ? (
-        <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-stone-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-stone-700">Tambah Mutasi Kas</h3>
             <button onClick={() => setShowMovement(false)} className="text-stone-400 hover:text-stone-600">
@@ -467,7 +467,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
                 'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium border transition-colors',
                 movType === 'IN'
                   ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-stone-600 border-stone-200 hover:border-blue-300'
+                  : 'bg-[var(--bg-card)] text-stone-600 border-stone-200 hover:border-blue-300'
               )}
             >
               <Plus className="w-3.5 h-3.5" /> Masuk
@@ -478,7 +478,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
                 'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium border transition-colors',
                 movType === 'OUT'
                   ? 'bg-red-500 text-white border-red-500'
-                  : 'bg-white text-stone-600 border-stone-200 hover:border-red-300'
+                  : 'bg-[var(--bg-card)] text-stone-600 border-stone-200 hover:border-red-300'
               )}
             >
               <Minus className="w-3.5 h-3.5" /> Keluar
@@ -518,7 +518,7 @@ export default function CashRegisterClient({ storeId, currency, employeeName = '
       )}
 
       {/* Close register */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-stone-200 p-4 space-y-3">
         <h3 className="text-sm font-semibold text-stone-700">Tutup Kasir</h3>
         <p className="text-xs text-stone-400">Hitung fisik uang kas dan masukkan jumlahnya</p>
         <input
