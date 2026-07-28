@@ -190,7 +190,7 @@ function Sparkline({
             borderRadius: 6,
             fontSize: 11,
           }}
-          formatter={(v: number) => [v.toFixed(2), '']}
+          formatter={(v: any) => String(v)}
           labelFormatter={() => ''}
         />
       </LineChart>

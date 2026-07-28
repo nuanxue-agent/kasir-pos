@@ -111,7 +111,7 @@ export default function HappyHourClient({ storeId }: HappyHourClientProps) {
       setHappyHours(Array.isArray(hhRes) ? hhRes : [])
       setCategories(Array.isArray(catRes) ? catRes : [])
       setProducts(Array.isArray(prodRes) ? prodRes : [])
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch data:', err)
       setHappyHours([])
       setCategories([])
