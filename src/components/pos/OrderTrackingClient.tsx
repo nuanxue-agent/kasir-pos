@@ -93,13 +93,13 @@ interface QRCodeStubProps {
 export function QRCodeStub({ url }: QRCodeStubProps) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative w-32 h-32 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-white">
-        <QrCode className="w-16 h-16 text-gray-400" />
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-white/90 rounded-lg">
-          <span className="text-xs text-center text-gray-500 px-2 break-all">{url}</span>
+      <div className="relative w-32 h-32 border-2 border-[var(--border-mid)] rounded-lg flex items-center justify-center bg-[var(--bg-card)]">
+        <QrCode className="w-16 h-16 text-[var(--text-3)]" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-[var(--bg-card)]/90 rounded-lg">
+          <span className="text-xs text-center text-[var(--text-3)] px-2 break-all">{url}</span>
         </div>
       </div>
-      <p className="text-xs text-gray-500">Scan untuk lacak pesanan</p>
+      <p className="text-xs text-[var(--text-3)]">Scan untuk lacak pesanan</p>
       <a
         href={url}
         target="_blank"
@@ -139,7 +139,7 @@ function StatusStepper({ currentStatus }: StatusStepperProps) {
                 <div
                   className={cn(
                     'h-1 flex-1 transition-colors duration-500',
-                    done || active ? 'bg-green-500' : 'bg-gray-200',
+                    done || active ? 'bg-green-500' : 'bg-[var(--bg-muted)]',
                   )}
                 />
               )}
@@ -148,7 +148,7 @@ function StatusStepper({ currentStatus }: StatusStepperProps) {
                   'w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 shrink-0',
                   done && 'bg-green-500 border-green-500 text-white',
                   active && 'bg-blue-500 border-blue-500 text-white scale-110',
-                  future && 'bg-gray-100 border-gray-300 text-gray-400',
+                  future && 'bg-[var(--bg-subtle)] border-[var(--border-mid)] text-[var(--text-3)]',
                 )}
               >
                 <Icon className="w-5 h-5" />
@@ -157,7 +157,7 @@ function StatusStepper({ currentStatus }: StatusStepperProps) {
                 <div
                   className={cn(
                     'h-1 flex-1 transition-colors duration-500',
-                    done ? 'bg-green-500' : 'bg-gray-200',
+                    done ? 'bg-green-500' : 'bg-[var(--bg-muted)]',
                   )}
                 />
               )}
@@ -168,7 +168,7 @@ function StatusStepper({ currentStatus }: StatusStepperProps) {
                 'text-[10px] mt-1 text-center font-medium leading-tight',
                 active && 'text-blue-600',
                 done && 'text-green-600',
-                future && 'text-gray-400',
+                future && 'text-[var(--text-3)]',
               )}
             >
               {STATUS_LABELS[status]}
@@ -232,7 +232,7 @@ export function OrderTrackingView({ token, initialData }: OrderTrackingViewProps
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-subtle)]">
         <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
       </div>
     )
@@ -240,7 +240,7 @@ export function OrderTrackingView({ token, initialData }: OrderTrackingViewProps
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-subtle)] p-4">
         <div className="text-center space-y-3">
           <p className="text-red-500 font-medium">{error ?? 'Pesanan tidak ditemukan'}</p>
           <button
@@ -257,27 +257,27 @@ export function OrderTrackingView({ token, initialData }: OrderTrackingViewProps
   const estimatedTime = calculateEstimatedTime(data.status, data.createdAt, data.estimatedMinutes)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8 px-4">
+    <div className="min-h-screen bg-[var(--bg-subtle)] flex flex-col items-center py-8 px-4">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">
             {data.storeName ?? 'Status Pesanan'}
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-[var(--text-3)] text-sm mt-1">
             Pesanan #{data.orderNumber}
           </p>
         </div>
 
         {/* Status card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <div className="bg-[var(--bg-card)] rounded-2xl shadow-sm border border-[var(--border)] p-6 space-y-6">
           {/* Stepper */}
           <StatusStepper currentStatus={data.status} />
 
           {/* Current status description */}
           <div className="text-center space-y-1">
-            <p className="font-semibold text-gray-800">{STATUS_LABELS[data.status]}</p>
-            <p className="text-sm text-gray-500">{STATUS_DESCRIPTIONS[data.status]}</p>
+            <p className="font-semibold text-[var(--text-1)]">{STATUS_LABELS[data.status]}</p>
+            <p className="text-sm text-[var(--text-3)]">{STATUS_DESCRIPTIONS[data.status]}</p>
             {estimatedTime && (
               <p className="text-sm font-medium text-blue-600 flex items-center justify-center gap-1">
                 <Clock className="w-4 h-4" />
@@ -288,16 +288,16 @@ export function OrderTrackingView({ token, initialData }: OrderTrackingViewProps
         </div>
 
         {/* Items */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="font-semibold text-gray-800 mb-3">Item Pesanan</h2>
+        <div className="bg-[var(--bg-card)] rounded-2xl shadow-sm border border-[var(--border)] p-6">
+          <h2 className="font-semibold text-[var(--text-1)] mb-3">Item Pesanan</h2>
           <ul className="space-y-2">
             {data.items.map((item) => (
               <li key={item.id} className="flex justify-between text-sm">
-                <span className="text-gray-700">
+                <span className="text-[var(--text-2)]">
                   {item.name}{' '}
-                  <span className="text-gray-400">×{item.qty}</span>
+                  <span className="text-[var(--text-3)]">×{item.qty}</span>
                 </span>
-                <span className="text-gray-700 font-medium">
+                <span className="text-[var(--text-2)] font-medium">
                   Rp {(item.price * item.qty).toLocaleString('id-ID')}
                 </span>
               </li>
@@ -306,7 +306,7 @@ export function OrderTrackingView({ token, initialData }: OrderTrackingViewProps
         </div>
 
         {/* Refresh indicator */}
-        <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+        <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-3)]">
           {refreshing ? (
             <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
@@ -375,8 +375,8 @@ export function GenerateTrackingLink({ orderId, orderNumber, storeId }: Generate
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-700">Pelacakan Pesanan #{orderNumber}</p>
-          <p className="text-xs text-gray-500">Bagikan link ini ke pelanggan</p>
+          <p className="text-sm font-medium text-[var(--text-2)]">Pelacakan Pesanan #{orderNumber}</p>
+          <p className="text-xs text-[var(--text-3)]">Bagikan link ini ke pelanggan</p>
         </div>
         <button
           onClick={generate}
@@ -391,11 +391,11 @@ export function GenerateTrackingLink({ orderId, orderNumber, storeId }: Generate
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       {trackingUrl && (
-        <div className="space-y-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="space-y-3 p-4 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border)]">
           <QRCodeStub url={trackingUrl} />
           <button
             onClick={copy}
-            className="w-full py-2 px-4 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="w-full py-2 px-4 bg-[var(--bg-card)] border border-[var(--border-mid)] rounded-lg text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
           >
             {copied ? '✓ Disalin!' : 'Salin Link'}
           </button>
@@ -444,24 +444,24 @@ export default function OrderTrackingClient({ storeId, currency }: OrderTracking
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Pelacakan Pesanan</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-1)]">Pelacakan Pesanan</h1>
+        <p className="text-[var(--text-3)] text-sm mt-1">
           Buat link pelacakan untuk dibagikan ke pelanggan
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Order list */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <p className="font-semibold text-gray-800 text-sm">Pesanan Aktif</p>
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-[var(--border)]">
+            <p className="font-semibold text-[var(--text-1)] text-sm">Pesanan Aktif</p>
           </div>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-[var(--text-3)]" />
             </div>
           ) : orders.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 text-sm">
+            <div className="text-center py-12 text-[var(--text-3)] text-sm">
               Tidak ada pesanan aktif
             </div>
           ) : (
@@ -471,13 +471,13 @@ export default function OrderTrackingClient({ storeId, currency }: OrderTracking
                   key={o.id}
                   onClick={() => setSelectedOrder(o)}
                   className={cn(
-                    'flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors',
+                    'flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--bg-subtle)] transition-colors',
                     selectedOrder?.id === o.id && 'bg-blue-50',
                   )}
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-800">#{o.number}</p>
-                    <p className="text-xs text-gray-500">{o.customerName ?? 'Tanpa nama'}</p>
+                    <p className="text-sm font-medium text-[var(--text-1)]">#{o.number}</p>
+                    <p className="text-xs text-[var(--text-3)]">{o.customerName ?? 'Tanpa nama'}</p>
                   </div>
                   <div className="text-right">
                     <span
@@ -486,7 +486,7 @@ export default function OrderTrackingClient({ storeId, currency }: OrderTracking
                         o.status === 'PENDING' && 'bg-yellow-100 text-yellow-700',
                         o.status === 'PREPARING' && 'bg-blue-100 text-blue-700',
                         o.status === 'READY' && 'bg-green-100 text-green-700',
-                        o.status === 'DELIVERED' && 'bg-gray-100 text-gray-600',
+                        o.status === 'DELIVERED' && 'bg-[var(--bg-subtle)] text-[var(--text-2)]',
                         o.status === 'PAID' && 'bg-emerald-100 text-emerald-700',
                       )}
                     >
@@ -500,7 +500,7 @@ export default function OrderTrackingClient({ storeId, currency }: OrderTracking
         </div>
 
         {/* Generate link panel */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
           {selectedOrder ? (
             <GenerateTrackingLink
               orderId={selectedOrder.id}
@@ -508,7 +508,7 @@ export default function OrderTrackingClient({ storeId, currency }: OrderTracking
               storeId={storeId}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-gray-400 text-sm gap-2">
+            <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-[var(--text-3)] text-sm gap-2">
               <QrCode className="w-10 h-10 text-gray-300" />
               <p>Pilih pesanan untuk membuat link pelacakan</p>
             </div>

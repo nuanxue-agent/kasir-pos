@@ -47,7 +47,7 @@ const DOC_TYPE_CONFIG: Record<DocumentType, { label: string; color: string }> = 
   INVOICE:  { label: 'Invoice', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   RECEIPT:  { label: 'Kwitansi', color: 'bg-green-50 text-green-700 border-green-200' },
   REPORT:   { label: 'Laporan', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  OTHER:    { label: 'Lainnya', color: 'bg-gray-50 text-gray-600 border-gray-200' },
+  OTHER:    { label: 'Lainnya', color: 'bg-[var(--bg-subtle)] text-[var(--text-2)] border-[var(--border)]' },
 }
 
 const TYPE_TABS: { value: DocumentType | ''; label: string }[] = [
@@ -296,18 +296,18 @@ function PreviewModal({ doc, onClose }: { doc: Document; onClose: () => void }) 
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 p-4">
       <div className="mb-3 flex w-full max-w-4xl items-center justify-between">
         <p className="truncate text-sm font-medium text-white">{doc.name}</p>
-        <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-white/20">
+        <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-[var(--bg-card)]/20">
           <X size={20} className="text-white" />
         </button>
       </div>
-      <div className="h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white">
+      <div className="h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl bg-[var(--bg-card)]">
         {isPdf ? (
           <embed src={doc.url} type="application/pdf" className="h-full w-full" />
         ) : isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={doc.url} alt={doc.name} className="h-full w-full object-contain" />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-gray-500">
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-[var(--text-3)]">
             <FileText size={48} />
             <p className="text-sm">Preview tidak tersedia untuk tipe file ini</p>
             <a

@@ -140,9 +140,9 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
 
       {/* Active shift card */}
       {loadingActive ? (
-        <div className="h-32 bg-white border border-stone-100 rounded-2xl animate-pulse" />
+        <div className="h-32 bg-[var(--bg-card)] border border-stone-100 rounded-2xl animate-pulse" />
       ) : activeShift ? (
-        <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-[var(--bg-card)] border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="bg-amber-50 px-5 py-3 flex items-center gap-3 border-b border-amber-100">
             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             <span className="text-sm font-semibold text-amber-700">Shift Sedang Berjalan</span>
@@ -187,7 +187,7 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
 
               {/* Denomination counter */}
               <div className="bg-stone-50 rounded-xl border border-stone-100 overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-stone-100 bg-white">
+                <div className="px-4 py-2.5 border-b border-stone-100 bg-[var(--bg-card)]">
                   <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Hitung Lembar / Keping</p>
                 </div>
                 <div className="divide-y divide-stone-100">
@@ -200,7 +200,7 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
                         placeholder="0"
                         value={denoms[d]}
                         onChange={e => setDenoms(prev => ({ ...prev, [d]: e.target.value }))}
-                        className="w-20 bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+                        className="w-20 bg-[var(--bg-card)] border border-stone-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                       />
                       <ArrowRight className="h-3.5 w-3.5 text-stone-300 shrink-0" />
                       <span className="text-sm font-medium text-stone-700 ml-auto">
@@ -248,7 +248,7 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
           )}
         </div>
       ) : (
-        <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-2 h-2 rounded-full bg-stone-300" />
             <span className="text-sm text-stone-500">Tidak ada shift aktif</span>
@@ -277,7 +277,7 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
       )}
 
       {/* Shift history */}
-      <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-[var(--bg-card)] border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-4 py-3.5 border-b border-stone-100">
           <h2 className="text-sm font-semibold text-stone-800">Riwayat Shift</h2>
         </div>
@@ -321,7 +321,7 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
                           { label: 'Estimasi', value: formatCurrency(s.expectedCash ?? 0, currency) },
                           { label: 'Aktual', value: formatCurrency(s.closingCash ?? 0, currency) },
                         ].map(item => (
-                          <div key={item.label} className="bg-white rounded-xl p-3 border border-stone-100">
+                          <div key={item.label} className="bg-[var(--bg-card)] rounded-xl p-3 border border-stone-100">
                             <p className="text-xs text-stone-400">{item.label}</p>
                             <p className="text-sm font-bold text-stone-800 mt-0.5">{item.value}</p>
                           </div>
@@ -330,7 +330,7 @@ export default function ShiftsPageClient({ storeId, currency, storeName = 'Toko'
                       {s.note && <p className="text-xs text-stone-500 mt-2 italic">&quot;{s.note}&quot;</p>}
                       <button
                         onClick={() => printShiftReport(s)}
-                        className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-stone-200 text-stone-600 text-xs font-medium hover:bg-white hover:border-amber-300 hover:text-amber-700 transition-colors"
+                        className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-stone-200 text-stone-600 text-xs font-medium hover:bg-[var(--bg-card)] hover:border-amber-300 hover:text-amber-700 transition-colors"
                       >
                         <Printer className="h-3.5 w-3.5" /> Cetak Laporan Shift
                       </button>

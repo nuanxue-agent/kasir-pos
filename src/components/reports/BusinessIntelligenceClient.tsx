@@ -85,7 +85,7 @@ export function buildPriceSensitivity(
 export function retentionColor(pct: number): string {
   if (pct >= 70) return 'bg-emerald-500 text-white'
   if (pct >= 50) return 'bg-emerald-400 text-white'
-  if (pct >= 30) return 'bg-yellow-400 text-gray-900'
+  if (pct >= 30) return 'bg-yellow-400 text-[var(--text-1)]'
   if (pct >= 10) return 'bg-orange-400 text-white'
   if (pct > 0) return 'bg-red-400 text-white'
   return 'bg-[var(--bg-card)] text-[var(--text-muted)]'

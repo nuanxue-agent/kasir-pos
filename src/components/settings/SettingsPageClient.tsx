@@ -636,7 +636,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                 }`}
               >
                 <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--bg-card)] shadow transition-transform ${
                     receiptSettings.showLogo ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />
@@ -661,7 +661,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
             <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-4">
               <p className="mb-2 text-xs font-semibold text-[var(--text-2)]">Preview Struk</p>
               <div
-                className="mx-auto rounded border border-stone-200 bg-white p-3 font-mono text-stone-700"
+                className="mx-auto rounded border border-stone-200 bg-[var(--bg-card)] p-3 font-mono text-stone-700"
                 style={{
                   width: receiptSettings.printWidth === 58 ? '160px' : '220px',
                   fontSize:
@@ -737,7 +737,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--bg-card)] shadow transition-transform ${
                       cfg.enabled ? 'translate-x-5' : 'translate-x-0.5'
                     }`}
                   />
@@ -799,7 +799,7 @@ export default function SettingsPageClient({ storeId, store }: SettingsPageClien
                 }`}
               >
                 <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--bg-card)] shadow transition-transform ${
                     emailAlerts ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />

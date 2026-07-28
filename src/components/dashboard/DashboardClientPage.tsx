@@ -89,7 +89,7 @@ const STATUS_STYLES: Record<string, { icon: React.ReactNode; pill: string; label
   },
   PENDING: {
     icon: <Clock className="h-3 w-3" />,
-    pill: 'bg-amber-50 text-amber-600 border border-amber-200',
+    pill: 'bg-[var(--bg-subtle)] text-indigo-600 border border-indigo-200',
     label: 'Pending',
   },
   VOIDED: {
@@ -669,7 +669,7 @@ export default function DashboardClientPage({
             icon={Users}
             label="Pelanggan Baru"
             value={String(stats.newCustomers ?? 0)}
-            color="orange"
+            color="blue"
             change={pctChange(stats.newCustomers ?? 0, yStats.newCustomers ?? 0)}
             loading={isLoading}
           />
@@ -689,7 +689,7 @@ export default function DashboardClientPage({
             : score < 6
               ? 'text-red-500'
               : score < 9
-                ? 'text-amber-500'
+                ? 'text-indigo-500'
                 : 'text-emerald-500'
         const bgColor =
           score === null
@@ -697,7 +697,7 @@ export default function DashboardClientPage({
             : score < 6
               ? 'bg-red-50'
               : score < 9
-                ? 'bg-amber-50'
+                ? 'bg-[var(--bg-subtle)]'
                 : 'bg-emerald-50'
         const borderColor =
           score === null
@@ -705,7 +705,7 @@ export default function DashboardClientPage({
             : score < 6
               ? 'border-red-200'
               : score < 9
-                ? 'border-amber-200'
+                ? 'border-indigo-200'
                 : 'border-emerald-200'
         const label =
           score === null ? '—' : score < 6 ? 'Detractor' : score < 9 ? 'Passive' : 'Promoter'
@@ -716,10 +716,10 @@ export default function DashboardClientPage({
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${score === null ? 'bg-[var(--bg-muted)]' : score < 6 ? 'bg-red-100' : score < 9 ? 'bg-amber-100' : 'bg-emerald-100'}`}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${score === null ? 'bg-[var(--bg-muted)]' : score < 6 ? 'bg-red-100' : score < 9 ? 'bg-indigo-100' : 'bg-emerald-100'}`}
                 >
                   <Star
-                    className={`h-5 w-5 ${score === null ? 'text-[var(--text-3)]' : score < 6 ? 'text-red-500' : score < 9 ? 'text-amber-500' : 'text-emerald-500'}`}
+                    className={`h-5 w-5 ${score === null ? 'text-[var(--text-3)]' : score < 6 ? 'text-red-500' : score < 9 ? 'text-indigo-500' : 'text-emerald-500'}`}
                   />
                 </div>
                 <div>
@@ -1056,10 +1056,10 @@ export default function DashboardClientPage({
           <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                <AlertTriangle className="h-3.5 w-3.5 text-indigo-500" />
                 Stok Menipis
                 {(lowStock as any[]).length > 0 && (
-                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                  <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
                     {(lowStock as any[]).length}
                   </span>
                 )}
@@ -1093,8 +1093,8 @@ export default function DashboardClientPage({
                     className="flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                        <Package className="h-3.5 w-3.5 text-amber-500" />
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-subtle)] dark:bg-indigo-900/20">
+                        <Package className="h-3.5 w-3.5 text-indigo-500" />
                       </div>
                       <p className="truncate text-sm text-[var(--text-1)]">{p.name}</p>
                     </div>
@@ -1102,7 +1102,7 @@ export default function DashboardClientPage({
                       className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold ${
                         p.stock === 0
                           ? 'border border-red-100 bg-red-50 text-red-500 dark:border-red-900/50 dark:bg-red-900/20'
-                          : 'border border-amber-100 bg-amber-50 text-amber-600 dark:border-amber-900/50 dark:bg-amber-900/20'
+                          : 'border border-[var(--border)] bg-[var(--bg-subtle)] text-indigo-600 dark:border-indigo-900/50 dark:bg-indigo-900/20'
                       }`}
                     >
                       {p.stock === 0 ? 'Habis' : `${p.stock} sisa`}

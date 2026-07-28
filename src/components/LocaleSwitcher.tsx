@@ -93,7 +93,7 @@ export function LocaleSwitcher({ className, showName = true }: LocaleSwitcherPro
           role="listbox"
           aria-label="Language options"
           className={cn(
-            'absolute top-full mt-1.5 w-48 bg-white rounded-xl',
+            'absolute top-full mt-1.5 w-48 bg-[var(--bg-card)] rounded-xl',
             'border border-stone-200 shadow-lg shadow-stone-100 py-1 z-50',
             // Align dropdown: flip to left side for RTL locales
             isRtl ? 'left-0' : 'right-0',

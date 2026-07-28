@@ -137,7 +137,7 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col">
+      <div className="bg-[var(--bg-card)] w-full sm:max-w-2xl sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
           <div>
@@ -232,7 +232,7 @@ export default function PODetailModal({ po, storeId, currency, onClose, onUpdate
                             max={line.qty - line.receivedQty}
                             value={receiveQtys[line.id] ?? 0}
                             onChange={e => setReceiveQtys(q => ({ ...q, [line.id]: Number(e.target.value) }))}
-                            className="w-20 bg-white border border-stone-200 rounded-lg px-2 py-1 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+                            className="w-20 bg-[var(--bg-card)] border border-stone-200 rounded-lg px-2 py-1 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                           />
                           <span className="text-xs text-stone-400">dari {line.qty - line.receivedQty} sisa</span>
                         </div>

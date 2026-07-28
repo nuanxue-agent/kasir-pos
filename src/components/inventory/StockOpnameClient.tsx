@@ -65,7 +65,7 @@ interface StockOpnameClientProps {
 function statusBadge(status: OpnameStatus) {
   switch (status) {
     case 'DRAFT':
-      return 'bg-gray-500/20 text-gray-400'
+      return 'bg-gray-500/20 text-[var(--text-3)]'
     case 'IN_PROGRESS':
       return 'bg-blue-500/20 text-blue-400'
     case 'COMPLETED':
@@ -579,7 +579,7 @@ export default function StockOpnameClient({ storeId }: StockOpnameClientProps) {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {rowStatus === 'pending' && (
-                            <span className="inline-flex items-center rounded-md bg-gray-500/20 px-2 py-0.5 text-xs text-gray-400">
+                            <span className="inline-flex items-center rounded-md bg-gray-500/20 px-2 py-0.5 text-xs text-[var(--text-3)]">
                               Belum
                             </span>
                           )}

@@ -41,10 +41,10 @@ type Step3Form = z.infer<typeof step3Schema>
 // ── Shared style ──────────────────────────────────────────────────────────────
 
 const inputClass =
-  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-amber-400 focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-amber-400/20'
+  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input,var(--bg-subtle))] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-[var(--accent)] focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20'
 
 const inputNoIconClass =
-  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] py-3 px-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-amber-400 focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-amber-400/20'
+  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input,var(--bg-subtle))] py-3 px-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-[var(--accent)] focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20'
 
 // ── Step labels ───────────────────────────────────────────────────────────────
 
@@ -91,17 +91,17 @@ function ProgressIndicator({ current }: { current: number }) {
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all ${
                   done
-                    ? 'bg-amber-500 text-white'
+                    ? 'bg-[var(--accent)] text-white'
                     : active
-                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-amber-200'
-                    : 'border-2 border-stone-200 bg-white text-stone-400'
+                    ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/20'
+                    : 'border-2 border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-3)]'
                 }`}
               >
                 {done ? <CheckCircle className="h-4 w-4" /> : step.id}
               </div>
               <span
                 className={`text-[10px] font-medium ${
-                  active ? 'text-amber-600' : done ? 'text-stone-500' : 'text-stone-300'
+                  active ? 'text-[var(--accent)]' : done ? 'text-[var(--text-2)]' : 'text-[var(--text-3)]'
                 }`}
               >
                 {step.label}
@@ -110,7 +110,7 @@ function ProgressIndicator({ current }: { current: number }) {
             {idx < STEPS.length - 1 && (
               <div
                 className={`mx-2 mb-4 h-0.5 w-10 rounded-full transition-colors ${
-                  current > step.id ? 'bg-amber-400' : 'bg-stone-200'
+                  current > step.id ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
                 }`}
               />
             )}
@@ -187,7 +187,7 @@ export default function SignupPage() {
     <div className="space-y-6">
       {/* Logo */}
       <div className="flex flex-col items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[var(--shadow-md)]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[var(--shadow-md)]">
           <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.5} />
         </div>
         <span className="text-lg font-bold tracking-tight text-[var(--text-1)]">Kasir POS</span>
@@ -250,7 +250,7 @@ export default function SignupPage() {
 
               <button
                 type="submit"
-                className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600"
+                className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--accent-hover)]"
               >
                 Lanjut — Info Toko
                 <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -314,13 +314,13 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex-1 rounded-lg border border-[var(--border)] py-3 text-sm font-semibold text-[var(--text-2)] hover:border-amber-300 hover:text-amber-700 transition-all"
+                  className="flex-1 rounded-lg border border-[var(--border)] py-3 text-sm font-semibold text-[var(--text-2)] hover:border-indigo-400 hover:text-[var(--accent)] transition-all"
                 >
                   Kembali
                 </button>
                 <button
                   type="submit"
-                  className="group flex flex-[2] items-center justify-center gap-2 rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600"
+                  className="group flex flex-[2] items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--accent-hover)]"
                 >
                   Lanjut — Pilih Paket
                   <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -356,8 +356,8 @@ export default function SignupPage() {
                       htmlFor={`plan-${plan.id}`}
                       className={`relative cursor-pointer rounded-xl border-2 p-5 transition-all ${
                         selected
-                          ? 'border-amber-400 bg-amber-50 shadow-md shadow-amber-100'
-                          : 'border-stone-200 bg-white hover:border-amber-200'
+                          ? 'border-[var(--accent)] bg-indigo-50 dark:bg-indigo-950/30 shadow-md shadow-indigo-500/10'
+                          : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-indigo-300 dark:hover:border-indigo-700'
                       }`}
                     >
                       <input
@@ -368,24 +368,24 @@ export default function SignupPage() {
                         className="sr-only"
                       />
                       {plan.highlight && (
-                        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-semibold text-white">
+                        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[var(--accent)] px-2.5 py-0.5 text-[10px] font-semibold text-white">
                           Populer
                         </div>
                       )}
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-bold text-stone-700">{plan.name}</span>
-                        <div className={`h-4 w-4 rounded-full border-2 transition-all flex items-center justify-center ${selected ? 'border-amber-500 bg-amber-500' : 'border-stone-300'}`}>
+                        <span className="text-sm font-bold text-[var(--text-1)]">{plan.name}</span>
+                        <div className={`h-4 w-4 rounded-full border-2 transition-all flex items-center justify-center ${selected ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-[var(--border)]'}`}>
                           {selected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </div>
                       </div>
                       <div className="flex items-baseline gap-1 mb-3">
-                        <span className="text-2xl font-bold text-stone-800">{plan.price}</span>
-                        <span className="text-xs text-stone-400">{plan.per}</span>
+                        <span className="text-2xl font-bold text-[var(--text-1)]">{plan.price}</span>
+                        <span className="text-xs text-[var(--text-3)]">{plan.per}</span>
                       </div>
                       <ul className="space-y-1.5">
                         {plan.features.map(f => (
-                          <li key={f} className="flex items-center gap-2 text-xs text-stone-600">
-                            <CheckCircle className="h-3 w-3 shrink-0 text-amber-500" />
+                          <li key={f} className="flex items-center gap-2 text-xs text-[var(--text-2)]">
+                            <CheckCircle className="h-3 w-3 shrink-0 text-[var(--accent)]" />
                             {f}
                           </li>
                         ))}
@@ -403,13 +403,13 @@ export default function SignupPage() {
                     {...form3.register('agreeTerms')}
                     type="checkbox"
                     id="agreeTerms"
-                    className="mt-0.5 h-4 w-4 rounded border-stone-300 accent-amber-500"
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
                   />
                   <label htmlFor="agreeTerms" className="text-sm text-[var(--text-2)] leading-relaxed cursor-pointer select-none">
                     Saya menyetujui{' '}
-                    <Link href="#" className="text-amber-600 hover:underline">Syarat &amp; Ketentuan</Link>
+                    <Link href="#" className="text-[var(--accent)] hover:underline">Syarat &amp; Ketentuan</Link>
                     {' '}dan{' '}
-                    <Link href="#" className="text-amber-600 hover:underline">Kebijakan Privasi</Link>
+                    <Link href="#" className="text-[var(--accent)] hover:underline">Kebijakan Privasi</Link>
                     {' '}Kasir POS.
                   </label>
                 </div>
@@ -422,14 +422,14 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 rounded-lg border border-[var(--border)] py-3 text-sm font-semibold text-[var(--text-2)] hover:border-amber-300 hover:text-amber-700 transition-all"
+                  className="flex-1 rounded-lg border border-[var(--border)] py-3 text-sm font-semibold text-[var(--text-2)] hover:border-indigo-400 hover:text-[var(--accent)] transition-all"
                 >
                   Kembali
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="group flex flex-[2] items-center justify-center gap-2 rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="group flex flex-[2] items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLoading ? (
                     <><Loader2 className="h-4 w-4 animate-spin" />Mendaftar…</>
@@ -445,7 +445,7 @@ export default function SignupPage() {
 
       <p className="text-center text-sm text-[var(--text-3)]">
         Sudah punya akun?{' '}
-        <Link href="/login" className="font-medium text-amber-600 hover:text-amber-700 transition-colors">
+        <Link href="/login" className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors">
           Masuk di sini
         </Link>
       </p>

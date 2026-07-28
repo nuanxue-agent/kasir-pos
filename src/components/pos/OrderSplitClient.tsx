@@ -184,27 +184,27 @@ function ItemSplitPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-[var(--text-3)]">
         Pilih jumlah item yang ingin dipindah ke sub-order baru.
       </p>
 
-      <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+      <div className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
         {order.items.map(item => (
           <div key={item.id} className="flex items-center gap-3 px-3 py-2">
             <GripVertical className="h-4 w-4 shrink-0 text-gray-300" />
             <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium text-gray-800">{item.name}</p>
+              <p className="truncate text-sm font-medium text-[var(--text-1)]">{item.name}</p>
               {item.variantName && (
-                <p className="text-xs text-gray-400">{item.variantName}</p>
+                <p className="text-xs text-[var(--text-3)]">{item.variantName}</p>
               )}
             </div>
-            <span className="text-xs text-gray-400 mr-2">
+            <span className="text-xs text-[var(--text-3)] mr-2">
               {fmt(item.price, currency)} × {item.qty}
             </span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                className="w-6 h-6 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 text-sm font-bold flex items-center justify-center"
+                className="w-6 h-6 rounded border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--bg-subtle)] text-sm font-bold flex items-center justify-center"
                 onClick={() => handleQtyChange(item.id, (splitQtys[item.id] ?? 0) - 1, item.qty)}
               >
                 −
@@ -214,7 +214,7 @@ function ItemSplitPanel({
               </span>
               <button
                 type="button"
-                className="w-6 h-6 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 text-sm font-bold flex items-center justify-center"
+                className="w-6 h-6 rounded border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--bg-subtle)] text-sm font-bold flex items-center justify-center"
                 onClick={() => handleQtyChange(item.id, (splitQtys[item.id] ?? 0) + 1, item.qty)}
               >
                 +
@@ -226,9 +226,9 @@ function ItemSplitPanel({
 
       {/* Totals preview */}
       <div className="grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-lg bg-gray-50 p-3 border border-gray-200">
-          <p className="text-xs text-gray-400 mb-1">Order Asli (sisa)</p>
-          <p className="font-semibold text-gray-800">{fmt(remainSubtotal, currency)}</p>
+        <div className="rounded-lg bg-[var(--bg-subtle)] p-3 border border-[var(--border)]">
+          <p className="text-xs text-[var(--text-3)] mb-1">Order Asli (sisa)</p>
+          <p className="font-semibold text-[var(--text-1)]">{fmt(remainSubtotal, currency)}</p>
         </div>
         <div className="rounded-lg bg-blue-50 p-3 border border-blue-200">
           <p className="text-xs text-blue-400 mb-1">Sub-order Baru</p>
@@ -244,7 +244,7 @@ function ItemSplitPanel({
           'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
           splitItems.length > 0 && !loading
             ? 'bg-blue-600 text-white hover:bg-blue-700'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed',
+            : 'bg-[var(--bg-subtle)] text-[var(--text-3)] cursor-not-allowed',
         )}
       >
         {loading ? (
@@ -280,26 +280,26 @@ function SeatSplitPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-[var(--text-3)]">
         Bagi tagihan secara merata berdasarkan jumlah tamu.
       </p>
 
       {/* Seat count selector */}
       <div className="flex items-center gap-3">
-        <Users className="h-5 w-5 text-gray-400" />
-        <span className="text-sm text-gray-600">Jumlah tamu:</span>
+        <Users className="h-5 w-5 text-[var(--text-3)]" />
+        <span className="text-sm text-[var(--text-2)]">Jumlah tamu:</span>
         <div className="flex items-center gap-2 ml-auto">
           <button
             type="button"
-            className="w-8 h-8 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100 text-lg font-bold flex items-center justify-center"
+            className="w-8 h-8 rounded-full border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--bg-subtle)] text-lg font-bold flex items-center justify-center"
             onClick={() => setSeats(s => Math.max(2, s - 1))}
           >
             −
           </button>
-          <span className="w-8 text-center font-semibold text-gray-800 tabular-nums">{seats}</span>
+          <span className="w-8 text-center font-semibold text-[var(--text-1)] tabular-nums">{seats}</span>
           <button
             type="button"
-            className="w-8 h-8 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100 text-lg font-bold flex items-center justify-center"
+            className="w-8 h-8 rounded-full border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--bg-subtle)] text-lg font-bold flex items-center justify-center"
             onClick={() => setSeats(s => Math.min(20, s + 1))}
           >
             +
@@ -310,10 +310,10 @@ function SeatSplitPanel({
       {/* Per-seat preview */}
       <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
         {perSeatTotal.map((total, i) => (
-          <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-            <p className="text-xs text-gray-400 mb-0.5">Tamu {i + 1}</p>
-            <p className="text-sm font-semibold text-gray-800">{fmt(total, currency)}</p>
-            <p className="text-xs text-gray-400">
+          <div key={i} className="rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)] p-2.5">
+            <p className="text-xs text-[var(--text-3)] mb-0.5">Tamu {i + 1}</p>
+            <p className="text-sm font-semibold text-[var(--text-1)]">{fmt(total, currency)}</p>
+            <p className="text-xs text-[var(--text-3)]">
               {buckets[i]?.reduce((s, b) => s + b.qty, 0) ?? 0} item
             </p>
           </div>
@@ -328,7 +328,7 @@ function SeatSplitPanel({
           'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
           !loading
             ? 'bg-blue-600 text-white hover:bg-blue-700'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed',
+            : 'bg-[var(--bg-subtle)] text-[var(--text-3)] cursor-not-allowed',
         )}
       >
         {loading ? (
@@ -365,7 +365,7 @@ function MergePanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-[var(--text-3)]">
         Gabungkan order ini dengan order lain di meja yang sama.
       </p>
 
@@ -375,7 +375,7 @@ function MergePanel({
           Tidak ada order lain yang bisa digabung di meja ini.
         </div>
       ) : (
-        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+        <div className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
           {others.map(o => (
             <button
               key={o.id}
@@ -383,7 +383,7 @@ function MergePanel({
               onClick={() => setSelectedId(o.id)}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
-                selectedId === o.id ? 'bg-blue-50' : 'hover:bg-gray-50',
+                selectedId === o.id ? 'bg-blue-50' : 'hover:bg-[var(--bg-subtle)]',
               )}
             >
               <div
@@ -391,16 +391,16 @@ function MergePanel({
                   'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
                   selectedId === o.id
                     ? 'border-blue-500 bg-blue-500'
-                    : 'border-gray-300',
+                    : 'border-[var(--border-mid)]',
                 )}
               >
                 {selectedId === o.id && <Check className="h-2.5 w-2.5 text-white" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{o.number}</p>
-                <p className="text-xs text-gray-400">{o.items.length} item</p>
+                <p className="text-sm font-medium text-[var(--text-1)]">{o.number}</p>
+                <p className="text-xs text-[var(--text-3)]">{o.items.length} item</p>
               </div>
-              <span className="text-sm font-semibold text-gray-700">
+              <span className="text-sm font-semibold text-[var(--text-2)]">
                 {fmt(o.total, currency)}
               </span>
             </button>
@@ -423,7 +423,7 @@ function MergePanel({
           'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
           selectedId && !loading
             ? 'bg-green-600 text-white hover:bg-green-700'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed',
+            : 'bg-[var(--bg-subtle)] text-[var(--text-3)] cursor-not-allowed',
         )}
       >
         {loading ? (
@@ -549,12 +549,12 @@ export default function OrderSplitClient({
       aria-label="Split / Gabung Order"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--bg-card)] shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <div>
-            <h2 className="font-semibold text-gray-900 text-base">Split / Gabung Order</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <h2 className="font-semibold text-[var(--text-1)] text-base">Split / Gabung Order</h2>
+            <p className="text-xs text-[var(--text-3)] mt-0.5">
               {order.number} · {fmt(order.total, currency)}
             </p>
           </div>
@@ -562,14 +562,14 @@ export default function OrderSplitClient({
             type="button"
             onClick={onClose}
             aria-label="Tutup"
-            className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="rounded-full p-1.5 text-[var(--text-3)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-2)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-1 p-2 border-b border-gray-100 bg-gray-50">
+        <div className="flex gap-1 p-2 border-b border-[var(--border)] bg-[var(--bg-subtle)]">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -578,8 +578,8 @@ export default function OrderSplitClient({
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors',
                 mode === tab.id
-                  ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
-                  : 'text-gray-500 hover:text-gray-700',
+                  ? 'bg-[var(--bg-card)] text-blue-600 shadow-sm border border-[var(--border)]'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-2)]',
               )}
             >
               {tab.icon}

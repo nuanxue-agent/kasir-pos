@@ -160,7 +160,7 @@ function NavGroupSection({
                     'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
                     active
                       ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/40'
-                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+                      : 'text-slate-400 hover:bg-[var(--bg-card)]/5 hover:text-slate-100',
                   )}
                 >
                   <item.icon
@@ -247,7 +247,7 @@ export function Sidebar({
         </a>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300 lg:hidden"
+          className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-[var(--bg-card)]/5 hover:text-slate-300 lg:hidden"
           aria-label="Tutup sidebar"
         >
           <X className="h-4 w-4" />
@@ -290,7 +290,7 @@ export function Sidebar({
             'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
             pathname.startsWith('/dashboard/settings')
               ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/40'
-              : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+              : 'text-slate-400 hover:bg-[var(--bg-card)]/5 hover:text-slate-100',
           )}
         >
           <Settings
@@ -306,7 +306,7 @@ export function Sidebar({
       {/* User section */}
       <div className="shrink-0 space-y-2 border-t border-white/5 p-3">
         <LocaleSwitcher showName={true} />
-        <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
+        <div className="flex items-center gap-3 rounded-xl bg-[var(--bg-card)]/5 px-3 py-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-sm">
             {initials}
           </div>

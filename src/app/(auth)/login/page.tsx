@@ -18,7 +18,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>
 
 const inputClass =
-  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-amber-400 focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-amber-400/20'
+  'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input,var(--bg-subtle))] py-3 pl-10 pr-4 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] transition-all focus:border-[var(--accent)] focus:bg-[var(--bg-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20'
 
 const DEMO_ACCOUNTS = [
   { label: 'Demo Owner', email: 'owner@demo.com', password: 'demo123', role: 'Pemilik' },
@@ -95,26 +95,26 @@ export default function LoginPage() {
 
       {/* Logo */}
       <div className="flex flex-col items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[var(--shadow-md)]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[var(--shadow-md)]">
           <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.5} />
         </div>
         <span className="text-lg font-bold tracking-tight text-[var(--text-1)]">Kasir POS</span>
       </div>
 
       {/* ── Demo Mode Banner ── */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3" data-testid="demo-banner">
+      <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 px-4 py-3" data-testid="demo-banner">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-amber-800">
+            <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">
               🎯 Coba dengan akun demo: <span className="font-mono">owner@demo.com</span> / <span className="font-mono">demo123</span>
             </p>
-            <p className="mt-0.5 text-xs text-amber-600">Akses penuh ke semua fitur — tidak perlu mendaftar.</p>
+            <p className="mt-0.5 text-xs text-indigo-600 dark:text-indigo-300">Akses penuh ke semua fitur — tidak perlu mendaftar.</p>
           </div>
           <button
             type="button"
             onClick={() => loginAsDemo(DEMO_ACCOUNTS[0])}
             disabled={isLoading || !!demoLoading}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             data-testid="btn-demo-quick"
           >
             {demoLoading === DEMO_ACCOUNTS[0].email ? (
@@ -140,7 +140,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {error && (
-            <div className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="flex items-center gap-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">
               <div className="h-2 w-2 flex-shrink-0 rounded-full bg-red-400" />
               {error}
             </div>
@@ -173,7 +173,7 @@ export default function LoginPage() {
               </label>
               <Link
                 href="/forgot-password"
-                className="text-xs text-[var(--text-3)] transition-colors hover:text-amber-600"
+                className="text-xs text-[var(--text-3)] transition-colors hover:text-[var(--accent)]"
               >
                 Lupa password?
               </Link>
@@ -198,7 +198,7 @@ export default function LoginPage() {
               {...register('rememberMe')}
               type="checkbox"
               id="rememberMe"
-              className="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400 focus:ring-offset-0 accent-amber-500"
+              className="h-4 w-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0 accent-[var(--accent)]"
             />
             <label htmlFor="rememberMe" className="text-sm text-[var(--text-2)] select-none cursor-pointer">
               Ingat saya selama 30 hari
@@ -208,7 +208,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading || !!demoLoading}
-            className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="group mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -242,12 +242,12 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => loginAsDemo(account)}
                 disabled={isLoading || !!demoLoading}
-                className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2.5 text-left transition-all hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2.5 text-left transition-all hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {demoLoading === account.email ? (
-                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-amber-500" />
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--accent)]" />
                 ) : (
-                  <Zap className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <Zap className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
                 )}
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-[var(--text-1)]">
@@ -267,16 +267,16 @@ export default function LoginPage() {
       {/* Social proof */}
       <div className="flex items-center justify-center gap-1.5" data-testid="social-proof-login">
         {[...Array(5)].map((_, i) => (
-          <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          <Star key={i} className="h-3.5 w-3.5 fill-indigo-400 text-indigo-400" />
         ))}
-        <span className="ml-1 text-xs text-stone-500">Dipercaya oleh 500+ toko</span>
+        <span className="ml-1 text-xs text-[var(--text-2)]">Dipercaya oleh 500+ toko</span>
       </div>
 
       <p className="text-center text-sm text-[var(--text-3)]">
         Belum punya akun?{' '}
         <Link
           href="/signup"
-          className="font-medium text-amber-600 transition-colors hover:text-amber-700"
+          className="font-medium text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)]"
         >
           Daftar
         </Link>

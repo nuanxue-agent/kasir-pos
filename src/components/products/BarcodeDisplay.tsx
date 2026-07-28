@@ -70,7 +70,7 @@ export default function BarcodeDisplay({
   return (
     <div className="flex flex-col items-start gap-2">
       <div
-        className="rounded border border-stone-100 bg-white p-2"
+        className="rounded border border-stone-100 bg-[var(--bg-card)] p-2"
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
       {showPrintButton && (

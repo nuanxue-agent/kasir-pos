@@ -93,7 +93,7 @@ export default function PWAInstallPrompt() {
       role="dialog"
       aria-modal="false"
       aria-label="Install Lakoo POS app"
-      className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 shadow-lg safe-area-inset-bottom"
+      className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-[var(--bg-card)] border-t border-[var(--border)] shadow-lg safe-area-inset-bottom"
     >
       <div className="flex items-start gap-3 max-w-lg mx-auto">
         {/* App icon */}
@@ -108,16 +108,16 @@ export default function PWAInstallPrompt() {
 
         {/* Text */}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 text-sm leading-tight">
+          <p className="font-semibold text-[var(--text-1)] text-sm leading-tight">
             Install Lakoo POS
           </p>
           {isIOSMode ? (
-            <p className="text-gray-500 text-xs mt-0.5">
+            <p className="text-[var(--text-3)] text-xs mt-0.5">
               Tap <span className="font-medium">Share</span> then{' '}
               <span className="font-medium">Add to Home Screen</span> to install.
             </p>
           ) : (
-            <p className="text-gray-500 text-xs mt-0.5">
+            <p className="text-[var(--text-3)] text-xs mt-0.5">
               Install the app for a faster, offline-ready experience.
             </p>
           )}
@@ -136,7 +136,7 @@ export default function PWAInstallPrompt() {
           <button
             onClick={handleDismiss}
             aria-label="Dismiss install prompt"
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full"
+            className="text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors p-1 rounded-full"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

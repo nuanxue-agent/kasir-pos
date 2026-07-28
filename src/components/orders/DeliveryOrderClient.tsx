@@ -474,7 +474,7 @@ export default function DeliveryOrderClient({ storeId, currency }: DeliveryOrder
                   <span
                     className={cn(
                       'inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold',
-                      activeTab === tab.value ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-600',
+                      activeTab === tab.value ? 'bg-[var(--bg-card)]/20 text-white' : 'bg-stone-200 text-stone-600',
                     )}
                   >
                     {count > 99 ? '99+' : count}

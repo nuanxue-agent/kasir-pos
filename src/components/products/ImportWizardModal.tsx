@@ -111,7 +111,7 @@ export default function ImportWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-[var(--bg-card)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
           <div>
@@ -220,7 +220,7 @@ export default function ImportWizardModal({
                 <button
                   type="button"
                   onClick={handleDownloadTemplate}
-                  className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-400 hover:text-amber-600"
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-[var(--bg-card)] px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-400 hover:text-amber-600"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Download Template

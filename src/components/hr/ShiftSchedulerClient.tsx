@@ -21,7 +21,7 @@ const ROLE_COLORS: Record<Role, string> = {
 const STATUS_COLORS: Record<ShiftStatus, string> = {
   SCHEDULED: 'bg-yellow-50 border-yellow-200',
   CONFIRMED: 'bg-emerald-50 border-emerald-200',
-  COMPLETED: 'bg-gray-50 border-gray-200',
+  COMPLETED: 'bg-[var(--bg-subtle)] border-[var(--border)]',
   ABSENT: 'bg-red-50 border-red-200',
 }
 

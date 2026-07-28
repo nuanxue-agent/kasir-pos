@@ -119,6 +119,18 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
+.input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-radius: var(--radius);
+}
+
+.surface {
+  background: var(--bg-subtle);
+  border-radius: var(--radius);
+}
+
 /* ── Button styles ───────────────────────────────────────────────────────── */
 .btn-primary {
   background-color: #4f46e5;

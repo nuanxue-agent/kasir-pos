@@ -412,7 +412,7 @@ export function NotificationCenterClient({ storeId }: NotificationCenterClientPr
                           >
                             <span
                               className={cn(
-                                'inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform',
+                                'inline-block h-3.5 w-3.5 rounded-full bg-[var(--bg-card)] shadow transition-transform',
                                 pref[channel] ? 'translate-x-4' : 'translate-x-0.5',
                               )}
                             />

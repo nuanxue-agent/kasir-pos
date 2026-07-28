@@ -67,7 +67,7 @@ const STATUS_CONFIG: Record<
     label: 'Dibersihkan',
     bg: 'bg-gray-500/10 hover:bg-gray-500/20',
     border: 'border-gray-400/40',
-    text: 'text-gray-500',
+    text: 'text-[var(--text-3)]',
     dot: 'bg-gray-400',
     ring: 'ring-gray-300',
   },
@@ -245,7 +245,7 @@ function ActionPanel({
             type="button"
             disabled={busy}
             onClick={() => changeStatus('CLEANING')}
-            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-2)] bg-[var(--bg-subtle)] hover:bg-[var(--bg-muted)] disabled:opacity-50 transition-colors"
           >
             <Pencil className="h-4 w-4" /> Tandai Dibersihkan
           </button>

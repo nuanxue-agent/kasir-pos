@@ -131,21 +131,21 @@ function AddBatchForm({ storeId, products, onAdded, onClose }: AddBatchFormProps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900">Tambah Batch Baru</h2>
-          <button onClick={onClose} aria-label="Tutup" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--bg-card)] shadow-xl">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
+          <h2 className="text-base font-semibold text-[var(--text-1)]">Tambah Batch Baru</h2>
+          <button onClick={onClose} aria-label="Tutup" className="rounded-lg p-1 text-[var(--text-3)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           {/* Product */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Produk</label>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text-2)]">Produk</label>
             <select
               value={form.productId}
               onChange={e => set('productId', e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             >
               <option value="">Pilih produk…</option>
@@ -156,43 +156,43 @@ function AddBatchForm({ storeId, products, onAdded, onClose }: AddBatchFormProps
           </div>
           {/* Batch number */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Nomor Batch</label>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text-2)]">Nomor Batch</label>
             <input
               type="text"
               value={form.batchNumber}
               onChange={e => set('batchNumber', e.target.value)}
               placeholder="cth. BATCH-2024-001"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             />
           </div>
           {/* Expiry date */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Tanggal Kadaluarsa</label>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text-2)]">Tanggal Kadaluarsa</label>
             <input
               type="date"
               value={form.expiryDate}
               onChange={e => set('expiryDate', e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             />
           </div>
           {/* Qty & cost row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah</label>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--text-2)]">Jumlah</label>
               <input
                 type="number"
                 min="1"
                 value={form.qty}
                 onChange={e => set('qty', e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Harga Pokok/unit</label>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--text-2)]">Harga Pokok/unit</label>
               <input
                 type="number"
                 min="0"
@@ -200,7 +200,7 @@ function AddBatchForm({ storeId, products, onAdded, onClose }: AddBatchFormProps
                 value={form.costPerUnit}
                 onChange={e => set('costPerUnit', e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 required
               />
             </div>
@@ -209,7 +209,7 @@ function AddBatchForm({ storeId, products, onAdded, onClose }: AddBatchFormProps
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="flex-1 rounded-lg border border-[var(--border)] py-2.5 text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-subtle)]"
             >
               Batal
             </button>
@@ -292,8 +292,8 @@ export default function ExpiryTrackingClient({ storeId }: ExpiryTrackingClientPr
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Pelacakan Kadaluarsa</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Kelola batch produk dan tanggal kadaluarsa</p>
+          <h1 className="text-xl font-semibold text-[var(--text-1)]">Pelacakan Kadaluarsa</h1>
+          <p className="mt-0.5 text-sm text-[var(--text-3)]">Kelola batch produk dan tanggal kadaluarsa</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
@@ -306,36 +306,36 @@ export default function ExpiryTrackingClient({ storeId }: ExpiryTrackingClientPr
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
               <Package className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{batches.length}</p>
-              <p className="text-xs text-gray-500">Total Batch</p>
+              <p className="text-2xl font-bold text-[var(--text-1)]">{batches.length}</p>
+              <p className="text-xs text-[var(--text-3)]">Total Batch</p>
             </div>
           </div>
         </div>
-        <div className={cn('rounded-xl border p-4 shadow-sm', expiredCount > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white')}>
+        <div className={cn('rounded-xl border p-4 shadow-sm', expiredCount > 0 ? 'border-red-200 bg-red-50' : 'border-[var(--border)] bg-[var(--bg-card)]')}>
           <div className="flex items-center gap-3">
-            <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', expiredCount > 0 ? 'bg-red-100' : 'bg-gray-100')}>
-              <AlertTriangle className={cn('h-5 w-5', expiredCount > 0 ? 'text-red-600' : 'text-gray-400')} />
+            <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', expiredCount > 0 ? 'bg-red-100' : 'bg-[var(--bg-subtle)]')}>
+              <AlertTriangle className={cn('h-5 w-5', expiredCount > 0 ? 'text-red-600' : 'text-[var(--text-3)]')} />
             </div>
             <div>
-              <p className={cn('text-2xl font-bold', expiredCount > 0 ? 'text-red-700' : 'text-gray-900')}>{expiredCount}</p>
-              <p className="text-xs text-gray-500">Kadaluarsa</p>
+              <p className={cn('text-2xl font-bold', expiredCount > 0 ? 'text-red-700' : 'text-[var(--text-1)]')}>{expiredCount}</p>
+              <p className="text-xs text-[var(--text-3)]">Kadaluarsa</p>
             </div>
           </div>
         </div>
-        <div className={cn('rounded-xl border p-4 shadow-sm', soonCount > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white')}>
+        <div className={cn('rounded-xl border p-4 shadow-sm', soonCount > 0 ? 'border-amber-200 bg-amber-50' : 'border-[var(--border)] bg-[var(--bg-card)]')}>
           <div className="flex items-center gap-3">
-            <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', soonCount > 0 ? 'bg-amber-100' : 'bg-gray-100')}>
-              <Clock className={cn('h-5 w-5', soonCount > 0 ? 'text-amber-600' : 'text-gray-400')} />
+            <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', soonCount > 0 ? 'bg-amber-100' : 'bg-[var(--bg-subtle)]')}>
+              <Clock className={cn('h-5 w-5', soonCount > 0 ? 'text-amber-600' : 'text-[var(--text-3)]')} />
             </div>
             <div>
-              <p className={cn('text-2xl font-bold', soonCount > 0 ? 'text-amber-700' : 'text-gray-900')}>{soonCount}</p>
-              <p className="text-xs text-gray-500">Segera Kadaluarsa</p>
+              <p className={cn('text-2xl font-bold', soonCount > 0 ? 'text-amber-700' : 'text-[var(--text-1)]')}>{soonCount}</p>
+              <p className="text-xs text-[var(--text-3)]">Segera Kadaluarsa</p>
             </div>
           </div>
         </div>
@@ -351,7 +351,7 @@ export default function ExpiryTrackingClient({ storeId }: ExpiryTrackingClientPr
               'shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
               filterStatus === s
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                : 'bg-[var(--bg-subtle)] text-[var(--text-2)] hover:bg-[var(--bg-muted)]',
             )}
           >
             {s === 'ALL' ? 'Semua' : s === 'EXPIRED' ? 'Kadaluarsa' : s === 'EXPIRING_SOON' ? 'Segera Kadaluarsa' : 'OK'}
@@ -360,19 +360,19 @@ export default function ExpiryTrackingClient({ storeId }: ExpiryTrackingClientPr
       </div>
 
       {/* Batch table */}
-      <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm text-gray-400">Memuat data batch…</div>
+          <div className="py-16 text-center text-sm text-[var(--text-3)]">Memuat data batch…</div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
             <Package className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-            <p className="text-sm text-gray-400">Belum ada batch{filterStatus !== 'ALL' ? ' dengan status ini' : ''}</p>
+            <p className="text-sm text-[var(--text-3)]">Belum ada batch{filterStatus !== 'ALL' ? ' dengan status ini' : ''}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-500">
+                <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)] text-xs font-medium uppercase tracking-wide text-[var(--text-3)]">
                   <th className="px-4 py-3 text-left">Produk</th>
                   <th className="px-4 py-3 text-left">No. Batch</th>
                   <th className="px-4 py-3 text-left">Tgl Kadaluarsa</th>
@@ -389,21 +389,21 @@ export default function ExpiryTrackingClient({ storeId }: ExpiryTrackingClientPr
                     <tr
                       key={b.id}
                       className={cn(
-                        'transition-colors hover:bg-gray-50/80',
+                        'transition-colors hover:bg-[var(--bg-subtle)]/80',
                         b.status === 'EXPIRED' && 'bg-red-50/40',
                         b.status === 'EXPIRING_SOON' && 'bg-amber-50/40',
                       )}
                     >
-                      <td className="px-4 py-3 font-medium text-gray-900">{name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{b.batchNumber}</td>
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 font-medium text-[var(--text-1)]">{name}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--text-2)]">{b.batchNumber}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">
                         <div>{b.expiryDate}</div>
-                        <div className={cn('text-xs', b.daysLeft < 0 ? 'text-red-500' : b.daysLeft <= 30 ? 'text-amber-500' : 'text-gray-400')}>
+                        <div className={cn('text-xs', b.daysLeft < 0 ? 'text-red-500' : b.daysLeft <= 30 ? 'text-amber-500' : 'text-[var(--text-3)]')}>
                           {b.daysLeft < 0 ? `${Math.abs(b.daysLeft)} hari lalu` : b.daysLeft === 0 ? 'Hari ini' : `${b.daysLeft} hari lagi`}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-gray-900">{b.qty.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-gray-700">{formatCurrency(b.costPerUnit)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{b.qty.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(b.costPerUnit)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={b.status} />
                       </td>

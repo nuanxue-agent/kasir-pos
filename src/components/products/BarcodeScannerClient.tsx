@@ -277,7 +277,7 @@ function LabelDesigner({
             <input
               value={config.storeName}
               onChange={e => setConfig(prev => ({ ...prev, storeName: e.target.value }))}
-              className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm"
+              className="rounded-lg border border-stone-200 bg-[var(--bg-card)] px-3 py-1.5 text-sm"
               placeholder="Nama toko..."
             />
           </div>
@@ -289,7 +289,7 @@ function LabelDesigner({
               max={20}
               value={config.copies}
               onChange={e => setConfig(prev => ({ ...prev, copies: Math.max(1, parseInt(e.target.value) || 1) }))}
-              className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm"
+              className="w-20 rounded-lg border border-stone-200 bg-[var(--bg-card)] px-3 py-1.5 text-sm"
             />
           </div>
         </div>
@@ -483,7 +483,7 @@ export default function BarcodeScannerClient({
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
               tab === t.id
-                ? 'bg-white text-amber-600 shadow-sm'
+                ? 'bg-[var(--bg-card)] text-amber-600 shadow-sm'
                 : 'text-stone-500 hover:text-stone-700',
             )}
           >
@@ -497,7 +497,7 @@ export default function BarcodeScannerClient({
       {tab === 'scanner' && (
         <div className="space-y-4">
           {/* Camera */}
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
+          <div className="rounded-xl border border-stone-200 bg-[var(--bg-card)] p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold text-stone-800">Kamera</h2>
               <button
@@ -577,7 +577,7 @@ export default function BarcodeScannerClient({
           )}
 
           {scannedProduct && !loading && (
-            <div className="rounded-xl border border-stone-200 bg-white p-4">
+            <div className="rounded-xl border border-stone-200 bg-[var(--bg-card)] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50">

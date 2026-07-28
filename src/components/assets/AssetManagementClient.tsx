@@ -230,8 +230,8 @@ export default function AssetManagementClient({ storeId, currency }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manajemen Aset</h1>
-          <p className="text-sm text-gray-500 mt-1">Daftar aset bisnis dan jadwal penyusutan</p>
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">Manajemen Aset</h1>
+          <p className="text-sm text-[var(--text-3)] mt-1">Daftar aset bisnis dan jadwal penyusutan</p>
         </div>
         <button
           onClick={() => setShowAddAsset(true)}
@@ -250,13 +250,13 @@ export default function AssetManagementClient({ storeId, currency }: Props) {
 
       {/* Asset table */}
       {isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400" /></div>
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-[var(--text-3)]" /></div>
       ) : assets.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">Belum ada aset. Klik &quot;Tambah Aset&quot; untuk mulai.</div>
+        <div className="text-center py-12 text-[var(--text-3)]">Belum ada aset. Klik &quot;Tambah Aset&quot; untuk mulai.</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <thead className="bg-[var(--bg-subtle)] text-xs font-semibold text-[var(--text-3)] uppercase tracking-wide">
               <tr>
                 <th className="px-4 py-3 text-left">Nama</th>
                 <th className="px-4 py-3 text-left">Kategori</th>
@@ -267,18 +267,18 @@ export default function AssetManagementClient({ storeId, currency }: Props) {
                 <th className="px-4 py-3 text-left">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[var(--border)]">
               {assets.map(asset => {
                 const bv = bookValueAtYear(asset, yearsSince(asset.purchaseDate))
                 const expanded = expandedId === asset.id
                 return (
                   <>
-                    <tr key={asset.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{asset.name}</td>
-                      <td className="px-4 py-3 text-gray-600">{asset.category}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{fmt(asset.purchasePrice)}</td>
+                    <tr key={asset.id} className="hover:bg-[var(--bg-subtle)]">
+                      <td className="px-4 py-3 font-medium text-[var(--text-1)]">{asset.name}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{asset.category}</td>
+                      <td className="px-4 py-3 text-right text-[var(--text-2)]">{fmt(asset.purchasePrice)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-blue-700">{fmt(bv)}</td>
-                      <td className="px-4 py-3 text-gray-600">{METHOD_LABELS[asset.method]}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{METHOD_LABELS[asset.method]}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[asset.status]}`}>
                           {STATUS_LABELS[asset.status]}
@@ -299,7 +299,7 @@ export default function AssetManagementClient({ storeId, currency }: Props) {
                     </tr>
                     {expanded && (
                       <tr key={`${asset.id}-detail`} className="bg-blue-50">
-                        <td colSpan={7} className="px-6 py-3 text-xs text-gray-600 space-y-1">
+                        <td colSpan={7} className="px-6 py-3 text-xs text-[var(--text-2)] space-y-1">
                           <p><span className="font-medium">Tanggal Beli:</span> {asset.purchaseDate}</p>
                           <p><span className="font-medium">Umur Manfaat:</span> {asset.usefulLife} tahun</p>
                           <p><span className="font-medium">Nilai Residu:</span> {fmt(asset.salvageValue)}</p>
@@ -365,9 +365,9 @@ function yearsSince(dateStr: string): number {
 
 function SummaryCard({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1">{value}<span className="text-sm font-normal text-gray-400 ml-1">{unit}</span></p>
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+      <p className="text-xs text-[var(--text-3)] font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-[var(--text-1)] mt-1">{value}<span className="text-sm font-normal text-[var(--text-3)] ml-1">{unit}</span></p>
     </div>
   )
 }
@@ -377,7 +377,7 @@ function ActionBtn({ icon, title, onClick }: { icon: React.ReactNode; title: str
     <button
       onClick={onClick}
       title={title}
-      className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+      className="p-1.5 rounded hover:bg-[var(--bg-subtle)] text-[var(--text-3)] hover:text-[var(--text-2)]"
     >
       {icon}
     </button>
@@ -450,7 +450,7 @@ function AssetFormModal({ initial, onClose, onSubmit, isPending }: AssetFormModa
           </Field>
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50">Batal</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm hover:bg-[var(--bg-subtle)]">Batal</button>
           <button
             onClick={() => onSubmit(form)}
             disabled={isPending || !form.name}
@@ -472,14 +472,14 @@ function DepreciationScheduleModal({ asset, currency, onClose }: { asset: Asset;
 
   return (
     <Modal title={`Jadwal Penyusutan — ${asset.name}`} onClose={onClose} wide>
-      <div className="text-xs text-gray-500 mb-3">
-        Metode: <span className="font-semibold text-gray-700">{METHOD_LABELS[asset.method]}</span>
-        {' · '}Umur Manfaat: <span className="font-semibold text-gray-700">{asset.usefulLife} tahun</span>
-        {' · '}Nilai Residu: <span className="font-semibold text-gray-700">{fmt(asset.salvageValue)}</span>
+      <div className="text-xs text-[var(--text-3)] mb-3">
+        Metode: <span className="font-semibold text-[var(--text-2)]">{METHOD_LABELS[asset.method]}</span>
+        {' · '}Umur Manfaat: <span className="font-semibold text-[var(--text-2)]">{asset.usefulLife} tahun</span>
+        {' · '}Nilai Residu: <span className="font-semibold text-[var(--text-2)]">{fmt(asset.salvageValue)}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
+          <thead className="bg-[var(--bg-subtle)] text-xs font-semibold text-[var(--text-3)] uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Tahun</th>
               <th className="px-3 py-2 text-right">Nilai Buku Awal</th>
@@ -487,9 +487,9 @@ function DepreciationScheduleModal({ asset, currency, onClose }: { asset: Asset;
               <th className="px-3 py-2 text-right">Nilai Buku Akhir</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-[var(--border)]">
             {schedule.map(row => (
-              <tr key={row.year} className="hover:bg-gray-50">
+              <tr key={row.year} className="hover:bg-[var(--bg-subtle)]">
                 <td className="px-3 py-2 font-medium">Tahun {row.year}</td>
                 <td className="px-3 py-2 text-right">{fmt(row.openingBookValue)}</td>
                 <td className="px-3 py-2 text-right text-red-600">({fmt(row.depreciation)})</td>
@@ -522,8 +522,8 @@ function MaintenanceModal({ asset, logs, currency, onClose, onAdd, isPending }: 
   return (
     <Modal title={`Log Pemeliharaan — ${asset.name}`} onClose={onClose} wide>
       {/* Add entry form */}
-      <div className="bg-gray-50 rounded-lg p-3 space-y-2 mb-4">
-        <p className="text-xs font-semibold text-gray-600 uppercase">Tambah Catatan</p>
+      <div className="bg-[var(--bg-subtle)] rounded-lg p-3 space-y-2 mb-4">
+        <p className="text-xs font-semibold text-[var(--text-2)] uppercase">Tambah Catatan</p>
         <div className="grid grid-cols-2 gap-2">
           <input type="date" className={inputCls} value={form.date} onChange={e => set('date', e.target.value)} />
           <input type="number" min="0" placeholder="Biaya (Rp)" className={inputCls} value={form.cost} onChange={e => set('cost', Number(e.target.value))} />
@@ -542,14 +542,14 @@ function MaintenanceModal({ asset, logs, currency, onClose, onAdd, isPending }: 
 
       {/* Log list */}
       {logs.length === 0 ? (
-        <p className="text-center py-6 text-gray-400 text-sm">Belum ada catatan pemeliharaan.</p>
+        <p className="text-center py-6 text-[var(--text-3)] text-sm">Belum ada catatan pemeliharaan.</p>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[var(--border)]">
           {logs.map(log => (
             <div key={log.id} className="py-2 flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-800">{log.description}</p>
-                <p className="text-xs text-gray-400">{log.date}</p>
+                <p className="text-sm font-medium text-[var(--text-1)]">{log.description}</p>
+                <p className="text-xs text-[var(--text-3)]">{log.date}</p>
               </div>
               <span className="text-sm font-semibold text-red-600">{fmt(log.cost)}</span>
             </div>
@@ -565,10 +565,10 @@ function MaintenanceModal({ asset, logs, currency, onClose, onAdd, isPending }: 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto`}>
+      <div className={`bg-[var(--bg-card)] rounded-xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto`}>
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100"><X className="w-4 h-4" /></button>
+          <h2 className="text-base font-semibold text-[var(--text-1)]">{title}</h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-subtle)]"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4">{children}</div>
       </div>
@@ -579,10 +579,10 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-[var(--text-2)] mb-1">{label}</label>
       {children}
     </div>
   )
 }
 
-const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputCls = 'w-full border border-[var(--border-mid)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'

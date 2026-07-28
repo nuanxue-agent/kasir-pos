@@ -186,7 +186,7 @@ export function Header({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-white/70 px-4 backdrop-blur-md dark:border-white/5 dark:bg-[#111827]/80">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-[var(--bg-card)]/70 px-4 backdrop-blur-md dark:border-white/5 dark:bg-[#111827]/80">
       {/* Mobile menu toggle */}
       <button
         onClick={onMenuToggle}

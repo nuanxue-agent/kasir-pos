@@ -87,7 +87,7 @@ export default function POFormModal({ storeId, currency, taxRate, onClose, onSav
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col">
+      <div className="bg-[var(--bg-card)] w-full sm:max-w-2xl sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
           <div className="flex items-center gap-2">
@@ -143,7 +143,7 @@ export default function POFormModal({ storeId, currency, taxRate, onClose, onSav
                   <div className="col-span-5">
                     <label className="text-xs text-stone-400 mb-1 block">Produk</label>
                     <select value={line.productId} onChange={e => updateLine(i, 'productId', e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-lg px-2 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400">
+                      className="w-full bg-[var(--bg-card)] border border-stone-200 rounded-lg px-2 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400">
                       <option value="">Pilih…</option>
                       {(products as any[]).map((p: any) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
@@ -154,13 +154,13 @@ export default function POFormModal({ storeId, currency, taxRate, onClose, onSav
                   <div className="col-span-2">
                     <label className="text-xs text-stone-400 mb-1 block">Qty</label>
                     <input type="number" min="1" value={line.qty} onChange={e => updateLine(i, 'qty', e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-lg px-2 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
+                      className="w-full bg-[var(--bg-card)] border border-stone-200 rounded-lg px-2 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
                   </div>
                   {/* Unit Cost */}
                   <div className="col-span-4">
                     <label className="text-xs text-stone-400 mb-1 block">Harga Beli</label>
                     <input type="number" min="0" value={line.unitCost} onChange={e => updateLine(i, 'unitCost', e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-lg px-2 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
+                      className="w-full bg-[var(--bg-card)] border border-stone-200 rounded-lg px-2 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
                   </div>
                   {/* Remove */}
                   <div className="col-span-1 flex items-end justify-center pb-1">

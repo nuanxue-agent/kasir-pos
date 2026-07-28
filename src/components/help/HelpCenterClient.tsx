@@ -236,7 +236,7 @@ function ShortcutModal({ onClose }: { onClose: () => void }) {
       aria-modal="true"
       aria-label="Keyboard shortcuts"
     >
-      <div className="w-full max-w-lg rounded-2xl border border-[var(--border,#e7e5e4)] bg-white shadow-2xl">
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border,#e7e5e4)] px-5 py-4">
           <div className="flex items-center gap-2">
             <Keyboard className="h-5 w-5 text-amber-500" />
@@ -433,7 +433,7 @@ export default function HelpCenterClient() {
           </div>
           <button
             onClick={() => setShowShortcuts(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--border,#e7e5e4)] bg-white px-3 py-2 text-xs font-medium text-stone-600 shadow-sm transition-colors hover:bg-stone-50"
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] px-3 py-2 text-xs font-medium text-stone-600 shadow-sm transition-colors hover:bg-stone-50"
           >
             <Keyboard className="h-3.5 w-3.5" />
             Pintasan
@@ -454,7 +454,7 @@ export default function HelpCenterClient() {
               className={cn(
                 'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
                 tab === t.id
-                  ? 'bg-white text-stone-800 shadow-sm'
+                  ? 'bg-[var(--bg-card)] text-stone-800 shadow-sm'
                   : 'text-stone-500 hover:text-stone-700',
               )}
             >
@@ -473,7 +473,7 @@ export default function HelpCenterClient() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Cari pertanyaan…"
-                className="w-full rounded-xl border border-[var(--border,#e7e5e4)] bg-white py-3 pr-10 pl-10 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none"
+                className="w-full rounded-xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] py-3 pr-10 pl-10 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none"
                 aria-label="Cari FAQ"
               />
               {search && (
@@ -500,7 +500,7 @@ export default function HelpCenterClient() {
                       'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                       activeCategory === cat
                         ? 'border-amber-400 bg-amber-50 text-amber-700'
-                        : 'border-[var(--border,#e7e5e4)] bg-white text-stone-600 hover:border-stone-300',
+                        : 'border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] text-stone-600 hover:border-stone-300',
                     )}
                   >
                     {Icon && <Icon className="h-3 w-3" />}
@@ -528,7 +528,7 @@ export default function HelpCenterClient() {
                   return (
                     <div
                       key={item.id}
-                      className="overflow-hidden rounded-xl border border-[var(--border,#e7e5e4)] bg-white shadow-sm"
+                      className="overflow-hidden rounded-xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] shadow-sm"
                     >
                       <button
                         onClick={() => setOpenId(isOpen ? null : item.id)}
@@ -564,7 +564,7 @@ export default function HelpCenterClient() {
             )}
           </>
         ) : (
-          <div className="rounded-2xl border border-[var(--border,#e7e5e4)] bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-[var(--border,#e7e5e4)] bg-[var(--bg-card)] p-5 shadow-sm">
             <div className="mb-5">
               <h2 className="text-base font-bold text-stone-800">Hubungi Tim Support</h2>
               <p className="mt-0.5 text-sm text-stone-500">

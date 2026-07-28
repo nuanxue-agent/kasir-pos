@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import {
   ShoppingBag, BarChart3, Package, Users, CheckCircle, ArrowRight,
-  Star, Wifi, WifiOff, Store, FileText, Zap,
+  Star, WifiOff, Store, FileText, Zap,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 // Demo credentials used site-wide
 export const DEMO_EMAIL = 'owner@demo.com'
@@ -61,28 +62,29 @@ export const PRICING_TIERS = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#fffdf7] text-[#1c1917]">
+    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-1)]">
       {/* ── Nav ── */}
-      <header className="sticky top-0 z-50 bg-[#fffdf7]/90 backdrop-blur-md border-b border-amber-100">
+      <header className="sticky top-0 z-50 bg-[var(--bg-canvas)]/90 backdrop-blur-md border-b border-[var(--border)]">
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-amber-200">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
               <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="text-xl font-bold tracking-tight text-[#1c1917]">Kasir POS</span>
+            <span className="text-xl font-bold tracking-tight text-[var(--text-1)]">Kasir POS</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#fitur" className="text-sm text-stone-500 hover:text-amber-600 transition-colors">Fitur</a>
-            <a href="#screenshot" className="text-sm text-stone-500 hover:text-amber-600 transition-colors">Tampilan</a>
-            <a href="#harga" className="text-sm text-stone-500 hover:text-amber-600 transition-colors">Harga</a>
+            <a href="#fitur" className="text-sm text-[var(--text-2)] hover:text-[var(--accent)] transition-colors">Fitur</a>
+            <a href="#screenshot" className="text-sm text-[var(--text-2)] hover:text-[var(--accent)] transition-colors">Tampilan</a>
+            <a href="#harga" className="text-sm text-[var(--text-2)] hover:text-[var(--accent)] transition-colors">Harga</a>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-stone-500 hover:text-[#1c1917] transition-colors hidden sm:block">
+            <ThemeToggle />
+            <Link href="/login" className="text-sm text-[var(--text-2)] hover:text-[var(--text-1)] transition-colors hidden sm:block">
               Masuk
             </Link>
             <Link
               href={DEMO_LOGIN_HREF}
-              className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all hover:scale-[1.02]"
+              className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/20 hover:bg-[var(--accent-hover)] transition-all hover:scale-[1.02]"
             >
               Coba Demo Gratis
             </Link>
@@ -94,20 +96,20 @@ export default function LandingPage() {
       <section className="px-6 pt-20 pb-24 lg:pt-28 lg:pb-32">
         <div className="mx-auto max-w-3xl text-center">
           {/* Badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm text-amber-700">
-            <span className="text-amber-500">✦</span>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/50 px-4 py-1.5 text-sm text-indigo-700 dark:text-indigo-300">
+            <span className="text-indigo-500">✦</span>
             Gratis untuk 1 toko — Tanpa kartu kredit
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-bold leading-[1.1] tracking-tight">
             Kasir POS —{' '}
-            <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
               Solusi Kasir Modern
             </span>
             {' '}untuk UMKM Indonesia
           </h1>
 
-          <p className="mt-6 text-lg text-stone-500 leading-relaxed max-w-xl mx-auto">
+          <p className="mt-6 text-lg text-[var(--text-2)] leading-relaxed max-w-xl mx-auto">
             Kelola penjualan, stok, laporan, dan multi-toko — semuanya dari satu aplikasi.
             Bekerja online maupun offline.
           </p>
@@ -115,7 +117,7 @@ export default function LandingPage() {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href={DEMO_LOGIN_HREF}
-              className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-amber-200 hover:shadow-amber-300 hover:scale-[1.02] transition-all"
+              className="group flex items-center gap-2 rounded-xl bg-[var(--accent)] px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-indigo-500/20 hover:bg-[var(--accent-hover)] hover:scale-[1.02] transition-all"
               data-testid="cta-demo"
             >
               Coba Demo Gratis
@@ -123,7 +125,7 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl border border-stone-200 px-7 py-3.5 text-sm font-semibold text-stone-600 hover:border-amber-300 hover:text-amber-700 transition-all"
+              className="rounded-xl border border-[var(--border)] px-7 py-3.5 text-sm font-semibold text-[var(--text-2)] hover:border-indigo-400 hover:text-[var(--accent)] transition-all"
             >
               Mulai Gratis — Tanpa Kartu Kredit
             </Link>
@@ -132,9 +134,9 @@ export default function LandingPage() {
           {/* Social proof */}
           <div className="mt-8 flex items-center justify-center gap-1.5">
             {[...Array(5)].map((_, i) => (
-              <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
+              <Star key={i} className="h-4 w-4 fill-indigo-400 text-indigo-400" />
             ))}
-            <span className="ml-2 text-sm text-stone-500" data-testid="social-proof">
+            <span className="ml-2 text-sm text-[var(--text-2)]" data-testid="social-proof">
               Dipercaya oleh 500+ toko di Indonesia
             </span>
           </div>
@@ -142,51 +144,51 @@ export default function LandingPage() {
 
         {/* App preview mock */}
         <div className="mx-auto mt-16 max-w-4xl">
-          <div className="relative rounded-2xl border border-amber-100 bg-white shadow-2xl shadow-amber-100/60 overflow-hidden">
+          <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl shadow-indigo-500/10 overflow-hidden">
             {/* Fake browser bar */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-100 bg-stone-50">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-subtle)]">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-red-400/70" />
-                <div className="w-3 h-3 rounded-full bg-amber-400/70" />
+                <div className="w-3 h-3 rounded-full bg-yellow-400/70" />
                 <div className="w-3 h-3 rounded-full bg-emerald-400/70" />
               </div>
               <div className="flex-1 flex justify-center">
-                <div className="flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-1 text-xs text-stone-400">
+                <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-canvas)] px-3 py-1 text-xs text-[var(--text-3)]">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   kasir-pos-alpha.vercel.app — Kasir POS
                 </div>
               </div>
             </div>
             {/* Mock POS UI */}
-            <div className="grid grid-cols-3 min-h-[280px] bg-[#fffdf7]">
+            <div className="grid grid-cols-3 min-h-[280px] bg-[var(--bg-canvas)]">
               {/* Products grid */}
               <div className="col-span-2 p-4 grid grid-cols-3 gap-3">
                 {['Ayam Bakar', 'Es Teh Manis', 'Mie Goreng', 'Kopi Hitam', 'Pisang Goreng', 'Keripik'].map((name, i) => (
-                  <div key={name} className="rounded-xl border border-amber-100 bg-white p-3 flex flex-col gap-2 shadow-sm">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-lg">
+                  <div key={name} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 flex flex-col gap-2 shadow-sm">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-lg">
                       {['🍗','🧋','🍜','☕','🍌','🍿'][i]}
                     </div>
-                    <p className="text-xs font-medium text-stone-700 leading-tight">{name}</p>
-                    <p className="text-xs font-bold text-amber-600">Rp{[35,8,22,10,10,12][i]}k</p>
+                    <p className="text-xs font-medium text-[var(--text-1)] leading-tight">{name}</p>
+                    <p className="text-xs font-bold text-indigo-500">Rp{[35,8,22,10,10,12][i]}k</p>
                   </div>
                 ))}
               </div>
               {/* Cart */}
-              <div className="border-l border-amber-100 bg-white p-4 flex flex-col gap-3">
-                <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Pesanan</p>
+              <div className="border-l border-[var(--border)] bg-[var(--bg-card)] p-4 flex flex-col gap-3">
+                <p className="text-xs font-semibold text-[var(--text-3)] uppercase tracking-wider">Pesanan</p>
                 <div className="space-y-2">
                   {[['Ayam Bakar','Rp35k'],['Es Teh Manis','Rp8k']].map(([n,p]) => (
                     <div key={n} className="flex justify-between items-center text-xs">
-                      <span className="text-stone-600">{n}</span>
-                      <span className="font-medium text-stone-800">{p}</span>
+                      <span className="text-[var(--text-2)]">{n}</span>
+                      <span className="font-medium text-[var(--text-1)]">{p}</span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-auto border-t border-stone-100 pt-3">
-                  <div className="flex justify-between text-sm font-bold text-stone-800">
+                <div className="mt-auto border-t border-[var(--border)] pt-3">
+                  <div className="flex justify-between text-sm font-bold text-[var(--text-1)]">
                     <span>Total</span><span>Rp43k</span>
                   </div>
-                  <div className="mt-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-center text-xs font-semibold text-white">
+                  <div className="mt-2 rounded-xl bg-[var(--accent)] py-2 text-center text-xs font-semibold text-white">
                     Bayar
                   </div>
                 </div>
@@ -197,17 +199,17 @@ export default function LandingPage() {
       </section>
 
       {/* ── Stats ── */}
-      <section className="border-y border-amber-100 bg-amber-50/50">
+      <section className="border-y border-[var(--border)] bg-[var(--bg-subtle)]">
         <div className="mx-auto max-w-4xl px-6 py-10">
-          <div className="grid grid-cols-3 divide-x divide-amber-100">
+          <div className="grid grid-cols-3 divide-x divide-[var(--border)]">
             {[
               ['10.000+', 'Transaksi dicatat'],
               ['500+', 'Toko aktif'],
               ['99.9%', 'Uptime'],
             ].map(([val, label]) => (
               <div key={label} className="px-6 text-center">
-                <div className="text-3xl font-bold text-amber-600">{val}</div>
-                <div className="mt-1 text-sm text-stone-500">{label}</div>
+                <div className="text-3xl font-bold text-[var(--accent)]">{val}</div>
+                <div className="mt-1 text-sm text-[var(--text-2)]">{label}</div>
               </div>
             ))}
           </div>
@@ -218,9 +220,9 @@ export default function LandingPage() {
       <section id="fitur" className="px-6 py-24">
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Fitur</p>
-            <h2 className="text-3xl sm:text-4xl font-bold">Semua yang kamu butuhkan</h2>
-            <p className="mt-3 text-stone-500">Dirancang khusus untuk UMKM yang ingin rapi tanpa ribet.</p>
+            <p className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest mb-3">Fitur</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-1)]">Semua yang kamu butuhkan</h2>
+            <p className="mt-3 text-[var(--text-2)]">Dirancang khusus untuk UMKM yang ingin rapi tanpa ribet.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -233,18 +235,13 @@ export default function LandingPage() {
                 offline:    'Tetap bisa transaksi meski koneksi internet putus. Sinkronisasi otomatis.',
                 customers:  'Simpan data pelanggan, kelola poin loyalitas, dan beri reward.',
               }
-              const colors: Record<string, string> = {
-                pos: 'bg-amber-50 text-amber-600', inventory: 'bg-orange-50 text-orange-600',
-                reports: 'bg-amber-50 text-amber-600', multistore: 'bg-orange-50 text-orange-600',
-                offline: 'bg-stone-100 text-stone-600', customers: 'bg-amber-50 text-amber-600',
-              }
               return (
-                <div key={id} className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-amber-200 transition-all">
-                  <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${colors[id]} mb-4`}>
+                <div key={id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-[var(--accent)] mb-4">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <h3 className="font-semibold text-stone-800 mb-2">{title}</h3>
-                  <p className="text-sm text-stone-500 leading-relaxed">{descs[id]}</p>
+                  <h3 className="font-semibold text-[var(--text-1)] mb-2">{title}</h3>
+                  <p className="text-sm text-[var(--text-2)] leading-relaxed">{descs[id]}</p>
                 </div>
               )
             })}
@@ -253,31 +250,31 @@ export default function LandingPage() {
       </section>
 
       {/* ── Screenshots (placeholder) ── */}
-      <section id="screenshot" className="px-6 py-24 bg-amber-50/40">
+      <section id="screenshot" className="px-6 py-24 bg-[var(--bg-subtle)]">
         <div className="mx-auto max-w-5xl">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Tampilan Aplikasi</p>
-            <h2 className="text-3xl sm:text-4xl font-bold">Antarmuka yang bersih & intuitif</h2>
-            <p className="mt-3 text-stone-500">Dirancang agar siapa pun bisa langsung pakai tanpa pelatihan.</p>
+            <p className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest mb-3">Tampilan Aplikasi</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-1)]">Antarmuka yang bersih &amp; intuitif</h2>
+            <p className="mt-3 text-[var(--text-2)]">Dirancang agar siapa pun bisa langsung pakai tanpa pelatihan.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {[
-              { label: 'Dashboard Penjualan', color: 'from-amber-400/30 to-orange-400/20', icon: BarChart3, desc: 'Ringkasan omzet & transaksi hari ini' },
-              { label: 'Layar Kasir (POS)', color: 'from-amber-500/25 to-amber-300/15', icon: ShoppingBag, desc: 'Pilih produk → tambah ke keranjang → bayar' },
-              { label: 'Laporan Bulanan', color: 'from-orange-400/30 to-amber-400/20', icon: FileText, desc: 'Grafik penjualan, produk terlaris, margin' },
+              { label: 'Dashboard Penjualan', color: 'from-indigo-500/30 to-purple-500/20', icon: BarChart3, desc: 'Ringkasan omzet & transaksi hari ini' },
+              { label: 'Layar Kasir (POS)', color: 'from-indigo-600/25 to-indigo-400/15', icon: ShoppingBag, desc: 'Pilih produk → tambah ke keranjang → bayar' },
+              { label: 'Laporan Bulanan', color: 'from-purple-500/30 to-indigo-400/20', icon: FileText, desc: 'Grafik penjualan, produk terlaris, margin' },
             ].map(({ label, color, icon: Icon, desc }) => (
-              <div key={label} className="rounded-2xl border border-amber-100 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all">
+              <div key={label} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden shadow-sm hover:shadow-md transition-all">
                 {/* placeholder colored "screenshot" */}
                 <div className={`h-44 bg-gradient-to-br ${color} flex items-center justify-center`}>
                   <div className="text-center">
-                    <Icon className="mx-auto h-10 w-10 text-amber-500/60 mb-2" />
-                    <span className="text-xs text-amber-700/60 font-medium">{label}</span>
+                    <Icon className="mx-auto h-10 w-10 text-indigo-400/70 mb-2" />
+                    <span className="text-xs text-indigo-500/80 dark:text-indigo-300/80 font-medium">{label}</span>
                   </div>
                 </div>
                 <div className="p-4">
-                  <p className="text-sm font-semibold text-stone-700">{label}</p>
-                  <p className="text-xs text-stone-400 mt-1">{desc}</p>
+                  <p className="text-sm font-semibold text-[var(--text-1)]">{label}</p>
+                  <p className="text-xs text-[var(--text-3)] mt-1">{desc}</p>
                 </div>
               </div>
             ))}
@@ -286,7 +283,7 @@ export default function LandingPage() {
           <div className="mt-10 text-center">
             <Link
               href={DEMO_LOGIN_HREF}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-amber-200 hover:shadow-amber-300 hover:scale-[1.02] transition-all"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-indigo-500/20 hover:bg-[var(--accent-hover)] hover:scale-[1.02] transition-all"
             >
               <Zap className="h-4 w-4" />
               Coba Demo Gratis Sekarang
@@ -299,8 +296,8 @@ export default function LandingPage() {
       <section className="px-6 py-24">
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Cara Kerja</p>
-            <h2 className="text-3xl sm:text-4xl font-bold">Siap pakai dalam 5 menit</h2>
+            <p className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest mb-3">Cara Kerja</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-1)]">Siap pakai dalam 5 menit</h2>
           </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             {[
@@ -309,11 +306,11 @@ export default function LandingPage() {
               { n: '03', title: 'Mulai jualan', desc: 'Buka kasir dari HP atau laptop, catat transaksi, lihat laporan.' },
             ].map(({ n, title, desc }) => (
               <div key={n} className="text-center">
-                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-2xl font-bold text-white shadow-lg shadow-amber-200">
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-bold text-white shadow-lg shadow-indigo-500/20">
                   {n}
                 </div>
-                <h3 className="font-semibold text-stone-800 mb-2">{title}</h3>
-                <p className="text-sm text-stone-500 leading-relaxed">{desc}</p>
+                <h3 className="font-semibold text-[var(--text-1)] mb-2">{title}</h3>
+                <p className="text-sm text-[var(--text-2)] leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -321,12 +318,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── Pricing ── */}
-      <section id="harga" className="px-6 py-24 bg-amber-50/40">
+      <section id="harga" className="px-6 py-24 bg-[var(--bg-subtle)]">
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-amber-600 uppercase tracking-widest mb-3">Harga</p>
-            <h2 className="text-3xl sm:text-4xl font-bold">Harga yang masuk akal</h2>
-            <p className="mt-3 text-stone-500">Tidak ada biaya tersembunyi. Batalkan kapan saja.</p>
+            <p className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest mb-3">Harga</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-1)]">Harga yang masuk akal</h2>
+            <p className="mt-3 text-[var(--text-2)]">Tidak ada biaya tersembunyi. Batalkan kapan saja.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -335,27 +332,27 @@ export default function LandingPage() {
                 key={id}
                 data-testid={`pricing-${id}`}
                 className={`relative rounded-2xl p-8 ${highlight
-                  ? 'bg-gradient-to-b from-amber-500 to-orange-500 text-white shadow-2xl shadow-amber-200 scale-[1.02]'
-                  : 'bg-white border border-stone-100 shadow-sm'}`}
+                  ? 'bg-gradient-to-b from-indigo-600 to-purple-700 text-white shadow-2xl shadow-indigo-500/30 scale-[1.02]'
+                  : 'bg-[var(--bg-card)] border border-[var(--border)] shadow-sm'}`}
               >
                 {highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-600 shadow">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-600 shadow">
                     Paling Populer
                   </div>
                 )}
-                <div className={`text-sm font-semibold uppercase tracking-widest ${highlight ? 'text-amber-100' : 'text-stone-400'}`}>
+                <div className={`text-sm font-semibold uppercase tracking-widest ${highlight ? 'text-indigo-200' : 'text-[var(--text-3)]'}`}>
                   {name}
                 </div>
                 <div className="mt-3 flex items-baseline gap-1">
                   <span className="text-4xl font-bold">{label}</span>
-                  <span className={`text-sm ${highlight ? 'text-amber-100' : 'text-stone-400'}`}>{per}</span>
+                  <span className={`text-sm ${highlight ? 'text-indigo-200' : 'text-[var(--text-3)]'}`}>{per}</span>
                 </div>
-                <p className={`mt-2 text-sm ${highlight ? 'text-amber-100' : 'text-stone-500'}`}>{desc}</p>
+                <p className={`mt-2 text-sm ${highlight ? 'text-indigo-200' : 'text-[var(--text-2)]'}`}>{desc}</p>
                 <ul className="mt-6 space-y-2.5">
                   {features.map(f => (
                     <li key={f} className="flex items-center gap-2.5 text-sm">
-                      <CheckCircle className={`h-4 w-4 shrink-0 ${highlight ? 'text-white' : 'text-amber-500'}`} />
-                      <span className={highlight ? 'text-white' : 'text-stone-600'}>{f}</span>
+                      <CheckCircle className={`h-4 w-4 shrink-0 ${highlight ? 'text-indigo-200' : 'text-[var(--accent)]'}`} />
+                      <span className={highlight ? 'text-white' : 'text-[var(--text-2)]'}>{f}</span>
                     </li>
                   ))}
                 </ul>
@@ -363,8 +360,8 @@ export default function LandingPage() {
                   href={ctaHref}
                   className={`mt-8 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all ${
                     highlight
-                      ? 'bg-white text-amber-600 hover:bg-amber-50'
-                      : 'border border-stone-200 text-stone-700 hover:border-amber-300 hover:text-amber-700'
+                      ? 'bg-white text-indigo-600 hover:bg-indigo-50'
+                      : 'border border-[var(--border)] text-[var(--text-1)] hover:border-indigo-400 hover:text-[var(--accent)]'
                   }`}
                 >
                   {cta}
@@ -376,14 +373,14 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="px-6 py-24 bg-gradient-to-br from-amber-500 to-orange-500">
+      <section className="px-6 py-24 bg-gradient-to-br from-indigo-600 to-purple-700">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white">Siap rapikan tokomu?</h2>
-          <p className="mt-4 text-amber-100 text-lg">
+          <p className="mt-4 text-indigo-200 text-lg">
             Bergabung dengan 500+ pemilik toko yang sudah pakai Kasir POS. Gratis untuk mulai.
           </p>
           <div className="mt-8 flex flex-wrap gap-4 justify-center">
-            <Link href="/signup" className="rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-amber-600 hover:bg-amber-50 transition-colors shadow-lg">
+            <Link href="/signup" className="rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors shadow-lg">
               Mulai Sekarang — Gratis
             </Link>
             <Link
@@ -397,24 +394,24 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-stone-100 px-6 py-10">
+      <footer className="bg-[#0f172a] px-6 py-10">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
               <ShoppingBag className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-bold text-stone-800">Kasir POS</span>
+            <span className="font-bold text-slate-200">Kasir POS</span>
           </div>
-          <div className="flex flex-wrap gap-6 text-sm text-stone-400">
-            <a href="#fitur" className="hover:text-amber-600 transition-colors">Fitur</a>
-            <a href="#screenshot" className="hover:text-amber-600 transition-colors">Tampilan</a>
-            <a href="#harga" className="hover:text-amber-600 transition-colors">Harga</a>
-            <Link href="/login" className="hover:text-amber-600 transition-colors">Masuk</Link>
-            <Link href="/signup" className="hover:text-amber-600 transition-colors">Daftar</Link>
-            <a href="#" className="hover:text-amber-600 transition-colors">Syarat &amp; Ketentuan</a>
-            <a href="#" className="hover:text-amber-600 transition-colors">Privasi</a>
+          <div className="flex flex-wrap gap-6 text-sm text-slate-400">
+            <a href="#fitur" className="hover:text-indigo-400 transition-colors">Fitur</a>
+            <a href="#screenshot" className="hover:text-indigo-400 transition-colors">Tampilan</a>
+            <a href="#harga" className="hover:text-indigo-400 transition-colors">Harga</a>
+            <Link href="/login" className="hover:text-indigo-400 transition-colors">Masuk</Link>
+            <Link href="/signup" className="hover:text-indigo-400 transition-colors">Daftar</Link>
+            <a href="#" className="hover:text-indigo-400 transition-colors">Syarat &amp; Ketentuan</a>
+            <a href="#" className="hover:text-indigo-400 transition-colors">Privasi</a>
           </div>
-          <p className="text-xs text-stone-400">© 2026 Kasir POS. All rights reserved.</p>
+          <p className="text-xs text-slate-500">© 2026 Kasir POS. All rights reserved.</p>
         </div>
       </footer>
     </div>

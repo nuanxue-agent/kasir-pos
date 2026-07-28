@@ -249,7 +249,7 @@ export function CustomerDetailModal({
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-stone-200 bg-white shadow-2xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-stone-200 bg-[var(--bg-card)] shadow-2xl">
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-stone-800">Customer Details</h2>
@@ -315,7 +315,7 @@ export function CustomerDetailModal({
 
                 {/* Stats row */}
                 <div className="grid grid-cols-3 gap-3 pt-1">
-                  <div className="rounded-lg border border-stone-100 bg-white px-3 py-3">
+                  <div className="rounded-lg border border-stone-100 bg-[var(--bg-card)] px-3 py-3">
                     <div className="mb-1 flex items-center gap-1.5">
                       <ShoppingBag className="h-3.5 w-3.5 text-stone-400" />
                       <p className="text-xs text-stone-500">Visits</p>
@@ -324,7 +324,7 @@ export function CustomerDetailModal({
                       {stats?.visitCount ?? customer.totalOrders}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-stone-100 bg-white px-3 py-3">
+                  <div className="rounded-lg border border-stone-100 bg-[var(--bg-card)] px-3 py-3">
                     <div className="mb-1 flex items-center gap-1.5">
                       <TrendingUp className="h-3.5 w-3.5 text-stone-400" />
                       <p className="text-xs text-stone-500">Total Spent</p>
@@ -333,7 +333,7 @@ export function CustomerDetailModal({
                       {formatCurrency(stats?.totalSpent ?? customer.totalSpent, currency)}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-stone-100 bg-white px-3 py-3">
+                  <div className="rounded-lg border border-stone-100 bg-[var(--bg-card)] px-3 py-3">
                     <div className="mb-1 flex items-center gap-1.5">
                       <Award className="h-3.5 w-3.5 text-stone-400" />
                       <p className="text-xs text-stone-500">Avg Order</p>
@@ -401,7 +401,7 @@ export function CustomerDetailModal({
                         type="number"
                         placeholder="e.g. 50 or -20"
                         className={cn(
-                          'w-full rounded-lg border bg-white px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none',
+                          'w-full rounded-lg border bg-[var(--bg-card)] px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none',
                           errors.delta ? 'border-red-400' : 'border-stone-200',
                         )}
                       />
@@ -416,7 +416,7 @@ export function CustomerDetailModal({
                         type="text"
                         placeholder="e.g. Compensation"
                         className={cn(
-                          'w-full rounded-lg border bg-white px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none',
+                          'w-full rounded-lg border bg-[var(--bg-card)] px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 focus:outline-none',
                           errors.reason ? 'border-red-400' : 'border-stone-200',
                         )}
                       />

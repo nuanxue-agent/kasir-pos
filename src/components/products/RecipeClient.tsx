@@ -453,7 +453,7 @@ export default function RecipeClient({ storeId, currency, products }: RecipeClie
             className={cn(
               'px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
               tab === t
-                ? 'bg-white text-[var(--text-1)] shadow-sm'
+                ? 'bg-[var(--bg-card)] text-[var(--text-1)] shadow-sm'
                 : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
             )}
           >
