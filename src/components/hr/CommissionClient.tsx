@@ -1,22 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Trophy,
   Plus,
   X,
   TrendingUp,
   DollarSign,
-  Calculator,
+  CheckCircle,
+  Banknote,
   ChevronLeft,
   ChevronRight,
-  Edit2,
-  Trash2,
+  Settings,
+  ReceiptText,
   Medal,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
 const MONTH_NAMES = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -25,6 +27,9 @@ const MONTH_NAMES = [
 
 const inputCls =
   'w-full bg-[var(--bg-subtle)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-[var(--text-1)] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition-all'
+
+type CommissionType = 'FIXED' | 'PERCENTAGE' | 'TIERED'
+type CommissionStatus = 'PENDING' | 'APPROVED' | 'PAID'
 
 interface CommissionClientProps {
   storeId: string
@@ -36,22 +41,67 @@ interface CommissionRule {
   storeId: string
   employeeId: string | null
   employeeName?: string
-  type: 'PERCENTAGE' | 'FLAT' | 'TIERED'
+  type: CommissionType
   value: number
-  tiers: string | null
-  effectiveFrom: string
+  minSales: number
+  maxSales: number | null
+  productCategory: string | null
+  tiers: Array<{ minSales: number; maxSales: number | null; rate: number }> | null
+  active: boolean
+}
+
+interface CommissionEntry {
+  id: string
+  ruleId: string
+  employeeId: string
+  employeeName?: string
+  orderId: string
+  saleAmount: number
+  commissionAmount: number
+  period: string
+  status: CommissionStatus
+  paidAt: string | null
+  createdAt: string
 }
 
 interface CommissionSummary {
   employeeId: string
   employeeName: string
-  position: string
-  ordersClosed: number
+  period: string
   totalSales: number
-  commissionEarned: number
+  totalCommission: number
+  pendingCount: number
+  approvedCount: number
+  paidCount: number
+  entryCount: number
 }
 
-// ── Rule Form ─────────────────────────────────────────────────────────────────
+const TYPE_LABEL: Record<CommissionType, string> = {
+  FIXED: 'Flat per Order',
+  PERCENTAGE: 'Persentase (%)',
+  TIERED: 'Bertingkat',
+}
+
+const STATUS_CONFIG: Record<CommissionStatus, { label: string; pill: string }> = {
+  PENDING: { label: 'Menunggu', pill: 'bg-yellow-50 text-yellow-700 border border-yellow-200' },
+  APPROVED: { label: 'Disetujui', pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  PAID: { label: 'Dibayar', pill: 'bg-blue-50 text-blue-700 border border-blue-200' },
+}
+
+const TROPHY_COLORS = [
+  'text-yellow-500', 'text-slate-400', 'text-amber-600', 'text-[var(--text-3)]', 'text-[var(--text-3)]',
+]
+const RANK_ICONS = [Trophy, Trophy, Medal, Medal, Medal]
+
+function fmt(n: number, currency: string) {
+  return formatCurrency(n, currency)
+}
+
+function currentPeriod() {
+  return new Date().toISOString().slice(0, 7)
+}
+
+// ── Rule Form Modal ───────────────────────────────────────────────────────────
 function RuleForm({
   storeId,
   employees,
@@ -67,10 +117,15 @@ function RuleForm({
 }) {
   const [form, setForm] = useState({
     employeeId: rule?.employeeId ?? '',
-    type: rule?.type ?? 'PERCENTAGE',
-    value: rule?.value ?? 0,
-    tiersJson: rule?.tiers ?? '[{"upTo":10000000,"rate":2},{"upTo":null,"rate":3}]',
-    effectiveFrom: rule?.effectiveFrom?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+    type: (rule?.type ?? 'PERCENTAGE') as CommissionType,
+    value: String(rule?.value ?? 5),
+    minSales: String(rule?.minSales ?? 0),
+    maxSales: rule?.maxSales != null ? String(rule.maxSales) : '',
+    productCategory: rule?.productCategory ?? '',
+    tiersJson: rule?.tiers
+      ? JSON.stringify(rule.tiers, null, 2)
+      : '[{"minSales":0,"maxSales":10000000,"rate":2},{"minSales":10000000,"maxSales":null,"rate":3}]',
+    active: rule?.active ?? true,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -82,24 +137,34 @@ function RuleForm({
     setError('')
     setSaving(true)
     try {
-      const tiers = form.type === 'TIERED' ? JSON.parse(form.tiersJson) : null
+      let tiers = null
+      if (form.type === 'TIERED') {
+        tiers = JSON.parse(form.tiersJson)
+      }
+      const payload: any = {
+        storeId,
+        employeeId: form.employeeId || null,
+        type: form.type,
+        value: Number(form.value),
+        minSales: Number(form.minSales),
+        maxSales: form.maxSales ? Number(form.maxSales) : null,
+        productCategory: form.productCategory || null,
+        tiers,
+        active: form.active,
+      }
       const url = rule
-        ? `/api/hr/commission-rules?storeId=${storeId}&id=${rule.id}`
-        : `/api/hr/commission-rules?storeId=${storeId}`
+        ? `/api/commission-rules/${rule.id}`
+        : '/api/commission-rules'
       const res = await fetch(url, {
         method: rule ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employeeId: form.employeeId || null,
-          type: form.type,
-          value: Number(form.value),
-          tiers,
-          effectiveFrom: form.effectiveFrom,
-        }),
+        body: JSON.stringify(payload),
       })
-      if (res.ok) onSaved()
-      else {
-        const d = (await res.json()) as any
+      if (res.ok) {
+        toast.success(rule ? 'Aturan diperbarui' : 'Aturan ditambahkan')
+        onSaved()
+      } else {
+        const d = await res.json() as any
         setError(d.error ?? 'Gagal menyimpan')
       }
     } catch {
@@ -121,9 +186,7 @@ function RuleForm({
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {error && (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {error}
-            </p>
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">
@@ -137,13 +200,11 @@ function RuleForm({
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">
-              Tipe Komisi
-            </label>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Tipe Komisi</label>
             <select value={form.type} onChange={set('type')} className={inputCls}>
-              <option value="PERCENTAGE">Persentase dari Penjualan (%)</option>
-              <option value="FLAT">Flat per Order (Rp)</option>
-              <option value="TIERED">Bertingkat (Tiered)</option>
+              {(Object.keys(TYPE_LABEL) as CommissionType[]).map(t => (
+                <option key={t} value={t}>{TYPE_LABEL[t]}</option>
+              ))}
             </select>
           </div>
           {form.type !== 'TIERED' && (
@@ -152,57 +213,176 @@ function RuleForm({
                 {form.type === 'PERCENTAGE' ? 'Persentase (%)' : 'Nominal per Order (Rp)'}
               </label>
               <input
-                type="number"
-                min="0"
-                step={form.type === 'PERCENTAGE' ? '0.1' : '1000'}
-                value={form.value}
-                onChange={set('value')}
-                className={inputCls}
+                type="number" min="0" step={form.type === 'PERCENTAGE' ? '0.1' : '1000'}
+                value={form.value} onChange={set('value')} className={inputCls}
               />
             </div>
           )}
           {form.type === 'TIERED' && (
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">
-                Tiers (JSON) — upTo: batas penjualan, rate: % komisi. upTo: null = tidak terbatas
+                Tiers (JSON) — minSales, maxSales (null=tak terbatas), rate (%)
               </label>
               <textarea
-                value={form.tiersJson}
-                onChange={set('tiersJson')}
-                rows={5}
+                value={form.tiersJson} onChange={set('tiersJson')} rows={5}
                 className={inputCls + ' resize-none font-mono text-xs'}
-                placeholder='[{"upTo":10000000,"rate":2},{"upTo":null,"rate":3}]'
               />
-              <p className="mt-1 text-xs text-[var(--text-3)]">
-                Contoh: 2% s.d. 10jt, 3% di atas 10jt
-              </p>
             </div>
           )}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">
-              Berlaku Mulai
-            </label>
-            <input
-              type="date"
-              value={form.effectiveFrom}
-              onChange={set('effectiveFrom')}
-              className={inputCls}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Min. Penjualan (Rp)</label>
+              <input type="number" min="0" value={form.minSales} onChange={set('minSales')} className={inputCls} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Maks. Penjualan (kosong=tak terbatas)</label>
+              <input type="number" min="0" value={form.maxSales} onChange={set('maxSales')} placeholder="Tak terbatas" className={inputCls} />
+            </div>
           </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Kategori Produk (opsional)</label>
+            <input type="text" value={form.productCategory} onChange={set('productCategory')} placeholder="mis. Elektronik" className={inputCls} />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-[var(--text-1)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={e => setForm(f => ({ ...f, active: e.target.checked }))}
+              className="rounded"
+            />
+            Aturan aktif
+          </label>
         </div>
         <div className="flex gap-3 border-t border-[var(--border)] p-4">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl bg-[var(--bg-muted)] py-2.5 text-sm font-semibold text-[var(--text-2)] hover:bg-stone-200"
-          >
+          <button onClick={onClose} className="flex-1 rounded-xl bg-[var(--bg-muted)] py-2.5 text-sm font-semibold text-[var(--text-2)] hover:bg-stone-200">
             Batal
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={saving}
+            onClick={handleSubmit} disabled={saving}
             className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-200 hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? 'Menyimpan…' : 'Simpan'}
+            {saving ? 'Menyimpan...' : 'Simpan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── New Entry Form Modal ──────────────────────────────────────────────────────
+function EntryForm({
+  storeId,
+  employees,
+  rules,
+  onClose,
+  onSaved,
+}: {
+  storeId: string
+  employees: any[]
+  rules: CommissionRule[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [form, setForm] = useState({
+    ruleId: rules[0]?.id ?? '',
+    employeeId: employees[0]?.id ?? '',
+    orderId: '',
+    saleAmount: '',
+    commissionAmount: '',
+    period: currentPeriod(),
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
+
+  async function handleSubmit() {
+    setError('')
+    const saleAmount = parseFloat(form.saleAmount)
+    const commissionAmount = parseFloat(form.commissionAmount)
+    if (!form.orderId.trim()) return setError('ID Order harus diisi')
+    if (isNaN(saleAmount) || saleAmount < 0) return setError('Nominal penjualan tidak valid')
+    if (isNaN(commissionAmount) || commissionAmount < 0) return setError('Komisi tidak valid')
+    setSaving(true)
+    const res = await fetch('/api/commission-entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storeId,
+        ruleId: form.ruleId,
+        employeeId: form.employeeId,
+        orderId: form.orderId.trim(),
+        saleAmount,
+        commissionAmount,
+        period: form.period,
+      }),
+    })
+    setSaving(false)
+    if (res.ok) {
+      toast.success('Entri komisi ditambahkan')
+      onSaved()
+    } else {
+      const d = await res.json() as any
+      setError(d.error ?? 'Gagal menyimpan')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex max-h-[92vh] w-full flex-col rounded-t-3xl bg-[var(--bg-card)] shadow-xl sm:max-w-md sm:rounded-xl">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+          <h2 className="font-bold text-[var(--text-1)]">Tambah Entri Komisi</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-[var(--bg-muted)]">
+            <X className="h-4 w-4 text-[var(--text-2)]" />
+          </button>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          {error && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+          )}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Aturan Komisi</label>
+            <select value={form.ruleId} onChange={set('ruleId')} className={inputCls}>
+              {rules.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.employeeName ? `${r.employeeName} — ` : 'Semua — '}{TYPE_LABEL[r.type]}
+                  {r.type === 'PERCENTAGE' ? ` ${r.value}%` : r.type === 'FIXED' ? ` Rp${r.value.toLocaleString()}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Karyawan</label>
+            <select value={form.employeeId} onChange={set('employeeId')} className={inputCls}>
+              {employees.map((e: any) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">ID Order</label>
+            <input type="text" value={form.orderId} onChange={set('orderId')} placeholder="ORD-001" className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Penjualan (Rp)</label>
+              <input type="number" min="0" value={form.saleAmount} onChange={set('saleAmount')} className={inputCls} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Komisi (Rp)</label>
+              <input type="number" min="0" value={form.commissionAmount} onChange={set('commissionAmount')} className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Periode</label>
+            <input type="month" value={form.period} onChange={set('period')} className={inputCls} />
+          </div>
+        </div>
+        <div className="flex gap-3 border-t border-[var(--border)] p-4">
+          <button onClick={onClose} className="flex-1 rounded-xl bg-[var(--bg-muted)] py-2.5 text-sm font-semibold text-[var(--text-2)]">Batal</button>
+          <button onClick={handleSubmit} disabled={saving} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50">
+            {saving ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
       </div>
@@ -211,22 +391,13 @@ function RuleForm({
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
-const TROPHY_COLORS = [
-  'text-yellow-500',
-  'text-slate-400',
-  'text-amber-600',
-  'text-[var(--text-3)]',
-  'text-[var(--text-3)]',
-]
-const RANK_ICONS = [Trophy, Trophy, Medal, Medal, Medal]
-
 function Leaderboard({ data, currency }: { data: CommissionSummary[]; currency: string }) {
-  const top5 = [...data].sort((a, b) => b.totalSales - a.totalSales).slice(0, 5)
+  const top5 = [...data].sort((a, b) => b.totalCommission - a.totalCommission).slice(0, 5)
   if (top5.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-card)] py-12 shadow-sm">
         <Trophy className="mb-3 h-10 w-10 text-stone-200" />
-        <p className="text-sm text-[var(--text-3)]">Belum ada data penjualan</p>
+        <p className="text-sm text-[var(--text-3)]">Belum ada data komisi</p>
       </div>
     )
   }
@@ -239,9 +410,7 @@ function Leaderboard({ data, currency }: { data: CommissionSummary[]; currency: 
             key={emp.employeeId}
             className={cn(
               'flex items-center gap-3 rounded-xl border p-4 shadow-sm',
-              i === 0
-                ? 'border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50'
-                : 'border-[var(--border)] bg-[var(--bg-card)]',
+              i === 0 ? 'border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50' : 'border-[var(--border)] bg-[var(--bg-card)]',
             )}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center">
@@ -249,15 +418,13 @@ function Leaderboard({ data, currency }: { data: CommissionSummary[]; currency: 
             </div>
             <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate font-semibold text-[var(--text-1)]">{emp.employeeName}</p>
+                <p className="truncate font-semibold text-[var(--text-1)]">{emp.employeeName ?? emp.employeeId}</p>
                 <p className="text-xs text-[var(--text-3)]">
-                  {emp.ordersClosed} order · {formatCurrency(emp.totalSales, currency)}
+                  {emp.entryCount} entri &bull; {fmt(emp.totalSales, currency)}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-bold text-emerald-600">
-                  +{formatCurrency(emp.commissionEarned, currency)}
-                </p>
+                <p className="font-bold text-emerald-600">+{fmt(emp.totalCommission, currency)}</p>
                 <p className="text-xs text-[var(--text-3)]">komisi</p>
               </div>
             </div>
@@ -268,65 +435,18 @@ function Leaderboard({ data, currency }: { data: CommissionSummary[]; currency: 
   )
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function CommissionClient({ storeId, currency }: CommissionClientProps) {
   const qc = useQueryClient()
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
-  const [tab, setTab] = useState<'summary' | 'rules'>('summary')
-  const [showForm, setShowForm] = useState(false)
+  const [tab, setTab] = useState<'summary' | 'entries' | 'rules'>('summary')
+  const [showRuleForm, setShowRuleForm] = useState(false)
+  const [showEntryForm, setShowEntryForm] = useState(false)
   const [editingRule, setEditingRule] = useState<CommissionRule | null>(null)
-  const [calculating, setCalculating] = useState(false)
-  const [calcResult, setCalcResult] = useState<string | null>(null)
 
-  // Fetch employees for dropdowns
-  const { data: employees = [] } = useQuery<any[]>({
-    queryKey: ['employees', storeId],
-    queryFn: () => fetch(`/api/employees?storeId=${storeId}`).then(r => r.json()),
-  })
-
-  // Fetch commission summary
-  const {
-    data: summary = [],
-    isLoading: summaryLoading,
-    refetch: refetchSummary,
-  } = useQuery<CommissionSummary[]>({
-    queryKey: ['commission', storeId, month, year],
-    queryFn: () =>
-      fetch(`/api/hr/commission?storeId=${storeId}&month=${month}&year=${year}`).then(r => r.json()),
-  })
-
-  // Fetch commission rules
-  const { data: rules = [], isLoading: rulesLoading } = useQuery<CommissionRule[]>({
-    queryKey: ['commission-rules', storeId],
-    queryFn: () => fetch(`/api/hr/commission-rules?storeId=${storeId}`).then(r => r.json()),
-  })
-
-  const deleteRule = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/hr/commission-rules?storeId=${storeId}&id=${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['commission-rules'] }),
-  })
-
-  async function calculate() {
-    setCalculating(true)
-    setCalcResult(null)
-    const res = await fetch('/api/hr/commission/calculate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storeId, month, year }),
-    })
-    const d = (await res.json()) as any
-    setCalculating(false)
-    if (res.ok) {
-      setCalcResult(`Berhasil: ${d.count ?? 0} karyawan dihitung`)
-      refetchSummary()
-      qc.invalidateQueries({ queryKey: ['commission'] })
-    } else {
-      setCalcResult(d.error ?? 'Gagal menghitung')
-    }
-  }
+  const period = `${year}-${String(month).padStart(2, '0')}`
 
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
@@ -337,15 +457,78 @@ export default function CommissionClient({ storeId, currency }: CommissionClient
     else setMonth(m => m + 1)
   }
 
-  const totalCommission = (summary as CommissionSummary[]).reduce(
-    (s, r) => s + r.commissionEarned, 0,
-  )
-  const totalSales = (summary as CommissionSummary[]).reduce((s, r) => s + r.totalSales, 0)
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['commission-summary', storeId] })
+    qc.invalidateQueries({ queryKey: ['commission-entries', storeId] })
+    qc.invalidateQueries({ queryKey: ['commission-rules', storeId] })
+  }
 
-  const TYPE_LABEL: Record<string, string> = {
-    PERCENTAGE: 'Persentase',
-    FLAT: 'Flat',
-    TIERED: 'Bertingkat',
+  const { data: employees = [] } = useQuery<any[]>({
+    queryKey: ['employees', storeId],
+    queryFn: () => fetch(`/api/employees?storeId=${storeId}`).then(r => r.json()),
+  })
+
+  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+    queryKey: ['commission-summary', storeId, period],
+    queryFn: async () => {
+      const res = await fetch(`/api/commission-entries/summary?storeId=${storeId}&period=${period}`)
+      return res.json() as Promise<{ data: CommissionSummary[]; period: string }>
+    },
+    enabled: tab === 'summary',
+  })
+
+  const { data: entriesData, isLoading: entriesLoading } = useQuery({
+    queryKey: ['commission-entries', storeId, period],
+    queryFn: async () => {
+      const res = await fetch(`/api/commission-entries?storeId=${storeId}&period=${period}`)
+      return res.json() as Promise<{ data: CommissionEntry[] }>
+    },
+    enabled: tab === 'entries',
+  })
+
+  const { data: rulesData, isLoading: rulesLoading } = useQuery({
+    queryKey: ['commission-rules', storeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/commission-rules?storeId=${storeId}&active=false`)
+      return res.json() as Promise<{ data: CommissionRule[] }>
+    },
+    enabled: tab === 'rules',
+  })
+
+  const summary: CommissionSummary[] = summaryData?.data ?? []
+  const entries: CommissionEntry[] = entriesData?.data ?? []
+  const rules: CommissionRule[] = rulesData?.data ?? []
+
+  const totalCommission = summary.reduce((s, r) => s + r.totalCommission, 0)
+  const totalSales = summary.reduce((s, r) => s + r.totalSales, 0)
+
+  async function doEntryAction(id: string, action: 'approve' | 'pay') {
+    const res = await fetch(`/api/commission-entries/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    if (res.ok) {
+      toast.success(action === 'approve' ? 'Disetujui' : 'Ditandai dibayar')
+      invalidate()
+    } else {
+      const d = await res.json() as any
+      toast.error(d.error ?? 'Gagal')
+    }
+  }
+
+  async function toggleRuleActive(rule: CommissionRule) {
+    const res = await fetch(`/api/commission-rules/${rule.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !rule.active }),
+    })
+    if (res.ok) {
+      toast.success(rule.active ? 'Aturan dinonaktifkan' : 'Aturan diaktifkan')
+      invalidate()
+    } else {
+      toast.error('Gagal mengubah status aturan')
+    }
   }
 
   return (
@@ -354,43 +537,50 @@ export default function CommissionClient({ storeId, currency }: CommissionClient
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-1)] sm:text-2xl">Komisi Penjualan</h1>
-          <p className="mt-0.5 text-sm text-[var(--text-3)]">
-            Aturan komisi, ringkasan, dan papan peringkat
-          </p>
+          <p className="mt-0.5 text-sm text-[var(--text-3)]">Aturan komisi, entri, dan ringkasan bulanan</p>
         </div>
-        {tab === 'rules' && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-200 transition-all hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" /> Tambah Aturan
-          </button>
-        )}
+        <div className="flex gap-2">
+          {tab === 'rules' && (
+            <button
+              onClick={() => { setEditingRule(null); setShowRuleForm(true) }}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-200 hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Tambah Aturan
+            </button>
+          )}
+          {tab === 'entries' && (
+            <button
+              onClick={() => setShowEntryForm(true)}
+              className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600"
+            >
+              <Plus className="h-4 w-4" /> Tambah Entri
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
-          <div className="mb-1 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50">
-              <DollarSign className="h-4 w-4 text-emerald-600" />
-            </div>
+          <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50">
+            <DollarSign className="h-4 w-4 text-emerald-600" />
           </div>
-          <p className="text-xl font-bold text-[var(--text-1)]">
-            {formatCurrency(totalCommission, currency)}
-          </p>
-          <p className="text-xs text-[var(--text-3)]">Total Komisi Bulan Ini</p>
+          <p className="text-xl font-bold text-[var(--text-1)]">{fmt(totalCommission, currency)}</p>
+          <p className="text-xs text-[var(--text-3)]">Total Komisi</p>
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm">
-          <div className="mb-1 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50">
-              <TrendingUp className="h-4 w-4 text-amber-500" />
-            </div>
+          <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50">
+            <TrendingUp className="h-4 w-4 text-amber-500" />
           </div>
-          <p className="text-xl font-bold text-[var(--text-1)]">
-            {formatCurrency(totalSales, currency)}
-          </p>
-          <p className="text-xs text-[var(--text-3)]">Total Penjualan Bulan Ini</p>
+          <p className="text-xl font-bold text-[var(--text-1)]">{fmt(totalSales, currency)}</p>
+          <p className="text-xs text-[var(--text-3)]">Total Penjualan</p>
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm col-span-2 sm:col-span-1">
+          <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50">
+            <ReceiptText className="h-4 w-4 text-blue-500" />
+          </div>
+          <p className="text-xl font-bold text-[var(--text-1)]">{summary.length}</p>
+          <p className="text-xs text-[var(--text-3)]">Karyawan dengan Komisi</p>
         </div>
       </div>
 
@@ -399,39 +589,18 @@ export default function CommissionClient({ storeId, currency }: CommissionClient
         <button onClick={prevMonth} className="rounded-lg p-1.5 hover:bg-[var(--bg-muted)]">
           <ChevronLeft className="h-4 w-4 text-[var(--text-2)]" />
         </button>
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-[var(--text-1)]">
-            {MONTH_NAMES[month - 1]} {year}
-          </span>
-          <button
-            onClick={calculate}
-            disabled={calculating}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
-          >
-            <Calculator className="h-3.5 w-3.5" />
-            {calculating ? 'Menghitung…' : 'Hitung Komisi'}
-          </button>
-        </div>
+        <span className="font-semibold text-[var(--text-1)]">{MONTH_NAMES[month - 1]} {year}</span>
         <button onClick={nextMonth} className="rounded-lg p-1.5 hover:bg-[var(--bg-muted)]">
           <ChevronRight className="h-4 w-4 text-[var(--text-2)]" />
         </button>
       </div>
-      {calcResult && (
-        <p className={cn(
-          'rounded-xl px-3 py-2 text-sm',
-          calcResult.startsWith('Berhasil')
-            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-            : 'border border-red-200 bg-red-50 text-red-600',
-        )}>
-          {calcResult}
-        </p>
-      )}
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-xl bg-[var(--bg-subtle)] p-1">
         {([
-          { key: 'summary', label: 'Ringkasan & Leaderboard', icon: Trophy },
-          { key: 'rules', label: 'Aturan Komisi', icon: TrendingUp },
+          { key: 'summary', label: 'Ringkasan', icon: Trophy },
+          { key: 'entries', label: 'Entri Komisi', icon: ReceiptText },
+          { key: 'rules', label: 'Aturan', icon: Settings },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -444,23 +613,20 @@ export default function CommissionClient({ storeId, currency }: CommissionClient
             )}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span>{label}</span>
+            <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
       </div>
 
-      {/* Summary + Leaderboard tab */}
+      {/* Summary tab */}
       {tab === 'summary' && (
         <div className="space-y-6">
-          {/* Leaderboard */}
           <div>
             <h2 className="mb-3 text-sm font-bold text-[var(--text-1)]">
-              🏆 Top 5 Tenaga Penjual — {MONTH_NAMES[month - 1]} {year}
+              Top Komisi — {MONTH_NAMES[month - 1]} {year}
             </h2>
-            <Leaderboard data={summary as CommissionSummary[]} currency={currency} />
+            <Leaderboard data={summary} currency={currency} />
           </div>
-
-          {/* Full summary table */}
           <div>
             <h2 className="mb-3 text-sm font-bold text-[var(--text-1)]">Ringkasan Per Karyawan</h2>
             {summaryLoading ? (
@@ -469,41 +635,32 @@ export default function CommissionClient({ storeId, currency }: CommissionClient
                   <div key={i} className="h-16 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
                 ))}
               </div>
-            ) : (summary as CommissionSummary[]).length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-card)] py-12 shadow-sm">
-                <Calculator className="mb-3 h-10 w-10 text-stone-200" />
-                <p className="text-sm text-[var(--text-3)]">
-                  Belum ada data. Klik "Hitung Komisi" untuk menghitung.
-                </p>
+            ) : summary.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] py-12">
+                <DollarSign className="mb-3 h-10 w-10 text-stone-200" />
+                <p className="text-sm text-[var(--text-3)]">Belum ada data komisi untuk periode ini</p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                 <table className="w-full text-sm">
                   <thead className="bg-[var(--bg-muted)] text-xs text-[var(--text-2)]">
                     <tr>
-                      {['Karyawan', 'Posisi', 'Order', 'Total Penjualan', 'Komisi'].map(h => (
+                      {['Karyawan', 'Total Penjualan', 'Komisi', 'Menunggu', 'Disetujui', 'Dibayar'].map(h => (
                         <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
-                    {(summary as CommissionSummary[])
-                      .sort((a, b) => b.totalSales - a.totalSales)
-                      .map(row => (
-                        <tr key={row.employeeId} className="hover:bg-[var(--bg-muted)]">
-                          <td className="px-4 py-3 font-medium text-[var(--text-1)]">
-                            {row.employeeName}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-2)]">{row.position}</td>
-                          <td className="px-4 py-3 text-[var(--text-2)]">{row.ordersClosed}</td>
-                          <td className="px-4 py-3 text-[var(--text-2)]">
-                            {formatCurrency(row.totalSales, currency)}
-                          </td>
-                          <td className="px-4 py-3 font-bold text-emerald-600">
-                            +{formatCurrency(row.commissionEarned, currency)}
-                          </td>
-                        </tr>
-                      ))}
+                    {[...summary].sort((a, b) => b.totalCommission - a.totalCommission).map(row => (
+                      <tr key={row.employeeId} className="hover:bg-[var(--bg-muted)]">
+                        <td className="px-4 py-3 font-medium text-[var(--text-1)]">{row.employeeName ?? row.employeeId}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">{fmt(row.totalSales, currency)}</td>
+                        <td className="px-4 py-3 font-semibold text-emerald-600">{fmt(row.totalCommission, currency)}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">{row.pendingCount}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">{row.approvedCount}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">{row.paidCount}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -512,90 +669,141 @@ export default function CommissionClient({ storeId, currency }: CommissionClient
         </div>
       )}
 
+      {/* Entries tab */}
+      {tab === 'entries' && (
+        <div className="space-y-3">
+          {entriesLoading ? (
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />)}
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] py-12">
+              <ReceiptText className="mb-3 h-10 w-10 text-stone-200" />
+              <p className="text-sm text-[var(--text-3)]">Belum ada entri komisi untuk periode ini</p>
+            </div>
+          ) : entries.map((entry) => {
+            const sc = STATUS_CONFIG[entry.status]
+            return (
+              <div key={entry.id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-[var(--text-1)]">{entry.employeeName ?? entry.employeeId}</span>
+                      <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', sc.pill)}>{sc.label}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-[var(--text-2)]">Order: {entry.orderId}</p>
+                    <p className="text-xs text-[var(--text-2)]">Periode: {entry.period}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-bold text-emerald-600">{fmt(entry.commissionAmount, currency)}</p>
+                    <p className="text-xs text-[var(--text-2)]">dari {fmt(entry.saleAmount, currency)}</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  {entry.status === 'PENDING' && (
+                    <button
+                      onClick={() => doEntryAction(entry.id, 'approve')}
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                    >
+                      <CheckCircle className="h-3 w-3" /> Setujui
+                    </button>
+                  )}
+                  {entry.status === 'APPROVED' && (
+                    <button
+                      onClick={() => doEntryAction(entry.id, 'pay')}
+                      className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                    >
+                      <Banknote className="h-3 w-3" /> Bayar
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Rules tab */}
       {tab === 'rules' && (
         <div className="space-y-3">
           {rulesLoading ? (
             <div className="space-y-2">
-              {[...Array(2)].map((_, i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
-              ))}
+              {[...Array(3)].map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />)}
             </div>
-          ) : (rules as CommissionRule[]).length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-card)] py-12 shadow-sm">
-              <TrendingUp className="mb-3 h-10 w-10 text-stone-200" />
+          ) : rules.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] py-12">
+              <Settings className="mb-3 h-10 w-10 text-stone-200" />
               <p className="text-sm text-[var(--text-3)]">Belum ada aturan komisi</p>
-              <button
-                onClick={() => setShowForm(true)}
-                className="mt-3 text-sm font-medium text-amber-500 hover:text-amber-600"
-              >
-                + Tambah aturan pertama
-              </button>
             </div>
-          ) : (
-            (rules as CommissionRule[]).map(rule => (
-              <div
-                key={rule.id}
-                className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        {TYPE_LABEL[rule.type]}
-                      </span>
-                      <span className="text-sm font-semibold text-[var(--text-1)]">
-                        {rule.employeeName ?? rule.employeeId ? `Khusus: ${rule.employeeName ?? rule.employeeId}` : 'Semua Karyawan'}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--text-3)]">
-                      {rule.type === 'PERCENTAGE' && `${rule.value}% dari penjualan`}
-                      {rule.type === 'FLAT' && `Rp ${rule.value.toLocaleString('id-ID')} per order`}
-                      {rule.type === 'TIERED' && 'Bertingkat (lihat detail JSON)'}
-                      {' · '} Berlaku mulai {rule.effectiveFrom?.slice(0, 10)}
-                    </p>
-                    {rule.type === 'TIERED' && rule.tiers && (
-                      <pre className="mt-2 rounded-lg bg-[var(--bg-subtle)] p-2 text-xs text-[var(--text-2)]">
-                        {typeof rule.tiers === 'string'
-                          ? JSON.stringify(JSON.parse(rule.tiers), null, 2)
-                          : JSON.stringify(rule.tiers, null, 2)}
-                      </pre>
+          ) : rules.map(rule => (
+            <div key={rule.id} className={cn(
+              'rounded-2xl border p-4',
+              rule.active ? 'border-[var(--border)] bg-[var(--bg-card)]' : 'border-[var(--border)] bg-[var(--bg-subtle)] opacity-60',
+            )}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-[var(--text-1)]">
+                      {rule.employeeName ?? 'Semua Karyawan'}
+                    </span>
+                    <span className="rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-xs text-[var(--text-2)]">
+                      {TYPE_LABEL[rule.type]}
+                    </span>
+                    {!rule.active && (
+                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">Nonaktif</span>
                     )}
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      onClick={() => setEditingRule(rule)}
-                      className="rounded-lg p-1.5 hover:bg-[var(--bg-muted)]"
-                    >
-                      <Edit2 className="h-3.5 w-3.5 text-[var(--text-2)]" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Hapus aturan ini?')) deleteRule.mutate(rule.id)
-                      }}
-                      className="rounded-lg p-1.5 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                    </button>
-                  </div>
+                  <p className="mt-0.5 text-sm text-[var(--text-2)]">
+                    {rule.type === 'PERCENTAGE' && `${rule.value}% dari penjualan`}
+                    {rule.type === 'FIXED' && `${fmt(rule.value, currency)} per order`}
+                    {rule.type === 'TIERED' && `${rule.tiers?.length ?? 0} tier`}
+                    {rule.minSales > 0 && ` · min ${fmt(rule.minSales, currency)}`}
+                    {rule.maxSales != null && ` · maks ${fmt(rule.maxSales, currency)}`}
+                    {rule.productCategory && ` · kategori: ${rule.productCategory}`}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => { setEditingRule(rule); setShowRuleForm(true) }}
+                    className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-2)] hover:bg-[var(--bg-muted)]"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => toggleRuleActive(rule)}
+                    className={cn(
+                      'rounded-lg px-3 py-1.5 text-xs font-medium',
+                      rule.active
+                        ? 'border border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                        : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                    )}
+                  >
+                    {rule.active ? 'Nonaktifkan' : 'Aktifkan'}
+                  </button>
                 </div>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       )}
 
-      {(showForm || editingRule) && (
+      {/* Modals */}
+      {showRuleForm && (
         <RuleForm
           storeId={storeId}
-          employees={employees as any[]}
+          employees={employees}
           rule={editingRule ?? undefined}
-          onClose={() => { setShowForm(false); setEditingRule(null) }}
-          onSaved={() => {
-            setShowForm(false)
-            setEditingRule(null)
-            qc.invalidateQueries({ queryKey: ['commission-rules'] })
-          }}
+          onClose={() => { setShowRuleForm(false); setEditingRule(null) }}
+          onSaved={() => { setShowRuleForm(false); setEditingRule(null); invalidate() }}
+        />
+      )}
+      {showEntryForm && (
+        <EntryForm
+          storeId={storeId}
+          employees={employees}
+          rules={rules}
+          onClose={() => setShowEntryForm(false)}
+          onSaved={() => { setShowEntryForm(false); invalidate() }}
         />
       )}
     </div>

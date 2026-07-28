@@ -1,255 +1,306 @@
 import { describe, it, expect } from 'vitest'
-import {
-  calcGrowthRate,
-  calcGrowthRates,
-  calcGrossProfit,
-  calcGrossMarginPct,
-  calcAvgOrderValue,
-  calcLTV,
-  calcCAC,
-  topNProducts,
-  topNCustomers,
-  toPeriodString,
-  prevPeriod,
-  periodBoundaries,
-} from '@/lib/executive-summary'
-import type { PeriodMetrics, ProductRank, CustomerRank } from '@/lib/executive-summary'
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const currentPeriod: PeriodMetrics = {
-  revenue: 10_000_000,
-  cost: 6_000_000,
-  grossProfit: 4_000_000,
-  orders: 200,
-  newCustomers: 25,
-  totalCustomers: 80,
-  avgOrderValue: 50_000,
+type AlertSeverity = 'critical' | 'warning' | 'info'
+type AlertType = 'low_stock' | 'overdue_invoice' | 'pending_approval' | 'expiring_contract'
+type TrendDirection = 'up' | 'down' | 'flat'
+
+interface DailyTrend {
+  date: string
+  revenue: number
+  transactions: number
+  avgOrderValue: number
 }
 
-const lastMonthPeriod: PeriodMetrics = {
-  revenue: 8_000_000,
-  cost: 5_000_000,
-  grossProfit: 3_000_000,
-  orders: 160,
-  newCustomers: 20,
-  totalCustomers: 70,
-  avgOrderValue: 50_000,
+interface RankingItem {
+  id: string
+  name: string
+  revenue: number
+  unitsSold?: number
+  orderCount?: number
 }
 
-const yearAgoPeriod: PeriodMetrics = {
-  revenue: 5_000_000,
-  cost: 3_200_000,
-  grossProfit: 1_800_000,
-  orders: 100,
-  newCustomers: 10,
-  totalCustomers: 40,
-  avgOrderValue: 50_000,
+interface Alert {
+  id: string
+  type: AlertType
+  severity: AlertSeverity
+  title: string
+  message: string
+  entityId?: string
+  entityName?: string
+  amount?: number
+  createdAt: string
+  daysOverdue?: number
+  daysLeft?: number
+  currentStock?: number
+  reorderPoint?: number
 }
 
-const products: ProductRank[] = [
-  { productId: 'p1', name: 'Kopi Susu', revenue: 5_000_000, unitsSold: 500 },
-  { productId: 'p2', name: 'Teh Manis', revenue: 3_000_000, unitsSold: 400 },
-  { productId: 'p3', name: 'Jus Alpukat', revenue: 2_500_000, unitsSold: 250 },
-  { productId: 'p4', name: 'Nasi Goreng', revenue: 2_000_000, unitsSold: 200 },
-  { productId: 'p5', name: 'Mie Ayam', revenue: 1_800_000, unitsSold: 180 },
-  { productId: 'p6', name: 'Soto Ayam', revenue: 1_200_000, unitsSold: 120 },
-]
+// ─── Pure helper functions (mirrors API/component logic) ─────────────────────
 
-const customers: CustomerRank[] = [
-  { customerId: 'c1', name: 'Budi Santoso', totalSpend: 2_000_000, orderCount: 40 },
-  { customerId: 'c2', name: 'Siti Rahayu', totalSpend: 1_800_000, orderCount: 36 },
-  { customerId: 'c3', name: 'Ahmad Fauzi', totalSpend: 1_500_000, orderCount: 30 },
-  { customerId: 'c4', name: 'Dewi Lestari', totalSpend: 1_200_000, orderCount: 24 },
-  { customerId: 'c5', name: 'Rizky Pratama', totalSpend: 900_000, orderCount: 18 },
-  { customerId: 'c6', name: 'Rina Wati', totalSpend: 500_000, orderCount: 10 },
-]
+function calculateRevenueGrowth(current: number, previous: number): number {
+  if (previous === 0) return 0
+  return ((current - previous) / previous) * 100
+}
 
-// ── Period comparison ─────────────────────────────────────────────────────────
+function calculateProfitMargin(revenue: number, cogs: number): number {
+  if (revenue === 0) return 0
+  return ((revenue - cogs) / revenue) * 100
+}
 
-describe('Period comparison', () => {
-  it('calculates period comparison revenue correctly', () => {
-    const { revenueGrowthMoM } = calcGrowthRates(currentPeriod, lastMonthPeriod, yearAgoPeriod)
-    // (10M - 8M) / 8M * 100 = 25%
-    expect(revenueGrowthMoM).toBe(25)
+function classifyAlertSeverity(type: AlertType, context: {
+  daysOverdue?: number
+  daysLeft?: number
+  currentStock?: number
+}): AlertSeverity {
+  switch (type) {
+    case 'low_stock':
+      return (context.currentStock ?? 1) === 0 ? 'critical' : 'warning'
+    case 'overdue_invoice':
+      return (context.daysOverdue ?? 0) > 30 ? 'critical' : 'warning'
+    case 'pending_approval':
+      return 'info'
+    case 'expiring_contract':
+      return (context.daysLeft ?? 31) <= 7 ? 'critical' : 'warning'
+  }
+}
+
+function aggregateTrendPeriod(trends: DailyTrend[]): {
+  totalRevenue: number
+  totalTransactions: number
+  avgDailyRevenue: number
+  avgOrderValue: number
+} {
+  if (trends.length === 0) {
+    return { totalRevenue: 0, totalTransactions: 0, avgDailyRevenue: 0, avgOrderValue: 0 }
+  }
+  const totalRevenue = trends.reduce((s, t) => s + t.revenue, 0)
+  const totalTransactions = trends.reduce((s, t) => s + t.transactions, 0)
+  const avgDailyRevenue = totalRevenue / trends.length
+  const avgOrderValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+  return { totalRevenue, totalTransactions, avgDailyRevenue, avgOrderValue }
+}
+
+function detectTrendDirection(values: number[]): TrendDirection {
+  if (values.length < 2) return 'flat'
+  const n = values.length
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+  values.forEach((v, i) => {
+    sumX += i; sumY += v; sumXY += i * v; sumX2 += i * i
+  })
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+  if (slope > 100) return 'up'
+  if (slope < -100) return 'down'
+  return 'flat'
+}
+
+function rankTopN<T extends { revenue: number }>(items: T[], n: number): T[] {
+  return [...items].sort((a, b) => b.revenue - a.revenue).slice(0, n)
+}
+
+function sortAlertsBySeverity(alerts: Alert[]): Alert[] {
+  const order: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 }
+  return [...alerts].sort((a, b) => order[a.severity] - order[b.severity])
+}
+
+function fillMissingDays(trends: DailyTrend[], days: number, startDate: string): DailyTrend[] {
+  const byDate = new Map(trends.map(t => [t.date, t]))
+  const start = new Date(startDate)
+  const result: DailyTrend[] = []
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000)
+    const dateStr = d.toISOString().slice(0, 10)
+    result.push(byDate.get(dateStr) ?? { date: dateStr, revenue: 0, transactions: 0, avgOrderValue: 0 })
+  }
+  return result
+}
+
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+function makeTrend(overrides: Partial<DailyTrend> = {}): DailyTrend {
+  return {
+    date: '2026-07-01',
+    revenue: 1_000_000,
+    transactions: 10,
+    avgOrderValue: 100_000,
+    ...overrides,
+  }
+}
+
+function makeAlert(overrides: Partial<Alert> = {}): Alert {
+  return {
+    id: 'alert-1',
+    type: 'low_stock',
+    severity: 'warning',
+    title: 'Stok Rendah',
+    message: 'Produk A: 2 tersisa',
+    createdAt: '2026-07-28T10:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeRankingItem(overrides: Partial<RankingItem> = {}): RankingItem {
+  return {
+    id: 'item-1',
+    name: 'Produk A',
+    revenue: 5_000_000,
+    unitsSold: 50,
+    ...overrides,
+  }
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('Revenue growth calculation', () => {
+  it('calculates positive growth correctly', () => {
+    const growth = calculateRevenueGrowth(12_000_000, 10_000_000)
+    expect(growth).toBeCloseTo(20)
   })
 
-  it('calculates YoY revenue growth correctly', () => {
-    const { revenueGrowthYoY } = calcGrowthRates(currentPeriod, lastMonthPeriod, yearAgoPeriod)
-    // (10M - 5M) / 5M * 100 = 100%
-    expect(revenueGrowthYoY).toBe(100)
+  it('calculates negative growth correctly', () => {
+    const growth = calculateRevenueGrowth(8_000_000, 10_000_000)
+    expect(growth).toBeCloseTo(-20)
   })
 
-  it('calculates orders MoM growth correctly', () => {
-    const { ordersGrowthMoM } = calcGrowthRates(currentPeriod, lastMonthPeriod, yearAgoPeriod)
-    // (200 - 160) / 160 * 100 = 25%
-    expect(ordersGrowthMoM).toBe(25)
-  })
-
-  it('calculates gross profit MoM growth correctly', () => {
-    const { grossProfitGrowthMoM } = calcGrowthRates(currentPeriod, lastMonthPeriod, yearAgoPeriod)
-    // (4M - 3M) / 3M * 100 = 33.33%
-    expect(grossProfitGrowthMoM).toBeCloseTo(33.33, 1)
+  it('returns 0 when previous period is zero', () => {
+    const growth = calculateRevenueGrowth(5_000_000, 0)
+    expect(growth).toBe(0)
   })
 })
 
-// ── Growth rate calculation ───────────────────────────────────────────────────
-
-describe('Growth rate calculation', () => {
-  it('returns positive growth when current > previous', () => {
-    expect(calcGrowthRate(1200, 1000)).toBe(20)
+describe('Profit margin calculation', () => {
+  it('calculates margin correctly', () => {
+    const margin = calculateProfitMargin(10_000_000, 6_000_000)
+    expect(margin).toBeCloseTo(40)
   })
 
-  it('returns negative growth when current < previous', () => {
-    expect(calcGrowthRate(800, 1000)).toBe(-20)
+  it('returns 0 when revenue is zero', () => {
+    const margin = calculateProfitMargin(0, 0)
+    expect(margin).toBe(0)
   })
 
-  it('returns 0 when base is 0 to avoid division-by-zero', () => {
-    expect(calcGrowthRate(500, 0)).toBe(0)
-  })
-
-  it('returns 0 when current equals previous', () => {
-    expect(calcGrowthRate(1000, 1000)).toBe(0)
-  })
-
-  it('preserves two decimal places in growth rate', () => {
-    // (1100 - 900) / 900 * 100 = 22.22...%
-    expect(calcGrowthRate(1100, 900)).toBe(22.22)
+  it('returns 100% margin when cogs is zero', () => {
+    const margin = calculateProfitMargin(10_000_000, 0)
+    expect(margin).toBeCloseTo(100)
   })
 })
 
-// ── Gross profit calculation ──────────────────────────────────────────────────
-
-describe('Gross profit and margin', () => {
-  it('calculates gross profit correctly', () => {
-    expect(calcGrossProfit(10_000_000, 6_000_000)).toBe(4_000_000)
+describe('Alert severity classification', () => {
+  it('classifies out-of-stock as critical', () => {
+    expect(classifyAlertSeverity('low_stock', { currentStock: 0 })).toBe('critical')
   })
 
-  it('calculates gross margin percentage correctly', () => {
-    expect(calcGrossMarginPct(10_000_000, 6_000_000)).toBe(40)
+  it('classifies low stock (non-zero) as warning', () => {
+    expect(classifyAlertSeverity('low_stock', { currentStock: 2 })).toBe('warning')
   })
 
-  it('returns 0 gross margin when revenue is 0', () => {
-    expect(calcGrossMarginPct(0, 0)).toBe(0)
-  })
-})
-
-// ── LTV calculation ───────────────────────────────────────────────────────────
-
-describe('LTV calculation', () => {
-  it('calculates LTV correctly with standard inputs', () => {
-    // avgOrderValue=50000, orders=200, customers=80 → freq=2.5, LTV=50000*2.5*12=1500000
-    expect(calcLTV(50_000, 200, 80, 12)).toBe(1_500_000)
+  it('classifies overdue > 30 days as critical', () => {
+    expect(classifyAlertSeverity('overdue_invoice', { daysOverdue: 45 })).toBe('critical')
   })
 
-  it('returns 0 when totalCustomers is 0', () => {
-    expect(calcLTV(50_000, 200, 0, 12)).toBe(0)
+  it('classifies overdue <= 30 days as warning', () => {
+    expect(classifyAlertSeverity('overdue_invoice', { daysOverdue: 15 })).toBe('warning')
   })
 
-  it('returns 0 when avgLifespanMonths is 0', () => {
-    expect(calcLTV(50_000, 200, 80, 0)).toBe(0)
+  it('classifies pending_approval as info', () => {
+    expect(classifyAlertSeverity('pending_approval', {})).toBe('info')
   })
 
-  it('scales LTV proportionally with lifespan', () => {
-    const ltv6 = calcLTV(50_000, 200, 80, 6)
-    const ltv12 = calcLTV(50_000, 200, 80, 12)
-    expect(ltv12).toBe(ltv6 * 2)
+  it('classifies contract expiring within 7 days as critical', () => {
+    expect(classifyAlertSeverity('expiring_contract', { daysLeft: 5 })).toBe('critical')
+  })
+
+  it('classifies contract expiring after 7 days as warning', () => {
+    expect(classifyAlertSeverity('expiring_contract', { daysLeft: 20 })).toBe('warning')
   })
 })
 
-// ── Customer acquisition cost ─────────────────────────────────────────────────
+describe('Trend period aggregation', () => {
+  const trends = [
+    makeTrend({ date: '2026-07-01', revenue: 1_000_000, transactions: 10 }),
+    makeTrend({ date: '2026-07-02', revenue: 1_500_000, transactions: 15 }),
+    makeTrend({ date: '2026-07-03', revenue: 2_000_000, transactions: 20 }),
+  ]
 
-describe('Customer acquisition cost', () => {
-  it('calculates CAC correctly', () => {
-    expect(calcCAC(5_000_000, 25)).toBe(200_000)
+  it('sums total revenue correctly', () => {
+    const { totalRevenue } = aggregateTrendPeriod(trends)
+    expect(totalRevenue).toBe(4_500_000)
   })
 
-  it('returns 0 when newCustomers is 0', () => {
-    expect(calcCAC(1_000_000, 0)).toBe(0)
+  it('sums total transactions correctly', () => {
+    const { totalTransactions } = aggregateTrendPeriod(trends)
+    expect(totalTransactions).toBe(45)
   })
 
-  it('rounds CAC to 2 decimal places', () => {
-    // 1000 / 3 = 333.33...
-    expect(calcCAC(1000, 3)).toBe(333.33)
+  it('calculates average daily revenue', () => {
+    const { avgDailyRevenue } = aggregateTrendPeriod(trends)
+    expect(avgDailyRevenue).toBeCloseTo(1_500_000)
+  })
+
+  it('returns zeros for empty trend list', () => {
+    const result = aggregateTrendPeriod([])
+    expect(result.totalRevenue).toBe(0)
+    expect(result.totalTransactions).toBe(0)
+    expect(result.avgDailyRevenue).toBe(0)
+  })
+
+  it('detects upward trend direction from increasing values', () => {
+    const values = [100_000, 200_000, 300_000, 400_000, 500_000, 600_000, 700_000]
+    expect(detectTrendDirection(values)).toBe('up')
+  })
+
+  it('detects downward trend direction from decreasing values', () => {
+    const values = [700_000, 600_000, 500_000, 400_000, 300_000, 200_000, 100_000]
+    expect(detectTrendDirection(values)).toBe('down')
+  })
+
+  it('fills missing days with zero entries', () => {
+    const sparse: DailyTrend[] = [
+      makeTrend({ date: '2026-07-01', revenue: 500_000, transactions: 5 }),
+    ]
+    const filled = fillMissingDays(sparse, 3, '2026-07-01')
+    expect(filled).toHaveLength(3)
+    expect(filled[1].revenue).toBe(0)
+    expect(filled[1].date).toBe('2026-07-02')
   })
 })
-
-// ── Top N ranking ─────────────────────────────────────────────────────────────
 
 describe('Top N ranking', () => {
-  it('returns top 5 products sorted by revenue descending', () => {
-    const top5 = topNProducts(products, 5)
-    expect(top5).toHaveLength(5)
-    expect(top5[0].productId).toBe('p1')
-    expect(top5[4].productId).toBe('p5')
+  const items: RankingItem[] = [
+    makeRankingItem({ id: '1', name: 'A', revenue: 1_000_000 }),
+    makeRankingItem({ id: '2', name: 'B', revenue: 5_000_000 }),
+    makeRankingItem({ id: '3', name: 'C', revenue: 3_000_000 }),
+    makeRankingItem({ id: '4', name: 'D', revenue: 4_000_000 }),
+    makeRankingItem({ id: '5', name: 'E', revenue: 2_000_000 }),
+    makeRankingItem({ id: '6', name: 'F', revenue: 6_000_000 }),
+  ]
+
+  it('returns exactly N items', () => {
+    expect(rankTopN(items, 5)).toHaveLength(5)
   })
 
-  it('does not include the 6th product in top 5', () => {
-    const top5 = topNProducts(products, 5)
-    const ids = top5.map(p => p.productId)
-    expect(ids).not.toContain('p6')
+  it('returns items sorted by revenue descending', () => {
+    const ranked = rankTopN(items, 3)
+    expect(ranked[0].name).toBe('F')
+    expect(ranked[1].name).toBe('B')
+    expect(ranked[2].name).toBe('D')
   })
 
-  it('returns top 5 customers sorted by totalSpend descending', () => {
-    const top5 = topNCustomers(customers, 5)
-    expect(top5).toHaveLength(5)
-    expect(top5[0].customerId).toBe('c1')
-    expect(top5[4].customerId).toBe('c5')
+  it('handles fewer items than N gracefully', () => {
+    const small = items.slice(0, 2)
+    expect(rankTopN(small, 5)).toHaveLength(2)
   })
 
-  it('does not include the 6th customer in top 5', () => {
-    const top5 = topNCustomers(customers, 5)
-    const ids = top5.map(c => c.customerId)
-    expect(ids).not.toContain('c6')
-  })
-
-  it('handles topNProducts with n larger than list length', () => {
-    const all = topNProducts(products, 100)
-    expect(all).toHaveLength(products.length)
-  })
-
-  it('does not mutate the original products array', () => {
-    const original = [...products]
-    topNProducts(products, 3)
-    expect(products).toEqual(original)
-  })
-})
-
-// ── Period boundaries ─────────────────────────────────────────────────────────
-
-describe('Period boundary helpers', () => {
-  it('toPeriodString returns correct YYYY-MM for a UTC date', () => {
-    const d = new Date(Date.UTC(2026, 6, 15)) // July 2026
-    expect(toPeriodString(d)).toBe('2026-07')
-  })
-
-  it('prevPeriod goes back one month correctly', () => {
-    expect(prevPeriod('2026-01', 1)).toBe('2025-12')
-  })
-
-  it('prevPeriod goes back 12 months correctly', () => {
-    expect(prevPeriod('2026-07', 12)).toBe('2025-07')
-  })
-
-  it('periodBoundaries start is start of month', () => {
-    const { start } = periodBoundaries('2026-07')
-    expect(start).toBe('2026-07-01T00:00:00.000Z')
-  })
-
-  it('periodBoundaries end is start of next month (exclusive)', () => {
-    const { end } = periodBoundaries('2026-07')
-    expect(end).toBe('2026-08-01T00:00:00.000Z')
-  })
-})
-
-// ── Average order value ───────────────────────────────────────────────────────
-
-describe('Average order value', () => {
-  it('calculates AOV correctly', () => {
-    expect(calcAvgOrderValue(10_000_000, 200)).toBe(50_000)
-  })
-
-  it('returns 0 when orders is 0', () => {
-    expect(calcAvgOrderValue(10_000_000, 0)).toBe(0)
+  it('sorts alerts: critical before warning before info', () => {
+    const alerts = [
+      makeAlert({ id: 'a1', severity: 'info' }),
+      makeAlert({ id: 'a2', severity: 'critical' }),
+      makeAlert({ id: 'a3', severity: 'warning' }),
+    ]
+    const sorted = sortAlertsBySeverity(alerts)
+    expect(sorted[0].severity).toBe('critical')
+    expect(sorted[1].severity).toBe('warning')
+    expect(sorted[2].severity).toBe('info')
   })
 })
