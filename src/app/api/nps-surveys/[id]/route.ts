@@ -1,36 +1,51 @@
-// PATCH /api/nps-surveys/:id
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { queryOne, exec } from '@/lib/db'
+import { query, exec, nowISO } from '@/lib/db'
+import { ensureNPSTables } from '../route'
 
 function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401)
-  const user = session.user as any
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await ensureNPSTables()
+    const { id } = await params
+    const body = await req.json() as any
+    const { name, question, active, triggerType } = body
 
-  const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400)
+    const [existing] = await query(`SELECT * FROM NPSSurvey WHERE id = ?`, [id])
+    if (!existing) return err('Survey not found', 404)
 
-  const { id } = await params
+    const VALID_TRIGGERS = ['POST_PURCHASE', 'MANUAL', 'SCHEDULED']
+    if (triggerType !== undefined && !VALID_TRIGGERS.includes(triggerType)) {
+      return err(`triggerType must be one of: ${VALID_TRIGGERS.join(', ')}`)
+    }
 
-  const existing = await queryOne(`SELECT * FROM NpsSurvey WHERE id=? AND storeId=?`, [id, storeId])
-  if (!existing) return err('Survey not found', 404)
+    const updates: string[] = []
+    const vals: any[] = []
 
-  const b = (await req.json()) as any
-  const updates: Record<string, any> = {}
-  if (b.name !== undefined) updates.name = b.name.trim()
-  if (b.question !== undefined) updates.question = b.question.trim()
-  if (b.active !== undefined) updates.active = b.active ? 1 : 0
-  if (Object.keys(updates).length === 0) return err('Nothing to update')
+    if (name !== undefined)        { updates.push('name = ?');        vals.push(name) }
+    if (question !== undefined)    { updates.push('question = ?');    vals.push(question) }
+    if (active !== undefined)      { updates.push('active = ?');      vals.push(active ? 1 : 0) }
+    if (triggerType !== undefined) { updates.push('triggerType = ?'); vals.push(triggerType) }
 
-  const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ')
-  await exec(
-    `UPDATE NpsSurvey SET ${setClauses} WHERE id=? AND storeId=?`,
-    [...Object.values(updates), id, storeId],
-  )
-  return NextResponse.json({ updated: true })
+    if (updates.length === 0) return err('No fields to update')
+
+    updates.push('updatedAt = ?')
+    vals.push(nowISO())
+    vals.push(id)
+
+    await exec(
+      `UPDATE NPSSurvey SET ${updates.join(', ')} WHERE id = ?`,
+      vals,
+    )
+
+    const [row] = await query(`SELECT * FROM NPSSurvey WHERE id = ?`, [id])
+    return NextResponse.json({ data: row })
+  } catch (e: any) {
+    return err(e.message, 500)
+  }
 }
