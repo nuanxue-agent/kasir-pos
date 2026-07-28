@@ -940,7 +940,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const oid = segs[1]
         // Only OWNER and MANAGER may refund
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
 
         const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
           oid,
@@ -1314,7 +1314,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const oid = segs[1]
         // Only OWNER and MANAGER may refund
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
 
         const b: any = await req.json()
         const validStatuses = new Set(['REFUNDED'])
@@ -1797,7 +1797,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'staff') {
       // Only OWNER or MANAGER can manage staff
       const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-      if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+      if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
 
       if (segs.length === 1) {
         if (method === 'GET')
@@ -3329,6 +3329,169 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── Vendors (alias to Suppliers + extended fields) ───────────────────────
+    if (segs[0] === 'vendors') {
+      // Lazy-init Vendor extended columns and PurchaseOrderApproval table
+      await exec(
+        `CREATE TABLE IF NOT EXISTS PurchaseOrderApproval (
+          id        TEXT PRIMARY KEY,
+          poId      TEXT NOT NULL,
+          userId    TEXT NOT NULL,
+          action    TEXT NOT NULL CHECK(action IN ('APPROVED','REJECTED')),
+          notes     TEXT,
+          createdAt TEXT NOT NULL
+        )`,
+        [],
+      )
+      // Ensure Supplier table has paymentTerms and leadTimeDays columns (lazy migration)
+      try {
+        await exec(`ALTER TABLE Supplier ADD COLUMN paymentTerms TEXT`, [])
+      } catch {}
+      try {
+        await exec(`ALTER TABLE Supplier ADD COLUMN leadTimeDays INTEGER NOT NULL DEFAULT 7`, [])
+      } catch {}
+      try {
+        await exec(`ALTER TABLE Supplier ADD COLUMN rating REAL NOT NULL DEFAULT 0`, [])
+      } catch {}
+
+      // GET /api/vendors — list vendors (suppliers) with stats
+      if (!segs[1] && method === 'GET') {
+        const search = url.searchParams.get('search') ?? ''
+        const params: any[] = [storeId]
+        const searchClause = search ? ` AND s.name LIKE ?` : ''
+        if (search) params.push(`%${search}%`)
+        const rows = await query(
+          `SELECT s.*,
+             COALESCE(SUM(po.total),0)  AS totalPurchases,
+             COUNT(DISTINCT po.id)      AS totalOrders,
+             MAX(po.createdAt)          AS lastOrderDate,
+             ROUND(AVG(sr.rating),1)    AS avgRating,
+             COUNT(DISTINCT sr.id)      AS ratingCount
+           FROM Supplier s
+           LEFT JOIN PurchaseOrder po ON po.supplierId=s.id AND po.storeId=s.storeId
+           LEFT JOIN SupplierRating sr ON sr.supplierId=s.id AND sr.storeId=s.storeId
+           WHERE s.storeId=? AND s.active=1${searchClause}
+           GROUP BY s.id ORDER BY s.name`,
+          params,
+        )
+        return ok(rows)
+      }
+
+      // POST /api/vendors — create vendor
+      if (!segs[1] && method === 'POST') {
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
+        const b = (await req.json()) as any
+        if (!b.name || b.name.trim().length < 2) return err('Nama vendor minimal 2 karakter')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO Supplier (id,storeId,name,email,phone,address,taxId,notes,paymentTerms,leadTimeDays,rating,active,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,null,null,?,?,0,1,?,?)`,
+          [
+            id, storeId,
+            b.name.trim(),
+            b.email ?? null,
+            b.phone ?? null,
+            b.address ?? null,
+            b.paymentTerms ?? null,
+            Number(b.leadTimeDays ?? 7),
+            t, t,
+          ],
+        )
+        return ok({ id }, 201)
+      }
+
+      // PATCH /api/vendors/:id — update vendor
+      if (segs[1] && method === 'PATCH') {
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
+        const b = (await req.json()) as any
+        const vendor = await queryOne<any>(`SELECT id FROM Supplier WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!vendor) return err('Vendor not found', 404)
+        const allowed = ['name','email','phone','address','paymentTerms','leadTimeDays','rating','active'] as const
+        const setClauses: string[] = []
+        const vals: any[] = []
+        for (const key of allowed) {
+          if (key in b) { setClauses.push(`${key}=?`); vals.push(b[key]) }
+        }
+        if (setClauses.length === 0) return err('No fields to update')
+        await exec(
+          `UPDATE Supplier SET ${setClauses.join(',')}, updatedAt=? WHERE id=? AND storeId=?`,
+          [...vals, nowISO(), segs[1], storeId],
+        )
+        return ok({ success: true })
+      }
+    }
+
+    // ── PO Approval workflow ─────────────────────────────────────────────────
+    if (segs[0] === 'purchase-orders' && segs[1] && segs[2]) {
+      // Lazy-init approval table
+      await exec(
+        `CREATE TABLE IF NOT EXISTS PurchaseOrderApproval (
+          id        TEXT PRIMARY KEY,
+          poId      TEXT NOT NULL,
+          userId    TEXT NOT NULL,
+          action    TEXT NOT NULL CHECK(action IN ('APPROVED','REJECTED')),
+          notes     TEXT,
+          createdAt TEXT NOT NULL
+        )`,
+        [],
+      )
+
+      // POST /api/purchase-orders/:id/submit
+      if (segs[2] === 'submit' && method === 'POST') {
+        const po = await queryOne<any>(`SELECT * FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!po) return err('PO not found', 404)
+        if (po.status !== 'DRAFT') return err('Hanya PO DRAFT yang bisa disubmit')
+        await exec(`UPDATE PurchaseOrder SET status='SUBMITTED', updatedAt=? WHERE id=? AND storeId=?`, [nowISO(), segs[1], storeId])
+        return ok({ success: true })
+      }
+
+      // POST /api/purchase-orders/:id/approve
+      if (segs[2] === 'approve' && method === 'POST') {
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden: hanya OWNER/MANAGER yang dapat menyetujui', 403)
+        const po = await queryOne<any>(`SELECT * FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!po) return err('PO not found', 404)
+        if (po.status !== 'SUBMITTED') return err('Hanya PO SUBMITTED yang bisa disetujui')
+        const b = (await req.json()) as any
+        const t = nowISO()
+        await exec(`UPDATE PurchaseOrder SET status='APPROVED', updatedAt=? WHERE id=? AND storeId=?`, [t, segs[1], storeId])
+        await exec(
+          `INSERT INTO PurchaseOrderApproval (id,poId,userId,action,notes,createdAt) VALUES (?,?,?,?,?,?)`,
+          [newId(), segs[1], user.id, 'APPROVED', b.notes ?? null, t],
+        )
+        return ok({ success: true })
+      }
+
+      // POST /api/purchase-orders/:id/reject
+      if (segs[2] === 'reject' && method === 'POST') {
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden: hanya OWNER/MANAGER yang dapat menolak', 403)
+        const po = await queryOne<any>(`SELECT * FROM PurchaseOrder WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!po) return err('PO not found', 404)
+        if (po.status !== 'SUBMITTED') return err('Hanya PO SUBMITTED yang bisa ditolak')
+        const b = (await req.json()) as any
+        const t = nowISO()
+        await exec(`UPDATE PurchaseOrder SET status='DRAFT', updatedAt=? WHERE id=? AND storeId=?`, [t, segs[1], storeId])
+        await exec(
+          `INSERT INTO PurchaseOrderApproval (id,poId,userId,action,notes,createdAt) VALUES (?,?,?,?,?,?)`,
+          [newId(), segs[1], user.id, 'REJECTED', b.notes ?? null, t],
+        )
+        return ok({ success: true })
+      }
+
+      // GET /api/purchase-orders/:id/approvals
+      if (segs[2] === 'approvals' && method === 'GET') {
+        const rows = await query(
+          `SELECT poa.*, u.name as userName
+           FROM PurchaseOrderApproval poa
+           LEFT JOIN User u ON u.id = poa.userId
+           WHERE poa.poId=?
+           ORDER BY poa.createdAt ASC`,
+          [segs[1]],
+        )
+        return ok(rows)
+      }
+    }
+
     // ── Chart of Accounts ────────────────────────────────────────────────────
     if (segs[0] === 'accounts') {
       if (!segs[1] && method === 'GET') {
@@ -4273,7 +4436,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       // POST /api/rewards — create a reward item (owner/manager only)
       if (segs.length === 1 && method === 'POST') {
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
         const b = (await req.json()) as any
         if (!b.name?.trim()) return err('name is required')
         if (!b.type || !['DISCOUNT_VOUCHER', 'FREE_PRODUCT', 'CASHBACK'].includes(b.type))
@@ -5044,7 +5207,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       // PATCH /api/hr/leave/:id — approve or reject
       if (segs[2] && method === 'PATCH') {
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'MANAGER'].includes(callerRole)) return err('Forbidden', 403)
+        if (!['OWNER', 'MANAGER'].includes(user.role)) return err('Forbidden', 403)
         const b = (await req.json()) as any
         const validStatuses = new Set(['APPROVED', 'REJECTED'])
         if (!b.status || !validStatuses.has(b.status))
@@ -5270,7 +5433,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       if (method === 'GET') {
         // OWNER / SUPERADMIN only
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'SUPERADMIN'].includes(callerRole)) return err('Forbidden', 403)
+        if (!['OWNER', 'SUPERADMIN'].includes(user.role)) return err('Forbidden', 403)
         const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
         const action = sp.get('action') ?? undefined
         const result = await getAuditLogs({ storeId, page, pageSize: 20, action })
@@ -7077,7 +7240,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'system' && segs[1] === 'health') {
       if (method === 'GET') {
         const callerRole = user.stores?.find((s: any) => s.id === storeId)?.role
-        if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(callerRole)) return err('Forbidden', 403)
+        if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(user.role)) return err('Forbidden', 403)
 
         // Row counts
         const [orderCount] = await query<{ c: number }>(
@@ -11483,6 +11646,156 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       await exec(`UPDATE KioskOrder SET status = ? WHERE id = ?`, [b.status, id])
       const updated = await queryOne(`SELECT * FROM KioskOrder WHERE id = ?`, [id]) as any
       return ok({ order: { ...updated, items: JSON.parse(updated?.items ?? '[]') } })
+    }
+
+    // ─── INVENTORY FORECAST ────────────────────────────────────────────────────
+    // GET /api/inventory/forecast?storeId= — sales velocity + stock projection
+
+    if (segs[0] === 'inventory' && segs[1] === 'forecast' && method === 'GET') {
+      const sid = sp.get('storeId') ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+
+      const PERIOD_DAYS = 30
+      const DEFAULT_LEAD_TIME = 14
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - PERIOD_DAYS)
+      const cutoffISO = cutoff.toISOString()
+
+      // Get all tracked products with their current stock
+      const products = await query<any>(
+        `SELECT id, name, sku, stock, lowStock FROM Product WHERE storeId = ? AND trackStock = 1 ORDER BY name ASC`,
+        [sid],
+      )
+
+      // Aggregate sales qty per product over the last 30 days from OrderItem + Order
+      const salesRows = await query<{ productId: string; totalSold: number }>(
+        `SELECT oi.productId, SUM(oi.qty) as totalSold
+         FROM OrderItem oi
+         JOIN \`Order\` o ON o.id = oi.orderId
+         WHERE o.storeId = ? AND o.createdAt >= ? AND o.status NOT IN ('CANCELLED','REFUNDED')
+         GROUP BY oi.productId`,
+        [sid, cutoffISO],
+      )
+      const salesMap = new Map(salesRows.map(r => [r.productId, Number(r.totalSold)]))
+
+      const forecast = products.map((p: any) => {
+        const totalSold = salesMap.get(p.id) ?? 0
+        const avgDailySales = totalSold / PERIOD_DAYS
+        const daysRemaining = avgDailySales > 0 ? p.stock / avgDailySales : Infinity
+        const reorderLeadTime = DEFAULT_LEAD_TIME
+        return {
+          productId: p.id,
+          productName: p.name,
+          sku: p.sku ?? null,
+          currentStock: p.stock,
+          avgDailySales: Math.round(avgDailySales * 100) / 100,
+          daysRemaining: isFinite(daysRemaining) ? Math.round(daysRemaining * 10) / 10 : 9999,
+          reorderLeadTime,
+          needsReorder: isFinite(daysRemaining) && daysRemaining < reorderLeadTime,
+          forecast30: Math.max(0, p.stock - avgDailySales * 30),
+          forecast60: Math.max(0, p.stock - avgDailySales * 60),
+          forecast90: Math.max(0, p.stock - avgDailySales * 90),
+        }
+      })
+
+      return ok({ forecast, generatedAt: nowISO() })
+    }
+
+    // ─── REORDER SUGGESTIONS ──────────────────────────────────────────────────
+
+    async function ensureReorderSuggestionTable() {
+      await exec(`CREATE TABLE IF NOT EXISTS ReorderSuggestion (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        productId TEXT NOT NULL,
+        currentStock REAL NOT NULL DEFAULT 0,
+        avgDailySales REAL NOT NULL DEFAULT 0,
+        daysRemaining REAL NOT NULL DEFAULT 0,
+        suggestedQty INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        createdAt TEXT NOT NULL
+      )`)
+    }
+
+    // GET /api/reorder-suggestions?storeId=
+    if (segs[0] === 'reorder-suggestions' && !segs[1] && method === 'GET') {
+      await ensureReorderSuggestionTable()
+      const sid = sp.get('storeId') ?? storeId
+      if (!assertStoreAccess(user, sid)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+      const status = sp.get('status') ?? ''
+      const rows = await query<any>(
+        status
+          ? `SELECT rs.*, p.name as productName FROM ReorderSuggestion rs LEFT JOIN Product p ON p.id = rs.productId WHERE rs.storeId = ? AND rs.status = ? ORDER BY rs.daysRemaining ASC`
+          : `SELECT rs.*, p.name as productName FROM ReorderSuggestion rs LEFT JOIN Product p ON p.id = rs.productId WHERE rs.storeId = ? ORDER BY rs.daysRemaining ASC`,
+        status ? [sid, status] : [sid],
+      )
+      return ok({ suggestions: rows })
+    }
+
+    // POST /api/reorder-suggestions — create suggestion(s)
+    if (segs[0] === 'reorder-suggestions' && !segs[1] && method === 'POST') {
+      await ensureReorderSuggestionTable()
+      const b = (await req.json()) as any
+      // Accept single or bulk array
+      const items: any[] = Array.isArray(b) ? b : [b]
+      const t = nowISO()
+      const created: string[] = []
+      for (const item of items) {
+        validateRequired(item, ['storeId', 'productId', 'currentStock', 'avgDailySales', 'daysRemaining', 'suggestedQty'])
+        if (!assertStoreAccess(user, item.storeId)) continue
+        const id = newId()
+        await exec(
+          `INSERT INTO ReorderSuggestion (id,storeId,productId,currentStock,avgDailySales,daysRemaining,suggestedQty,status,createdAt) VALUES (?,?,?,?,?,?,?,'PENDING',?)`,
+          [id, item.storeId, item.productId, Number(item.currentStock), Number(item.avgDailySales), Number(item.daysRemaining), Math.ceil(Number(item.suggestedQty)), t],
+        )
+        created.push(id)
+      }
+      return ok({ created }, 201)
+    }
+
+    // PATCH /api/reorder-suggestions/:id
+    if (segs[0] === 'reorder-suggestions' && segs[1] && method === 'PATCH') {
+      await ensureReorderSuggestionTable()
+      const id = segs[1]
+      const existing = await queryOne<any>(`SELECT * FROM ReorderSuggestion WHERE id = ?`, [id])
+      if (!existing) return err('Suggestion not found', 404, 'NOT_FOUND', requestId, startMs)
+      if (!assertStoreAccess(user, existing.storeId)) return err('Forbidden', 403, 'FORBIDDEN', requestId, startMs)
+
+      const b = (await req.json()) as any
+      const VALID_STATUSES = new Set(['PENDING', 'ORDERED', 'DISMISSED'])
+      if (b.status && !VALID_STATUSES.has(b.status)) {
+        throw new ValidationError("status must be PENDING, ORDERED, or DISMISSED", 'INVALID_VALUE')
+      }
+      const newStatus = b.status ?? existing.status
+
+      await exec(`UPDATE ReorderSuggestion SET status = ? WHERE id = ?`, [newStatus, id])
+
+      // If createPO flag is set, generate a minimal draft PO
+      if (b.createPO && newStatus === 'ORDERED') {
+        const product = await queryOne<any>(`SELECT * FROM Product WHERE id = ?`, [existing.productId])
+        const sid = existing.storeId
+        // Find a default supplier if any
+        const supplier = await queryOne<any>(`SELECT id FROM Supplier WHERE storeId = ? LIMIT 1`, [sid])
+        if (supplier && product) {
+          const count = await queryOne<any>(`SELECT COUNT(*) as c FROM PurchaseOrder WHERE storeId = ?`, [sid])
+          const num = `PO-${String((count?.c ?? 0) + 1).padStart(4, '0')}`
+          const poId = newId()
+          const t2 = nowISO()
+          const unitCost = product.costPrice ?? product.price ?? 0
+          const subtotal = Math.ceil(existing.suggestedQty) * Number(unitCost)
+          await exec(
+            `INSERT INTO PurchaseOrder (id,storeId,supplierId,userId,number,status,expectedDate,subtotal,taxAmt,total,note,createdAt,updatedAt) VALUES (?,?,?,?,?,'DRAFT',?,?,?,?,?,?,?)`,
+            [poId, sid, supplier.id, user.id, num, null, subtotal, 0, subtotal, `Auto dari Reorder Suggestion: ${product.name}`, t2, t2],
+          )
+          await exec(
+            `INSERT INTO PurchaseOrderLine (id,orderId,productId,productName,qty,unitCost,receivedQty,subtotal,createdAt) VALUES (?,?,?,?,?,?,0,?,?)`,
+            [newId(), poId, existing.productId, product.name, Math.ceil(existing.suggestedQty), unitCost, subtotal, t2],
+          )
+        }
+      }
+
+      const updated = await queryOne(`SELECT * FROM ReorderSuggestion WHERE id = ?`, [id])
+      return ok({ suggestion: updated })
     }
 
   } catch (e: any) {
