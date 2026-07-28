@@ -6727,11 +6727,268 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ── stock-takes ───────────────────────────────────────────────────────────
+    // GET  /api/stock-takes?storeId=           — list all stock-takes
+    // POST /api/stock-takes                    — create new stock-take
+    // GET  /api/stock-takes/:id                — get stock-take with items
+    // PATCH /api/stock-takes/:id               — update metadata / status
+    // POST /api/stock-takes/:id/items          — bulk upsert counted qtys
+    // POST /api/stock-takes/:id/finalize       — post adjustments to StockLog
+    if (segs[0] === 'stock-takes') {
+      // Lazy-init tables
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StockTake (
+          id          TEXT PRIMARY KEY,
+          storeId     TEXT NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT','IN_PROGRESS','COMPLETED')),
+          startedAt   TEXT NOT NULL,
+          completedAt TEXT,
+          notes       TEXT,
+          createdAt   TEXT NOT NULL,
+          updatedAt   TEXT NOT NULL
+        )
+      `)
+      await exec(`CREATE INDEX IF NOT EXISTS idx_stock_take_store ON StockTake(storeId)`)
+      await exec(`
+        CREATE TABLE IF NOT EXISTS StockTakeItem (
+          id          TEXT PRIMARY KEY,
+          stockTakeId TEXT NOT NULL,
+          productId   TEXT NOT NULL,
+          expectedQty REAL NOT NULL DEFAULT 0,
+          countedQty  REAL,
+          variance    REAL NOT NULL DEFAULT 0,
+          notes       TEXT,
+          FOREIGN KEY (stockTakeId) REFERENCES StockTake(id),
+          FOREIGN KEY (productId)   REFERENCES Product(id)
+        )
+      `)
+      await exec(`CREATE INDEX IF NOT EXISTS idx_stock_take_item_take ON StockTakeItem(stockTakeId)`)
+
+      // ── GET /api/stock-takes — list ─────────────────────────────────────────
+      if (segs.length === 1 && method === 'GET') {
+        const takes = await query<any>(
+          `SELECT t.*,
+                  COUNT(i.id) as itemCount,
+                  COALESCE(SUM(i.variance), 0) as totalVariance
+           FROM StockTake t
+           LEFT JOIN StockTakeItem i ON i.stockTakeId = t.id
+           WHERE t.storeId = ?
+           GROUP BY t.id
+           ORDER BY t.startedAt DESC`,
+          [storeId],
+        )
+        return ok(takes)
+      }
+
+      // ── POST /api/stock-takes — create ──────────────────────────────────────
+      if (segs.length === 1 && method === 'POST') {
+        const b = (await req.json()) as { startedAt?: string; notes?: string }
+        const takeId = newId()
+        const t = nowISO()
+        const startedAt = b.startedAt ?? t
+
+        await exec(
+          `INSERT INTO StockTake (id, storeId, status, startedAt, completedAt, notes, createdAt, updatedAt)
+           VALUES (?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?)`,
+          [takeId, storeId, startedAt, b.notes ?? null, t, t],
+        )
+
+        // Snapshot all trackStock products at current qty
+        const products = await query<any>(
+          `SELECT id, name, sku, stock FROM Product WHERE storeId = ? AND trackStock = 1 AND active = 1 ORDER BY name ASC`,
+          [storeId],
+        )
+        for (const p of products) {
+          await exec(
+            `INSERT INTO StockTakeItem (id, stockTakeId, productId, expectedQty, countedQty, variance, notes)
+             VALUES (?, ?, ?, ?, NULL, 0, NULL)`,
+            [newId(), takeId, p.id, p.stock],
+          )
+        }
+
+        const take = await queryOne<any>(`SELECT * FROM StockTake WHERE id = ?`, [takeId])
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku
+           FROM StockTakeItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.stockTakeId = ?
+           ORDER BY p.name ASC`,
+          [takeId],
+        )
+        return ok({ ...take, items }, 201)
+      }
+
+      // ── GET /api/stock-takes/:id — detail ───────────────────────────────────
+      if (segs.length === 2 && method === 'GET') {
+        const takeId = segs[1]
+        const take = await queryOne<any>(
+          `SELECT * FROM StockTake WHERE id = ? AND storeId = ?`,
+          [takeId, storeId],
+        )
+        if (!take) return err('Stock take not found', 404, 'NOT_FOUND')
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku
+           FROM StockTakeItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.stockTakeId = ?
+           ORDER BY p.name ASC`,
+          [takeId],
+        )
+        return ok({ ...take, items })
+      }
+
+      // ── PATCH /api/stock-takes/:id — update metadata ────────────────────────
+      if (segs.length === 2 && method === 'PATCH') {
+        const takeId = segs[1]
+        const take = await queryOne<any>(
+          `SELECT * FROM StockTake WHERE id = ? AND storeId = ?`,
+          [takeId, storeId],
+        )
+        if (!take) return err('Stock take not found', 404, 'NOT_FOUND')
+        if (take.status === 'COMPLETED')
+          return err('Stock take already completed', 400, 'ALREADY_COMPLETED')
+
+        const b = (await req.json()) as { notes?: string; status?: string }
+        const t = nowISO()
+        const updates: string[] = []
+        const vals: any[] = []
+
+        if (b.notes !== undefined) { updates.push('notes = ?'); vals.push(b.notes) }
+        if (b.status !== undefined && ['DRAFT', 'IN_PROGRESS'].includes(b.status)) {
+          updates.push('status = ?'); vals.push(b.status)
+        }
+        if (updates.length > 0) {
+          vals.push(t, takeId)
+          await exec(`UPDATE StockTake SET ${updates.join(', ')}, updatedAt = ? WHERE id = ?`, vals)
+        }
+
+        const updated = await queryOne<any>(`SELECT * FROM StockTake WHERE id = ?`, [takeId])
+        return ok(updated)
+      }
+
+      // ── POST /api/stock-takes/:id/items — bulk upsert counted qtys ──────────
+      if (segs.length === 3 && segs[2] === 'items' && method === 'POST') {
+        const takeId = segs[1]
+        const take = await queryOne<any>(
+          `SELECT * FROM StockTake WHERE id = ? AND storeId = ?`,
+          [takeId, storeId],
+        )
+        if (!take) return err('Stock take not found', 404, 'NOT_FOUND')
+        if (take.status === 'COMPLETED')
+          return err('Stock take already completed', 400, 'ALREADY_COMPLETED')
+
+        const b = (await req.json()) as {
+          items: { productId: string; countedQty: number; notes?: string }[]
+        }
+        if (!Array.isArray(b.items)) return err('items array required', 400)
+
+        for (const it of b.items) {
+          const sysRow = await queryOne<any>(
+            `SELECT expectedQty FROM StockTakeItem WHERE stockTakeId = ? AND productId = ?`,
+            [takeId, it.productId],
+          )
+          if (!sysRow) continue
+          const variance = Number(it.countedQty) - sysRow.expectedQty
+          await exec(
+            `UPDATE StockTakeItem SET countedQty = ?, variance = ?, notes = ?
+             WHERE stockTakeId = ? AND productId = ?`,
+            [it.countedQty, variance, it.notes ?? null, takeId, it.productId],
+          )
+        }
+
+        // Transition to IN_PROGRESS if still DRAFT
+        if (take.status === 'DRAFT') {
+          await exec(
+            `UPDATE StockTake SET status = 'IN_PROGRESS', updatedAt = ? WHERE id = ?`,
+            [nowISO(), takeId],
+          )
+        }
+
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku
+           FROM StockTakeItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.stockTakeId = ?
+           ORDER BY p.name ASC`,
+          [takeId],
+        )
+        return ok({ updated: b.items.length, items })
+      }
+
+      // ── POST /api/stock-takes/:id/finalize — post adjustments ───────────────
+      if (segs.length === 3 && segs[2] === 'finalize' && method === 'POST') {
+        const takeId = segs[1]
+        const take = await queryOne<any>(
+          `SELECT * FROM StockTake WHERE id = ? AND storeId = ?`,
+          [takeId, storeId],
+        )
+        if (!take) return err('Stock take not found', 404, 'NOT_FOUND')
+        if (take.status === 'COMPLETED')
+          return err('Stock take already completed', 400, 'ALREADY_COMPLETED')
+
+        const allItems = await query<any>(
+          `SELECT * FROM StockTakeItem WHERE stockTakeId = ?`,
+          [takeId],
+        )
+        const uncounted = allItems.filter((i: any) => i.countedQty === null || i.countedQty === undefined)
+        if (uncounted.length > 0)
+          return err(`${uncounted.length} items have not been counted yet`, 400, 'UNCOUNTED_ITEMS')
+
+        const withVariance = allItems.filter((i: any) => i.variance !== 0)
+        const t = nowISO()
+
+        for (const item of withVariance) {
+          // Update product stock
+          await exec(
+            `UPDATE Product SET stock = stock + ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
+            [item.variance, t, item.productId, storeId],
+          )
+          // Post StockLog adjustment
+          await exec(
+            `INSERT INTO StockLog (id, productId, type, qty, note, createdAt)
+             VALUES (?, ?, 'ADJUSTMENT', ?, ?, ?)`,
+            [
+              newId(),
+              item.productId,
+              Math.abs(item.variance),
+              `Stock take #${takeId.slice(-8)} (${item.variance > 0 ? 'surplus' : 'shortage'})`,
+              t,
+            ],
+          )
+        }
+
+        await exec(
+          `UPDATE StockTake SET status = 'COMPLETED', completedAt = ?, updatedAt = ? WHERE id = ?`,
+          [t, t, takeId],
+        )
+
+        logAudit({
+          storeId,
+          userId: user.id,
+          action: 'STOCK_TAKE_COMPLETE',
+          resourceType: 'StockTake',
+          resourceId: takeId,
+          meta: { itemsAdjusted: withVariance.length },
+        }).catch(() => {})
+
+        const updated = await queryOne<any>(`SELECT * FROM StockTake WHERE id = ?`, [takeId])
+        const items = await query<any>(
+          `SELECT i.*, p.name as productName, p.sku as productSku
+           FROM StockTakeItem i
+           JOIN Product p ON p.id = i.productId
+           WHERE i.stockTakeId = ?
+           ORDER BY p.name ASC`,
+          [takeId],
+        )
+        return ok({ ...updated, items })
+      }
+    }
+
     // ── accounting/reconciliation ─────────────────────────────────────────────
-    // GET  /api/accounting/reconciliation?storeId=&from=&to=
-    //      → returns unmatched system transactions for the date range
+    // GET /api/accounting/reconciliation?storeId=&from=&to=
+    // → returns unmatched system transactions for the date range
     // POST /api/accounting/reconciliation?storeId=
-    //      body: { bankId, systemId }  → creates a reconciliation match record
+    // body: { bankId, systemId } → creates a reconciliation match record
     if (segs[0] === 'accounting' && segs[1] === 'reconciliation') {
       // Lazy-create BankStatement table if it doesn't exist yet
       await exec(
@@ -8840,6 +9097,262 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
 
       return ok({ generated, count: generated.length }, 201)
+    }
+
+    // ─── BUDGETS (period-based) ───────────────────────────────────────────────
+    if (segs[0] === 'budgets') {
+      // Lazy-create BudgetV2 table (period as YYYY-MM string, with notes)
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BudgetV2 (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          category     TEXT NOT NULL,
+          period       TEXT NOT NULL,
+          budgetAmount REAL NOT NULL DEFAULT 0,
+          notes        TEXT,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL,
+          UNIQUE(storeId, category, period)
+        )
+      `)
+
+      if (method === 'GET') {
+        const period = sp.get('period') ?? (() => {
+          const d = new Date()
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        })()
+        if (!/^\d{4}-\d{2}$/.test(period)) return err('Invalid period format (YYYY-MM)', 400)
+
+        const rows = (await query(
+          `SELECT * FROM BudgetV2 WHERE storeId=? AND period=? ORDER BY category`,
+          [storeId, period],
+        )) as any[]
+        return ok(rows)
+      }
+
+      if (method === 'POST') {
+        const b = (await req.json()) as any
+        if (!b.category || b.budgetAmount === undefined) return err('Missing required fields', 400)
+        if (!b.period || !/^\d{4}-\d{2}$/.test(b.period)) return err('Invalid period format (YYYY-MM)', 400)
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO BudgetV2 (id,storeId,category,period,budgetAmount,notes,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,?,?)
+           ON CONFLICT(storeId,category,period) DO UPDATE
+             SET budgetAmount=excluded.budgetAmount, notes=excluded.notes, updatedAt=excluded.updatedAt`,
+          [id, storeId, b.category, b.period, Number(b.budgetAmount), b.notes ?? null, t, t],
+        )
+        return ok({ id }, 201)
+      }
+
+      if (segs[1] && method === 'PATCH') {
+        const b = (await req.json()) as any
+        if (b.budgetAmount === undefined) return err('budgetAmount is required', 400)
+        await exec(
+          `UPDATE BudgetV2 SET budgetAmount=?, notes=?, updatedAt=? WHERE id=? AND storeId=?`,
+          [Number(b.budgetAmount), b.notes ?? null, nowISO(), segs[1], storeId],
+        )
+        return ok({ success: true })
+      }
+
+      if (segs[1] && method === 'DELETE') {
+        await exec(`DELETE FROM BudgetV2 WHERE id=? AND storeId=?`, [segs[1], storeId])
+        return ok({ success: true })
+      }
+    }
+
+    // ─── REPORTS / BUDGET-VS-ACTUAL ──────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'budget-vs-actual' && method === 'GET') {
+      const period = sp.get('period') ?? (() => {
+        const d = new Date()
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      })()
+      if (!/^\d{4}-\d{2}$/.test(period)) return err('Invalid period format (YYYY-MM)', 400)
+
+      // Ensure tables exist
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BudgetV2 (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          category     TEXT NOT NULL,
+          period       TEXT NOT NULL,
+          budgetAmount REAL NOT NULL DEFAULT 0,
+          notes        TEXT,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL,
+          UNIQUE(storeId, category, period)
+        )
+      `)
+
+      const [year, month] = period.split('-').map(Number)
+      const firstDay = `${period}-01`
+      const lastDay = new Date(year, month, 0).toISOString().slice(0, 10)
+
+      // Fetch budgets for period
+      const budgetRows = (await query(
+        `SELECT * FROM BudgetV2 WHERE storeId=? AND period=?`,
+        [storeId, period],
+      )) as any[]
+
+      // Actuals from Expense table — map category names to budget categories
+      // COGS → BAHAN_BAKU/OPERASIONAL, PAYROLL → GAJI, RENT → SEWA, UTILITIES → UTILITAS, MARKETING → MARKETING
+      const expenseActuals = (await query(
+        `SELECT category, COALESCE(SUM(amount),0) as actual
+           FROM Expense
+          WHERE storeId=? AND date BETWEEN ? AND ?
+          GROUP BY category`,
+        [storeId, firstDay, lastDay],
+      )) as any[]
+
+      // Payroll actuals: sum of totalNet from PayrollRun for the period
+      const payrollRow = await queryOne<any>(
+        `SELECT COALESCE(SUM(totalNet),0) as payrollTotal
+           FROM PayrollRun
+          WHERE storeId=? AND period=? AND status='PAID'`,
+        [storeId, period],
+      )
+      const payrollActual = Number(payrollRow?.payrollTotal ?? 0)
+
+      // Build expense map: group expense categories into budget categories
+      const expenseMap = new Map<string, number>()
+      const CATEGORY_MAP: Record<string, string> = {
+        BAHAN_BAKU: 'COGS',
+        GAJI: 'PAYROLL',
+        SEWA: 'RENT',
+        UTILITAS: 'UTILITIES',
+        MARKETING: 'MARKETING',
+        OPERASIONAL: 'OTHER',
+        LAINNYA: 'OTHER',
+      }
+      for (const row of expenseActuals) {
+        const budgetCat = CATEGORY_MAP[row.category] ?? 'OTHER'
+        expenseMap.set(budgetCat, (expenseMap.get(budgetCat) ?? 0) + Number(row.actual))
+      }
+      // Add payroll to PAYROLL bucket
+      expenseMap.set('PAYROLL', (expenseMap.get('PAYROLL') ?? 0) + payrollActual)
+
+      const BUDGET_CATEGORIES = ['COGS', 'PAYROLL', 'RENT', 'UTILITIES', 'MARKETING', 'OTHER']
+      const result = BUDGET_CATEGORIES.map((cat) => {
+        const budgetRow = budgetRows.find((b: any) => b.category === cat)
+        const budgetAmount = Number(budgetRow?.budgetAmount ?? 0)
+        const actualAmount = expenseMap.get(cat) ?? 0
+        const variance = actualAmount - budgetAmount
+        const utilizationPct = budgetAmount > 0 ? (actualAmount / budgetAmount) * 100 : (actualAmount > 0 ? 100 : 0)
+        const status = utilizationPct > 100 ? 'red' : utilizationPct >= 80 ? 'amber' : 'green'
+        return {
+          category: cat,
+          budgetAmount,
+          actualAmount,
+          variance,
+          utilizationPct,
+          status,
+          budgetId: budgetRow?.id ?? null,
+          notes: budgetRow?.notes ?? null,
+        }
+      })
+
+      return ok(result)
+    }
+
+    // ─── REPORTS / BUDGET-ALERTS ─────────────────────────────────────────────
+    if (segs[0] === 'reports' && segs[1] === 'budget-alerts' && method === 'GET') {
+      const period = sp.get('period') ?? (() => {
+        const d = new Date()
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      })()
+
+      // Lazy-create BudgetAlert table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BudgetAlert (
+          id         TEXT PRIMARY KEY,
+          storeId    TEXT NOT NULL,
+          category   TEXT NOT NULL,
+          period     TEXT NOT NULL,
+          threshold  INTEGER NOT NULL,
+          alertedAt  TEXT NOT NULL,
+          UNIQUE(storeId, category, period, threshold)
+        )
+      `)
+
+      // Also ensure BudgetV2 exists before querying budget-vs-actual logic
+      await exec(`
+        CREATE TABLE IF NOT EXISTS BudgetV2 (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          category     TEXT NOT NULL,
+          period       TEXT NOT NULL,
+          budgetAmount REAL NOT NULL DEFAULT 0,
+          notes        TEXT,
+          createdAt    TEXT NOT NULL,
+          updatedAt    TEXT NOT NULL,
+          UNIQUE(storeId, category, period)
+        )
+      `)
+
+      const [year2, month2] = period.split('-').map(Number)
+      const firstDay2 = `${period}-01`
+      const lastDay2 = new Date(year2, month2, 0).toISOString().slice(0, 10)
+
+      const budgetRows2 = (await query(
+        `SELECT * FROM BudgetV2 WHERE storeId=? AND period=?`,
+        [storeId, period],
+      )) as any[]
+
+      const expenseActuals2 = (await query(
+        `SELECT category, COALESCE(SUM(amount),0) as actual
+           FROM Expense
+          WHERE storeId=? AND date BETWEEN ? AND ?
+          GROUP BY category`,
+        [storeId, firstDay2, lastDay2],
+      )) as any[]
+
+      const payrollRow2 = await queryOne<any>(
+        `SELECT COALESCE(SUM(totalNet),0) as payrollTotal
+           FROM PayrollRun
+          WHERE storeId=? AND period=? AND status='PAID'`,
+        [storeId, period],
+      )
+      const payrollActual2 = Number(payrollRow2?.payrollTotal ?? 0)
+
+      const expenseMap2 = new Map<string, number>()
+      const CAT_MAP2: Record<string, string> = {
+        BAHAN_BAKU: 'COGS', GAJI: 'PAYROLL', SEWA: 'RENT',
+        UTILITAS: 'UTILITIES', MARKETING: 'MARKETING', OPERASIONAL: 'OTHER', LAINNYA: 'OTHER',
+      }
+      for (const row of expenseActuals2) {
+        const bc = CAT_MAP2[row.category] ?? 'OTHER'
+        expenseMap2.set(bc, (expenseMap2.get(bc) ?? 0) + Number(row.actual))
+      }
+      expenseMap2.set('PAYROLL', (expenseMap2.get('PAYROLL') ?? 0) + payrollActual2)
+
+      // Fire alerts for any category hitting 80% or 100%
+      const THRESHOLDS: (80 | 100)[] = [80, 100]
+      const generated: any[] = []
+      for (const budgetRow of budgetRows2) {
+        const budgetAmount = Number(budgetRow.budgetAmount)
+        if (budgetAmount <= 0) continue
+        const actual = expenseMap2.get(budgetRow.category) ?? 0
+        const pct = (actual / budgetAmount) * 100
+        for (const threshold of THRESHOLDS) {
+          if (pct >= threshold) {
+            const alertId = newId()
+            const alertedAt = nowISO()
+            await exec(
+              `INSERT OR IGNORE INTO BudgetAlert (id,storeId,category,period,threshold,alertedAt)
+               VALUES (?,?,?,?,?,?)`,
+              [alertId, storeId, budgetRow.category, period, threshold, alertedAt],
+            )
+          }
+        }
+      }
+
+      const alerts = (await query(
+        `SELECT * FROM BudgetAlert WHERE storeId=? AND period=? ORDER BY alertedAt DESC`,
+        [storeId, period],
+      )) as any[]
+
+      return ok(alerts)
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
