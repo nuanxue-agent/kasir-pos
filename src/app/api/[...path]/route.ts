@@ -792,6 +792,252 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok({ ...updatedOrder, items, payments })
       }
 
+      // ── POST /api/orders/:id/split — split selected items into a new sub-order ─
+      if (segs.length === 3 && segs[2] === 'split' && method === 'POST') {
+        const oid = segs[1]
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+        if (order.status !== 'PENDING')
+          return err('Only PENDING orders can be split', 400)
+
+        const b: any = await req.json()
+        if (!b.items?.length) return err('items array is required', 400)
+
+        const allItems = await query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid])
+
+        // Validate each split item
+        for (const s of b.items as Array<{ orderItemId: string; qty: number }>) {
+          const orig = allItems.find((i: any) => i.id === s.orderItemId)
+          if (!orig) return err(`Item ${s.orderItemId} not found`, 400)
+          if (s.qty <= 0 || s.qty > orig.qty)
+            return err(`Invalid qty for item "${orig.name}"`, 400)
+        }
+
+        // Lazy-init OrderSplit table
+        await exec(
+          `CREATE TABLE IF NOT EXISTS OrderSplit (
+            id TEXT PRIMARY KEY,
+            originalOrderId TEXT NOT NULL,
+            splitOrderId TEXT NOT NULL,
+            storeId TEXT NOT NULL,
+            createdAt TEXT NOT NULL
+          )`,
+          [],
+        )
+
+        const t = nowISO()
+        const newOid = newId()
+        const newNumber = `SPL-${Date.now()}`
+
+        // Calculate new order totals from split items
+        const splitItemsData = (b.items as Array<{ orderItemId: string; qty: number }>).map(s => {
+          const orig = allItems.find((i: any) => i.id === s.orderItemId) as any
+          const unitPrice = orig.price - (orig.discount ?? 0)
+          return { ...orig, splitQty: s.qty, lineTotal: unitPrice * s.qty }
+        })
+        const splitSubtotal = splitItemsData.reduce((s: number, i: any) => s + i.lineTotal, 0)
+
+        const stmts: Array<{ sql: string; params: any[] }> = []
+
+        // Create new (split) order
+        stmts.push({
+          sql: `INSERT INTO "Order" (id,storeId,number,status,userId,customerId,discountId,subtotal,discountAmt,taxAmt,total,note,tableId,tableNumber,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          params: [
+            newOid,
+            storeId,
+            newNumber,
+            'PENDING',
+            order.userId,
+            order.customerId ?? null,
+            null,
+            splitSubtotal,
+            0,
+            0,
+            splitSubtotal,
+            order.note ?? null,
+            b.newTableId ?? order.tableId ?? null,
+            order.tableNumber ?? null,
+            t,
+            t,
+          ],
+        })
+
+        // Copy split items into new order, reduce qty on original
+        for (const s of b.items as Array<{ orderItemId: string; qty: number }>) {
+          const orig = allItems.find((i: any) => i.id === s.orderItemId) as any
+          const unitPrice = orig.price - (orig.discount ?? 0)
+          // Insert into new order
+          stmts.push({
+            sql: `INSERT INTO OrderItem (id,orderId,productId,variantId,name,variantName,price,qty,discount,subtotal) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+            params: [
+              newId(),
+              newOid,
+              orig.productId ?? null,
+              orig.variantId ?? null,
+              orig.name,
+              orig.variantName ?? null,
+              orig.price,
+              s.qty,
+              orig.discount ?? 0,
+              unitPrice * s.qty,
+            ],
+          })
+          const remaining = orig.qty - s.qty
+          if (remaining > 0) {
+            // Reduce qty on original item
+            stmts.push({
+              sql: `UPDATE OrderItem SET qty = ?, subtotal = ? WHERE id = ?`,
+              params: [remaining, (orig.price - (orig.discount ?? 0)) * remaining, orig.id],
+            })
+          } else {
+            // Remove item from original order entirely
+            stmts.push({
+              sql: `DELETE FROM OrderItem WHERE id = ?`,
+              params: [orig.id],
+            })
+          }
+        }
+
+        // Recalculate original order subtotal/total
+        const remainingItems = allItems.filter(
+          (i: any) =>
+            !(b.items as Array<{ orderItemId: string; qty: number }>).some(
+              s => s.orderItemId === i.id && s.qty >= i.qty,
+            ),
+        )
+        const newOrigSubtotal = remainingItems.reduce((s: number, i: any) => {
+          const splitEntry = (b.items as Array<{ orderItemId: string; qty: number }>).find(
+            x => x.orderItemId === i.id,
+          )
+          const remainQty = splitEntry ? i.qty - splitEntry.qty : i.qty
+          return s + (i.price - (i.discount ?? 0)) * remainQty
+        }, 0)
+        stmts.push({
+          sql: `UPDATE "Order" SET subtotal = ?, total = ?, updatedAt = ? WHERE id = ?`,
+          params: [newOrigSubtotal, newOrigSubtotal, t, oid],
+        })
+
+        // Record the split relationship
+        stmts.push({
+          sql: `INSERT INTO OrderSplit (id,originalOrderId,splitOrderId,storeId,createdAt) VALUES (?,?,?,?,?)`,
+          params: [newId(), oid, newOid, storeId, t],
+        })
+
+        await batchExec(stmts)
+
+        logAudit({
+          storeId,
+          userId: user.id,
+          action: 'ORDER_SPLIT',
+          resourceType: 'Order',
+          resourceId: oid,
+          meta: { splitOrderId: newOid, splitNumber: newNumber },
+        }).catch(() => {})
+
+        const [splitOrder, splitOrderItems] = await Promise.all([
+          queryOne(`SELECT * FROM "Order" WHERE id = ?`, [newOid]),
+          query(`SELECT * FROM OrderItem WHERE orderId = ?`, [newOid]),
+        ])
+        return ok({ splitOrder: { ...splitOrder, items: splitOrderItems } }, 201)
+      }
+
+      // ── POST /api/orders/:id/merge — merge another open order into this one ──
+      if (segs.length === 3 && segs[2] === 'merge' && method === 'POST') {
+        const oid = segs[1]
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+        if (order.status !== 'PENDING')
+          return err('Source order must be PENDING', 400)
+
+        const b: any = await req.json()
+        if (!b.targetOrderId) return err('targetOrderId is required', 400)
+        if (b.targetOrderId === oid) return err('Cannot merge order with itself', 400)
+
+        const target = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          b.targetOrderId,
+          storeId,
+        ])
+        if (!target) return err('Target order not found', 404)
+        if (target.status !== 'PENDING') return err('Target order must be PENDING', 400)
+
+        const targetItems = await query(`SELECT * FROM OrderItem WHERE orderId = ?`, [
+          b.targetOrderId,
+        ])
+        const t = nowISO()
+        const stmts: Array<{ sql: string; params: any[] }> = []
+
+        // Move all target items into source order
+        for (const item of targetItems) {
+          stmts.push({
+            sql: `UPDATE OrderItem SET orderId = ? WHERE id = ?`,
+            params: [oid, item.id],
+          })
+        }
+
+        // Update source order total
+        const mergedTotal = Number(order.total) + Number(target.total)
+        const mergedSubtotal = Number(order.subtotal) + Number(target.subtotal)
+        stmts.push({
+          sql: `UPDATE "Order" SET subtotal = ?, total = ?, updatedAt = ? WHERE id = ?`,
+          params: [mergedSubtotal, mergedTotal, t, oid],
+        })
+
+        // Void the target order (it's now empty)
+        stmts.push({
+          sql: `UPDATE "Order" SET status = 'VOIDED', updatedAt = ? WHERE id = ?`,
+          params: [t, b.targetOrderId],
+        })
+
+        await batchExec(stmts)
+
+        logAudit({
+          storeId,
+          userId: user.id,
+          action: 'ORDER_MERGE',
+          resourceType: 'Order',
+          resourceId: oid,
+          meta: { mergedFromId: b.targetOrderId, mergedTotal },
+        }).catch(() => {})
+
+        const [mergedOrder, mergedItems] = await Promise.all([
+          queryOne(`SELECT * FROM "Order" WHERE id = ?`, [oid]),
+          query(`SELECT * FROM OrderItem WHERE orderId = ?`, [oid]),
+        ])
+        return ok({ order: { ...mergedOrder, items: mergedItems } })
+      }
+
+      // ── GET /api/orders/:id/splits — list all sub-orders created from this order ─
+      if (segs.length === 3 && segs[2] === 'splits' && method === 'GET') {
+        const oid = segs[1]
+        const order = await queryOne(`SELECT * FROM "Order" WHERE id = ? AND storeId = ?`, [
+          oid,
+          storeId,
+        ])
+        if (!order) return err('Order not found', 404)
+
+        // Table may not exist yet — return empty list gracefully
+        let splits: any[] = []
+        try {
+          splits = await query(
+            `SELECT os.*, o.number as splitNumber, o.total as splitTotal, o.status as splitStatus
+             FROM OrderSplit os
+             JOIN "Order" o ON os.splitOrderId = o.id
+             WHERE os.originalOrderId = ? AND os.storeId = ?
+             ORDER BY os.createdAt DESC`,
+            [oid, storeId],
+          )
+        } catch {
+          // OrderSplit table doesn't exist yet
+        }
+        return ok({ splits })
+      }
+
       // ── PATCH /api/orders/:id/void — PATCH alias for void ────────────────────
       if (segs.length === 3 && segs[2] === 'void' && method === 'PATCH') {
         const oid = segs[1]
@@ -4648,6 +4894,162 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const result = await getAuditLogs({ storeId, page, pageSize: 20, action })
         return ok(result)
       }
+    }
+
+    // ─── KITCHEN ORDERS (KDS) ─────────────────────────────────────────────────
+    if (segs[0] === 'kitchen' && segs[1] === 'orders') {
+      // Lazy-init KitchenOrder table
+      await exec(`CREATE TABLE IF NOT EXISTS KitchenOrder (
+        id TEXT PRIMARY KEY,
+        orderId TEXT NOT NULL,
+        storeId TEXT NOT NULL,
+        orderNumber TEXT NOT NULL,
+        tableNumber INTEGER,
+        items TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'NEW',
+        priority INTEGER NOT NULL DEFAULT 0,
+        startedAt TEXT,
+        readyAt TEXT,
+        servedAt TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+
+      // GET /api/kitchen/orders?storeId=&status=
+      if (segs.length === 2 && method === 'GET') {
+        const statusFilter = sp.get('status')
+        const validKdsStatuses = new Set(['NEW', 'PREPARING', 'READY', 'SERVED'])
+        let sql = `SELECT * FROM KitchenOrder WHERE storeId = ?`
+        const params: any[] = [storeId]
+        if (statusFilter && validKdsStatuses.has(statusFilter)) {
+          sql += ` AND status = ?`
+          params.push(statusFilter)
+        } else {
+          // Default: exclude SERVED older than 2 hours
+          sql += ` AND (status != 'SERVED' OR updatedAt > datetime('now', '-2 hours'))`
+        }
+        sql += ` ORDER BY priority DESC, createdAt ASC`
+        const rows = await query(sql, params)
+        return ok((rows as any[]).map(r => ({ ...r, items: JSON.parse(r.items) })))
+      }
+
+      // POST /api/kitchen/orders — create KDS entry from an existing order
+      if (segs.length === 2 && method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['orderId', 'orderNumber', 'items'])
+        if (!Array.isArray(b.items) || b.items.length === 0)
+          return err('items must be a non-empty array')
+        const kid = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO KitchenOrder (id,orderId,storeId,orderNumber,tableNumber,items,status,priority,startedAt,readyAt,servedAt,createdAt,updatedAt)
+           VALUES (?,?,?,?,?,?,'NEW',?,NULL,NULL,NULL,?,?)`,
+          [
+            kid,
+            b.orderId,
+            storeId,
+            b.orderNumber,
+            b.tableNumber ? Number(b.tableNumber) : null,
+            JSON.stringify(b.items),
+            Number(b.priority) || 0,
+            t,
+            t,
+          ],
+        )
+        return ok(
+          {
+            id: kid,
+            orderId: b.orderId,
+            storeId,
+            orderNumber: b.orderNumber,
+            tableNumber: b.tableNumber ?? null,
+            items: b.items,
+            status: 'NEW',
+            priority: Number(b.priority) || 0,
+            startedAt: null,
+            readyAt: null,
+            servedAt: null,
+            createdAt: t,
+            updatedAt: t,
+          },
+          201,
+        )
+      }
+
+      // PATCH /api/kitchen/orders/:id — advance status or update priority
+      if (segs.length === 3 && method === 'PATCH') {
+        const kid = segs[2]
+        const b: any = await req.json()
+        const validKdsStatuses = new Set(['NEW', 'PREPARING', 'READY', 'SERVED'])
+        if (b.status && !validKdsStatuses.has(b.status))
+          return err('status must be NEW | PREPARING | READY | SERVED')
+        const t = nowISO()
+        const updates: string[] = ['status = ?', 'updatedAt = ?']
+        const vals: any[] = [b.status, t]
+        if (b.status === 'PREPARING') { updates.push('startedAt = ?'); vals.push(t) }
+        if (b.status === 'READY')     { updates.push('readyAt = ?');   vals.push(t) }
+        if (b.status === 'SERVED')    { updates.push('servedAt = ?');  vals.push(t) }
+        if (b.priority !== undefined) { updates.push('priority = ?');  vals.push(Number(b.priority)) }
+        vals.push(kid, storeId)
+        await exec(
+          `UPDATE KitchenOrder SET ${updates.join(', ')} WHERE id = ? AND storeId = ?`,
+          vals,
+        )
+        return ok({ success: true })
+      }
+    }
+
+    // ─── KITCHEN ANALYTICS ────────────────────────────────────────────────────
+    if (segs[0] === 'kitchen' && segs[1] === 'analytics' && method === 'GET') {
+      const from = sp.get('from')
+      const to   = sp.get('to')
+      // Ensure table exists
+      await exec(`CREATE TABLE IF NOT EXISTS KitchenOrder (
+        id TEXT PRIMARY KEY,
+        orderId TEXT NOT NULL,
+        storeId TEXT NOT NULL,
+        orderNumber TEXT NOT NULL,
+        tableNumber INTEGER,
+        items TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'NEW',
+        priority INTEGER NOT NULL DEFAULT 0,
+        startedAt TEXT,
+        readyAt TEXT,
+        servedAt TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+      let sql = `SELECT * FROM KitchenOrder WHERE storeId = ? AND startedAt IS NOT NULL AND readyAt IS NOT NULL`
+      const params: any[] = [storeId]
+      if (from) { sql += ` AND createdAt >= ?`; params.push(from) }
+      if (to)   { sql += ` AND createdAt <= ?`; params.push(to) }
+      const rows = await query(sql, params) as any[]
+      const orders = rows.map(r => ({ ...r, items: JSON.parse(r.items) }))
+
+      // Average prep time per item category
+      const catMap = new Map<string, { totalMs: number; count: number }>()
+      for (const o of orders) {
+        const ms = new Date(o.readyAt).getTime() - new Date(o.startedAt).getTime()
+        for (const item of o.items) {
+          const cat = item.category ?? 'Uncategorized'
+          const e = catMap.get(cat) ?? { totalMs: 0, count: 0 }
+          e.totalMs += ms
+          e.count   += item.qty ?? 1
+          catMap.set(cat, e)
+        }
+      }
+      const avgPrepByCategory = Array.from(catMap.entries()).map(([category, { totalMs, count }]) => ({
+        category,
+        avgMs: count > 0 ? Math.round(totalMs / count) : 0,
+        count,
+      }))
+
+      // Busiest hour heatmap
+      const hourCounts = new Array<number>(24).fill(0)
+      for (const o of rows) { hourCounts[new Date(o.createdAt).getHours()] += 1 }
+      const heatmap = hourCounts.map((count, hour) => ({ hour, count }))
+
+      return ok({ avgPrepByCategory, heatmap })
     }
 
     // ─── KITCHEN TICKETS (KOT) ────────────────────────────────────────────────
