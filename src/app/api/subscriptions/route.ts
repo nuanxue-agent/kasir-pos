@@ -8,7 +8,7 @@ function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status })
 }
 
-async function ensureTables() {
+export async function ensureSubscriptionTables() {
   await exec(`CREATE TABLE IF NOT EXISTS MembershipPlan (
     id            TEXT PRIMARY KEY,
     storeId       TEXT NOT NULL,
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   const storeId = sp.get('storeId') ?? user.stores?.[0]?.id
   if (!storeId) return err('storeId required', 400)
 
-  await ensureTables()
+  await ensureSubscriptionTables()
 
   const status = sp.get('status')
   const customerId = sp.get('customerId')
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
   if (!storeId) return err('storeId required', 400)
 
-  await ensureTables()
+  await ensureSubscriptionTables()
 
   const b = (await req.json()) as any
   if (!b.customerId) return err("Field 'customerId' is required", 400)
