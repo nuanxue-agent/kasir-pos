@@ -4783,23 +4783,43 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
 
     // ─── GIFT CARDS ───────────────────────────────────────────────────────────
     if (segs[0] === 'gift-cards') {
-      // Lazy table creation — runs once per cold start, no-op thereafter
+      // Lazy table creation — GiftCard + GiftCardTransaction
       await exec(
         `CREATE TABLE IF NOT EXISTS GiftCard (
           id              TEXT PRIMARY KEY,
           storeId         TEXT NOT NULL,
           code            TEXT NOT NULL UNIQUE,
+          amount          REAL NOT NULL DEFAULT 0,
           balance         REAL NOT NULL DEFAULT 0,
           originalBalance REAL NOT NULL DEFAULT 0,
+          issuedTo        TEXT,
+          issuedAt        TEXT NOT NULL,
           expiresAt       TEXT,
           status          TEXT NOT NULL DEFAULT 'ACTIVE',
-          issuedTo        TEXT,
+          recipientName   TEXT,
+          recipientEmail  TEXT,
           createdAt       TEXT NOT NULL
         )`,
         [],
       )
+      await exec(
+        `CREATE TABLE IF NOT EXISTS GiftCardTransaction (
+          id        TEXT PRIMARY KEY,
+          cardId    TEXT NOT NULL,
+          orderId   TEXT,
+          amount    REAL NOT NULL,
+          type      TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )`,
+        [],
+      )
+      // Add new columns to existing GiftCard table if missing (migration)
+      await exec(`ALTER TABLE GiftCard ADD COLUMN amount REAL NOT NULL DEFAULT 0`, []).catch(() => {})
+      await exec(`ALTER TABLE GiftCard ADD COLUMN issuedAt TEXT NOT NULL DEFAULT ''`, []).catch(() => {})
+      await exec(`ALTER TABLE GiftCard ADD COLUMN recipientName TEXT`, []).catch(() => {})
+      await exec(`ALTER TABLE GiftCard ADD COLUMN recipientEmail TEXT`, []).catch(() => {})
 
-      // GET /api/gift-cards?storeId= — list active gift cards for the store
+      // GET /api/gift-cards?storeId= — list gift cards for the store
       if (segs.length === 1 && method === 'GET') {
         const rows = await query(
           `SELECT g.*, c.name as customerName
@@ -4812,29 +4832,51 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         return ok(rows)
       }
 
-      // POST /api/gift-cards — issue a new gift card
+      // POST /api/gift-cards — issue one or a batch of gift cards
       if (segs.length === 1 && method === 'POST') {
         const b = (await req.json()) as any
-        if (!b.balance || Number(b.balance) <= 0) return err('balance must be positive')
-        const code = generateGiftCardCode()
-        const id = newId()
+        const rawAmount = Number(b.amount ?? b.balance)
+        if (!rawAmount || rawAmount <= 0) return err('amount must be positive')
+        const batchCount = Math.min(100, Math.max(1, Number(b.batch ?? 1)))
         const t = nowISO()
-        await exec(
-          `INSERT INTO GiftCard (id,storeId,code,balance,originalBalance,expiresAt,status,issuedTo,createdAt)
-           VALUES (?,?,?,?,?,?,?,?,?)`,
-          [
-            id,
-            storeId,
-            code,
-            Number(b.balance),
-            Number(b.balance),
-            b.expiresAt || null,
-            'ACTIVE',
-            b.issuedTo || null,
-            t,
-          ],
+        const codes: string[] = []
+        for (let i = 0; i < batchCount; i++) {
+          const code = generateGiftCardCode()
+          const id = newId()
+          await exec(
+            `INSERT INTO GiftCard (id,storeId,code,amount,balance,originalBalance,issuedTo,issuedAt,expiresAt,status,recipientName,recipientEmail,createdAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [
+              id, storeId, code, rawAmount, rawAmount, rawAmount,
+              b.issuedTo || null, t, b.expiresAt || null, 'ACTIVE',
+              b.recipientName || null, b.recipientEmail || null, t,
+            ],
+          )
+          await exec(
+            `INSERT INTO GiftCardTransaction (id,cardId,orderId,amount,type,createdAt) VALUES (?,?,?,?,?,?)`,
+            [newId(), id, null, rawAmount, 'ISSUE', t],
+          )
+          codes.push(code)
+        }
+        if (batchCount === 1) {
+          return ok({ id: newId(), code: codes[0], amount: rawAmount, balance: rawAmount }, 201)
+        }
+        return ok({ codes, count: batchCount, amount: rawAmount }, 201)
+      }
+
+      // GET /api/gift-cards/redeem — not valid; handled below as POST
+      // GET /api/gift-cards/:code/balance — balance inquiry
+      if (segs.length === 3 && segs[2] === 'balance' && method === 'GET') {
+        const code = segs[1].toUpperCase()
+        const card = await queryOne<any>(
+          `SELECT g.*, c.name as customerName
+           FROM GiftCard g LEFT JOIN Customer c ON g.issuedTo = c.id
+           WHERE g.code = ? AND g.storeId = ?`,
+          [code, storeId],
         )
-        return ok({ id, code, balance: Number(b.balance) }, 201)
+        if (!card) return err('Gift card not found', 404)
+        const liveStatus = resolveGiftCardStatus(card.balance, card.expiresAt)
+        return ok({ ...card, status: liveStatus })
       }
 
       // GET /api/gift-cards/:code — look up by code (used at POS)
@@ -4848,12 +4890,67 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
           [code, storeId],
         )
         if (!card) return err('Gift card not found', 404)
-        // Return with resolved live status
         const liveStatus = resolveGiftCardStatus(card.balance, card.expiresAt)
         return ok({ ...card, status: liveStatus })
       }
 
-      // PATCH /api/gift-cards/:code/redeem — deduct balance
+      // POST /api/gift-cards/redeem — deduct balance (POS checkout)
+      if (segs.length === 2 && segs[1] === 'redeem' && method === 'POST') {
+        const b = (await req.json()) as any
+        const code = String(b.code ?? '').toUpperCase()
+        const amount = Number(b.amount)
+        const orderId: string | null = b.orderId || null
+        if (!code) return err('code is required')
+        if (!amount || amount <= 0) return err('amount must be positive')
+
+        const card = await queryOne<any>(`SELECT * FROM GiftCard WHERE code = ? AND storeId = ?`, [
+          code, storeId,
+        ])
+        if (!card) return err('Gift card not found', 404)
+
+        const liveStatus = resolveGiftCardStatus(card.balance, card.expiresAt)
+        if (liveStatus === 'EXPIRED') return err('Gift card has expired', 400)
+        if (liveStatus === 'USED' || (liveStatus as string) === 'REDEEMED') return err('Gift card has no remaining balance', 400)
+        if ((liveStatus as string) === 'VOIDED') return err('Gift card has been voided', 400)
+
+        const { newBalance, applied } = deductGiftCardBalance(card.balance, amount)
+        const newStatus = newBalance <= 0 ? 'REDEEMED' : 'ACTIVE'
+        const t = nowISO()
+
+        await exec(`UPDATE GiftCard SET balance = ?, status = ? WHERE code = ? AND storeId = ?`, [
+          newBalance, newStatus, code, storeId,
+        ])
+        await exec(
+          `INSERT INTO GiftCardTransaction (id,cardId,orderId,amount,type,createdAt) VALUES (?,?,?,?,?,?)`,
+          [newId(), card.id, orderId, applied, 'REDEEM', t],
+        )
+        return ok({ applied, newBalance, status: newStatus })
+      }
+
+      // POST /api/gift-cards/void — void a gift card by id
+      if (segs.length === 2 && segs[1] === 'void' && method === 'POST') {
+        const b = (await req.json()) as any
+        const id = String(b.id ?? '')
+        if (!id) return err('id is required')
+
+        const card = await queryOne<any>(`SELECT * FROM GiftCard WHERE id = ? AND storeId = ?`, [
+          id, storeId,
+        ])
+        if (!card) return err('Gift card not found', 404)
+        if (card.status === 'VOIDED') return err('Gift card is already voided', 400)
+
+        const t = nowISO()
+        await exec(`UPDATE GiftCard SET status = 'VOIDED', balance = 0 WHERE id = ? AND storeId = ?`, [
+          id, storeId,
+        ])
+        await exec(
+          `INSERT INTO GiftCardTransaction (id,cardId,orderId,amount,type,createdAt) VALUES (?,?,?,?,?,?)`,
+          [newId(), id, null, card.balance, 'REFUND', t],
+        )
+        return ok({ success: true, id })
+      }
+
+      // PATCH /api/gift-cards/:code/redeem — legacy alias, kept for backward compat
       if (segs.length === 3 && segs[2] === 'redeem' && method === 'PATCH') {
         const code = segs[1].toUpperCase()
         const b = (await req.json()) as any
@@ -4861,8 +4958,7 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         if (!amount || amount <= 0) return err('amount must be positive')
 
         const card = await queryOne<any>(`SELECT * FROM GiftCard WHERE code = ? AND storeId = ?`, [
-          code,
-          storeId,
+          code, storeId,
         ])
         if (!card) return err('Gift card not found', 404)
 
@@ -4871,14 +4967,16 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         if (liveStatus === 'USED') return err('Gift card has no remaining balance', 400)
 
         const { newBalance, applied } = deductGiftCardBalance(card.balance, amount)
-        const newStatus = resolveGiftCardStatus(newBalance, card.expiresAt)
+        const newStatus = newBalance <= 0 ? 'REDEEMED' : 'ACTIVE'
+        const t = nowISO()
 
         await exec(`UPDATE GiftCard SET balance = ?, status = ? WHERE code = ? AND storeId = ?`, [
-          newBalance,
-          newStatus,
-          code,
-          storeId,
+          newBalance, newStatus, code, storeId,
         ])
+        await exec(
+          `INSERT INTO GiftCardTransaction (id,cardId,orderId,amount,type,createdAt) VALUES (?,?,?,?,?,?)`,
+          [newId(), card.id, b.orderId || null, applied, 'REDEEM', t],
+        )
         return ok({ applied, newBalance, status: newStatus })
       }
     }
