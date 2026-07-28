@@ -203,7 +203,7 @@ export default function MarginAnalysisClient({ storeId, currency }: MarginAnalys
           <PrintButton />
           <ExportButton
             data={filteredMargins as any}
-            type="csv"
+            type="excel"
             label="Export CSV"
             filename={`margin-analysis-${storeId}`}
             columns={exportColumns}
