@@ -10199,6 +10199,187 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── REFERRAL PROGRAMS ────────────────────────────────────────────────────
+    if (segs[0] === 'referral-programs') {
+      // Lazy-create ReferralProgram table
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ReferralProgram (
+          id           TEXT PRIMARY KEY,
+          storeId      TEXT NOT NULL,
+          name         TEXT NOT NULL,
+          rewardType   TEXT NOT NULL DEFAULT 'POINTS',
+          rewardAmount REAL NOT NULL DEFAULT 0,
+          active       INTEGER NOT NULL DEFAULT 1,
+          createdAt    TEXT NOT NULL
+        )
+      `)
+
+      // GET /api/referral-programs?storeId=
+      if (method === 'GET') {
+        const rows = await query(
+          `SELECT * FROM ReferralProgram WHERE storeId=? ORDER BY createdAt DESC`,
+          [storeId],
+        )
+        return ok((rows as any[]).map((r) => ({ ...r, active: Boolean(r.active) })))
+      }
+
+      // POST /api/referral-programs — create a new program
+      if (method === 'POST' && segs.length === 1) {
+        const b = (await req.json()) as any
+        validateRequired(b, ['name', 'rewardType', 'rewardAmount'])
+        const validTypes = ['DISCOUNT', 'POINTS', 'CASH']
+        if (!validTypes.includes(b.rewardType)) {
+          return err('rewardType must be DISCOUNT, POINTS, or CASH', 400, 'INVALID_VALUE', requestId, startMs)
+        }
+        validatePositive(b.rewardAmount, 'rewardAmount')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO ReferralProgram (id,storeId,name,rewardType,rewardAmount,active,createdAt)
+           VALUES (?,?,?,?,?,1,?)`,
+          [id, storeId, b.name, b.rewardType, Number(b.rewardAmount), t],
+        )
+        return ok({ id, name: b.name, rewardType: b.rewardType, rewardAmount: Number(b.rewardAmount), active: true, createdAt: t }, 201)
+      }
+
+      // PATCH /api/referral-programs/:id — toggle active or update fields
+      if (method === 'PATCH' && segs.length === 2) {
+        const progId = segs[1]
+        const b = (await req.json()) as any
+        const existing = await queryOne(`SELECT * FROM ReferralProgram WHERE id=? AND storeId=?`, [progId, storeId])
+        if (!existing) return err('Program not found', 404, 'NOT_FOUND', requestId, startMs)
+        const updates: Record<string, any> = {}
+        if (b.active !== undefined) updates.active = b.active ? 1 : 0
+        if (b.name !== undefined) updates.name = b.name
+        if (b.rewardType !== undefined) updates.rewardType = b.rewardType
+        if (b.rewardAmount !== undefined) updates.rewardAmount = Number(b.rewardAmount)
+        if (Object.keys(updates).length === 0) return err('Nothing to update', 400, 'VALIDATION_ERROR', requestId, startMs)
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(`UPDATE ReferralProgram SET ${setClauses} WHERE id=? AND storeId=?`, [...values, progId, storeId])
+        return ok({ updated: true })
+      }
+    }
+
+    // ─── REFERRALS (program-based) ────────────────────────────────────────────
+    if (segs[0] === 'referrals' && segs[1] !== 'track') {
+      // Lazy-create tables
+      await exec(`
+        CREATE TABLE IF NOT EXISTS CustomerReferral (
+          id          TEXT PRIMARY KEY,
+          programId   TEXT NOT NULL,
+          referrerId  TEXT NOT NULL,
+          refereeId   TEXT,
+          referralCode TEXT NOT NULL,
+          storeId     TEXT NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          createdAt   TEXT NOT NULL
+        )
+      `)
+      await exec(`ALTER TABLE Customer ADD COLUMN referralCode TEXT`, []).catch(() => {})
+
+      // GET /api/referrals?storeId=
+      if (method === 'GET' && segs.length === 1) {
+        const rows = await query(
+          `SELECT cr.*,
+                  ref.name AS referrerName,
+                  ref2.name AS refereeName
+           FROM CustomerReferral cr
+           LEFT JOIN Customer ref  ON ref.id  = cr.referrerId
+           LEFT JOIN Customer ref2 ON ref2.id = cr.refereeId
+           WHERE cr.storeId = ?
+           ORDER BY cr.createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows)
+      }
+
+      // POST /api/referrals/:id/reward — mark referral as REWARDED
+      if (method === 'POST' && segs.length === 3 && segs[2] === 'reward') {
+        const refId = segs[1]
+        const referral = await queryOne<any>(
+          `SELECT cr.*, rp.rewardType, rp.rewardAmount
+           FROM CustomerReferral cr
+           JOIN ReferralProgram rp ON rp.id = cr.programId
+           WHERE cr.id=? AND cr.storeId=?`,
+          [refId, storeId],
+        )
+        if (!referral) return err('Referral not found', 404, 'NOT_FOUND', requestId, startMs)
+        if (referral.status !== 'QUALIFIED') {
+          return err('Referral must be QUALIFIED before rewarding', 400, 'INVALID_TRANSITION', requestId, startMs)
+        }
+        await exec(`UPDATE CustomerReferral SET status='REWARDED' WHERE id=?`, [refId])
+        return ok({ rewarded: true, rewardType: referral.rewardType, rewardAmount: referral.rewardAmount })
+      }
+    }
+
+    // ─── REFERRALS TRACK ─────────────────────────────────────────────────────
+    if (segs[0] === 'referrals' && segs[1] === 'track' && method === 'POST') {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS CustomerReferral (
+          id          TEXT PRIMARY KEY,
+          programId   TEXT NOT NULL,
+          referrerId  TEXT NOT NULL,
+          refereeId   TEXT,
+          referralCode TEXT NOT NULL,
+          storeId     TEXT NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          createdAt   TEXT NOT NULL
+        )
+      `)
+      await exec(`ALTER TABLE Customer ADD COLUMN referralCode TEXT`, []).catch(() => {})
+
+      const b = (await req.json()) as any
+      validateRequired(b, ['referralCode', 'refereePhone'])
+
+      // Find referrer by referralCode
+      const referrer = await queryOne<any>(
+        `SELECT * FROM Customer WHERE referralCode=? AND storeId=?`,
+        [b.referralCode, storeId],
+      )
+      if (!referrer) return err('Kode referral tidak valid', 404, 'NOT_FOUND', requestId, startMs)
+
+      // Find referee by phone
+      const referee = await queryOne<any>(
+        `SELECT * FROM Customer WHERE phone=? AND storeId=?`,
+        [b.refereePhone, storeId],
+      )
+      if (!referee) return err('Pelanggan referee tidak ditemukan', 404, 'NOT_FOUND', requestId, startMs)
+
+      if (referee.id === referrer.id) {
+        return err('Pelanggan tidak bisa mereferral diri sendiri', 400, 'SELF_REFERRAL', requestId, startMs)
+      }
+
+      // Duplicate: referee already referred by anyone
+      const alreadyReferred = await queryOne(
+        `SELECT id FROM CustomerReferral WHERE refereeId=? AND storeId=?`,
+        [referee.id, storeId],
+      )
+      if (alreadyReferred) return err('Pelanggan sudah pernah direferral', 409, 'DUPLICATE_REFERRAL', requestId, startMs)
+
+      // Duplicate: same referrer→referee pair
+      const dupPair = await queryOne(
+        `SELECT id FROM CustomerReferral WHERE referrerId=? AND refereeId=? AND storeId=?`,
+        [referrer.id, referee.id, storeId],
+      )
+      if (dupPair) return err('Referral ini sudah tercatat', 409, 'DUPLICATE_REFERRAL', requestId, startMs)
+
+      // Find active program
+      const program = await queryOne<any>(
+        `SELECT * FROM ReferralProgram WHERE storeId=? AND active=1 LIMIT 1`,
+        [storeId],
+      )
+      if (!program) return err('Tidak ada program referral aktif', 400, 'NO_ACTIVE_PROGRAM', requestId, startMs)
+
+      const id = newId()
+      const t = nowISO()
+      await exec(
+        `INSERT INTO CustomerReferral (id,programId,referrerId,refereeId,referralCode,storeId,status,createdAt)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [id, program.id, referrer.id, referee.id, b.referralCode, storeId, 'QUALIFIED', t],
+      )
+      return ok({ id, status: 'QUALIFIED', referrerId: referrer.id, refereeId: referee.id }, 201)
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
