@@ -1,207 +1,192 @@
 import { describe, it, expect } from 'vitest'
 
-// ── Pure business-logic helpers mirroring API route logic ─────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Generate a vendor invite token (hex, 64 chars) */
-function generateInviteToken(): string {
-  // In the real route we use two newId() calls joined without dashes
-  const chars = 'abcdef0123456789'
-  let token = ''
-  for (let i = 0; i < 64; i++) {
-    token += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return token
+type POStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'ORDERED' | 'RECEIVED' | 'CANCELLED'
+
+interface Vendor {
+  id: string
+  storeId: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  paymentTerms: string | null
+  leadTimeDays: number
+  rating: number
+  active: number
 }
 
-/** Check if an invite is expired relative to a given "now" */
-function isInviteExpired(expiresAt: string, now = new Date()): boolean {
-  return new Date(expiresAt) <= now
+interface PurchaseOrder {
+  id: string
+  storeId: string
+  supplierId: string
+  status: POStatus
+  subtotal: number
+  taxAmt: number
+  total: number
+  expectedDate: string | null
+  createdAt: string
 }
 
-/** Calculate invite expiry date: 7 days from creation */
-function calcInviteExpiry(createdAt: string): Date {
-  const d = new Date(createdAt)
-  d.setDate(d.getDate() + 7)
+interface POApproval {
+  id: string
+  poId: string
+  userId: string
+  action: 'APPROVED' | 'REJECTED'
+  notes: string | null
+  createdAt: string
+}
+
+// ── Pure business-logic functions (mirrors API logic) ─────────────────────────
+
+const VALID_TRANSITIONS: Record<POStatus, POStatus[]> = {
+  DRAFT:     ['SUBMITTED', 'CANCELLED'],
+  SUBMITTED: ['APPROVED', 'DRAFT', 'CANCELLED'],  // DRAFT = rejected back
+  APPROVED:  ['ORDERED', 'CANCELLED'],
+  ORDERED:   ['RECEIVED', 'CANCELLED'],
+  RECEIVED:  [],
+  CANCELLED: [],
+}
+
+function canTransition(from: POStatus, to: POStatus): boolean {
+  return VALID_TRANSITIONS[from].includes(to)
+}
+
+function canApprove(role: string): boolean {
+  return ['OWNER', 'MANAGER'].includes(role)
+}
+
+function calcLeadTimeArrival(orderDate: string, leadTimeDays: number): Date {
+  const d = new Date(orderDate)
+  d.setDate(d.getDate() + leadTimeDays)
   return d
 }
 
-/** Calculate vendor performance scorecard from list of POs */
-interface PO {
-  status: string
-  createdAt: string
-  expectedDate?: string
-  updatedAt?: string
-  confirmedAt?: string
-  total: number
+function calcPOTotal(subtotal: number, taxRate: number): { taxAmt: number; total: number } {
+  const taxAmt = Math.round(subtotal * taxRate)
+  return { taxAmt, total: subtotal + taxAmt }
 }
 
-interface Scorecard {
-  onTimePct: number
-  avgResponseHours: number
-  qualityRating: number
-  totalOrders: number
-  totalValue: number
+function aggregateVendorRating(ratings: number[]): number {
+  if (ratings.length === 0) return 0
+  const avg = ratings.reduce((s, r) => s + r, 0) / ratings.length
+  return Math.round(avg * 10) / 10
 }
 
-function calcScorecard(pos: PO[]): Scorecard {
-  const totalOrders = pos.length
-  const totalValue = pos.reduce((s, p) => s + p.total, 0)
-  const received = pos.filter(p => p.status === 'RECEIVED')
-  const onTime = received.filter(p => {
-    if (!p.expectedDate || !p.updatedAt) return false
-    return new Date(p.updatedAt) <= new Date(p.expectedDate)
-  })
-  const onTimePct = received.length ? (onTime.length / received.length) * 100 : 0
-
-  const confirmed = pos.filter(p => p.confirmedAt && p.createdAt)
-  const avgResponseHours = confirmed.length
-    ? confirmed.reduce((sum, p) => {
-        return sum + (new Date(p.confirmedAt!).getTime() - new Date(p.createdAt).getTime()) / (1000 * 60 * 60)
-      }, 0) / confirmed.length
-    : 0
-
-  const qualityRating = received.length ? 4.2 : 0 // stub
-
-  return { onTimePct, avgResponseHours, qualityRating, totalOrders, totalValue }
+function isValidRating(rating: number): boolean {
+  return Number.isInteger(rating) && rating >= 1 && rating <= 5
 }
 
-/** Sort messages by sentAt ascending */
-interface Msg { id: string; sentAt: string; direction: 'IN' | 'OUT'; body: string }
-function sortMessageThread(messages: Msg[]): Msg[] {
-  return [...messages].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
-}
-
-/** Filter POs by status */
-function filterPOsByStatus(pos: PO[], statuses: string[]): PO[] {
-  return pos.filter(p => statuses.includes(p.status))
+function getEstimatedArrival(po: PurchaseOrder, vendor: Vendor): Date | null {
+  if (!po.expectedDate) return null
+  return calcLeadTimeArrival(po.expectedDate, vendor.leadTimeDays)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('Vendor invite token generation', () => {
-  it('generates a token of length 64', () => {
-    const token = generateInviteToken()
-    expect(token).toHaveLength(64)
+describe('PO status transition validation', () => {
+  it('allows DRAFT → SUBMITTED', () => {
+    expect(canTransition('DRAFT', 'SUBMITTED')).toBe(true)
   })
 
-  it('generates only hex characters', () => {
-    const token = generateInviteToken()
-    expect(token).toMatch(/^[a-f0-9]+$/)
+  it('allows SUBMITTED → APPROVED', () => {
+    expect(canTransition('SUBMITTED', 'APPROVED')).toBe(true)
   })
 
-  it('generates unique tokens on successive calls', () => {
-    const tokens = new Set(Array.from({ length: 20 }, generateInviteToken))
-    expect(tokens.size).toBe(20)
-  })
-})
-
-describe('Invite expiry validation', () => {
-  it('marks a past-date invite as expired', () => {
-    const past = new Date(Date.now() - 1000).toISOString()
-    expect(isInviteExpired(past)).toBe(true)
+  it('allows APPROVED → ORDERED', () => {
+    expect(canTransition('APPROVED', 'ORDERED')).toBe(true)
   })
 
-  it('marks a future-date invite as not expired', () => {
-    const future = new Date(Date.now() + 60_000).toISOString()
-    expect(isInviteExpired(future)).toBe(false)
+  it('allows ORDERED → RECEIVED', () => {
+    expect(canTransition('ORDERED', 'RECEIVED')).toBe(true)
   })
 
-  it('calculates expiry 7 days from createdAt', () => {
-    const created = '2025-01-01T00:00:00.000Z'
-    const expiry = calcInviteExpiry(created)
-    expect(expiry.toISOString()).toBe('2025-01-08T00:00:00.000Z')
+  it('blocks DRAFT → APPROVED (must go through SUBMITTED)', () => {
+    expect(canTransition('DRAFT', 'APPROVED')).toBe(false)
+  })
+
+  it('blocks RECEIVED → CANCELLED (terminal state)', () => {
+    expect(canTransition('RECEIVED', 'CANCELLED')).toBe(false)
+  })
+
+  it('allows DRAFT → CANCELLED', () => {
+    expect(canTransition('DRAFT', 'CANCELLED')).toBe(true)
   })
 })
 
-describe('Performance scorecard calculation', () => {
-  const samplePOs: PO[] = [
-    {
-      status: 'RECEIVED',
-      createdAt: '2025-01-01T08:00:00.000Z',
-      expectedDate: '2025-01-10T00:00:00.000Z',
-      updatedAt: '2025-01-09T12:00:00.000Z', // on time
-      confirmedAt: '2025-01-01T10:00:00.000Z',
-      total: 500_000,
-    },
-    {
-      status: 'RECEIVED',
-      createdAt: '2025-01-05T08:00:00.000Z',
-      expectedDate: '2025-01-12T00:00:00.000Z',
-      updatedAt: '2025-01-15T08:00:00.000Z', // late
-      confirmedAt: '2025-01-05T20:00:00.000Z',
-      total: 300_000,
-    },
-    {
-      status: 'DRAFT',
-      createdAt: '2025-01-10T08:00:00.000Z',
-      total: 200_000,
-    },
-  ]
-
-  it('calculates on-time % correctly (1 of 2 received on time = 50%)', () => {
-    const sc = calcScorecard(samplePOs)
-    expect(sc.onTimePct).toBe(50)
+describe('Approval permission check', () => {
+  it('allows OWNER to approve', () => {
+    expect(canApprove('OWNER')).toBe(true)
   })
 
-  it('returns 0 on-time % when no RECEIVED POs exist', () => {
-    const sc = calcScorecard([{ status: 'DRAFT', createdAt: '2025-01-01T00:00:00.000Z', total: 0 }])
-    expect(sc.onTimePct).toBe(0)
+  it('allows MANAGER to approve', () => {
+    expect(canApprove('MANAGER')).toBe(true)
   })
 
-  it('counts total orders including all statuses', () => {
-    const sc = calcScorecard(samplePOs)
-    expect(sc.totalOrders).toBe(3)
+  it('blocks CASHIER from approving', () => {
+    expect(canApprove('CASHIER')).toBe(false)
   })
 
-  it('sums total value across all POs', () => {
-    const sc = calcScorecard(samplePOs)
-    expect(sc.totalValue).toBe(1_000_000)
-  })
-
-  it('calculates average response time in hours', () => {
-    const sc = calcScorecard(samplePOs)
-    // PO1: 2h, PO2: 12h → avg 7h
-    expect(sc.avgResponseHours).toBe(7)
+  it('blocks STAFF from approving', () => {
+    expect(canApprove('STAFF')).toBe(false)
   })
 })
 
-describe('Message thread ordering', () => {
-  const messages: Msg[] = [
-    { id: 'm3', sentAt: '2025-01-03T10:00:00.000Z', direction: 'IN', body: 'Third' },
-    { id: 'm1', sentAt: '2025-01-01T10:00:00.000Z', direction: 'OUT', body: 'First' },
-    { id: 'm2', sentAt: '2025-01-02T10:00:00.000Z', direction: 'IN', body: 'Second' },
-  ]
-
-  it('sorts messages oldest-first', () => {
-    const sorted = sortMessageThread(messages)
-    expect(sorted.map(m => m.id)).toEqual(['m1', 'm2', 'm3'])
+describe('Lead time calculation', () => {
+  it('calculates arrival date correctly', () => {
+    const arrival = calcLeadTimeArrival('2024-01-01', 7)
+    expect(arrival.toISOString().slice(0, 10)).toBe('2024-01-08')
   })
 
-  it('does not mutate the original array', () => {
-    const original = [...messages]
-    sortMessageThread(messages)
-    expect(messages.map(m => m.id)).toEqual(original.map(m => m.id))
+  it('handles 30-day lead time spanning month boundary', () => {
+    const arrival = calcLeadTimeArrival('2024-01-15', 30)
+    expect(arrival.toISOString().slice(0, 10)).toBe('2024-02-14')
+  })
+
+  it('returns null estimated arrival when no expectedDate', () => {
+    const vendor: Vendor = { id: 'v1', storeId: 's1', name: 'V', email: null, phone: null, address: null, paymentTerms: 'NET30', leadTimeDays: 7, rating: 4, active: 1 }
+    const po: PurchaseOrder = { id: 'po1', storeId: 's1', supplierId: 'v1', status: 'DRAFT', subtotal: 100000, taxAmt: 0, total: 100000, expectedDate: null, createdAt: '2024-01-01T00:00:00Z' }
+    expect(getEstimatedArrival(po, vendor)).toBeNull()
   })
 })
 
-describe('PO status filtering', () => {
-  const pos: PO[] = [
-    { status: 'DRAFT', createdAt: '2025-01-01T00:00:00.000Z', total: 100 },
-    { status: 'SENT', createdAt: '2025-01-02T00:00:00.000Z', total: 200 },
-    { status: 'CONFIRMED', createdAt: '2025-01-03T00:00:00.000Z', total: 300 },
-    { status: 'RECEIVED', createdAt: '2025-01-04T00:00:00.000Z', total: 400 },
-    { status: 'CANCELLED', createdAt: '2025-01-05T00:00:00.000Z', total: 500 },
-  ]
-
-  it('filters open POs (DRAFT, SENT, CONFIRMED)', () => {
-    const open = filterPOsByStatus(pos, ['DRAFT', 'SENT', 'CONFIRMED'])
-    expect(open).toHaveLength(3)
-    expect(open.map(p => p.status)).toEqual(['DRAFT', 'SENT', 'CONFIRMED'])
+describe('Vendor rating aggregation', () => {
+  it('returns 0 for no ratings', () => {
+    expect(aggregateVendorRating([])).toBe(0)
   })
 
-  it('filters only RECEIVED POs for payment history', () => {
-    const received = filterPOsByStatus(pos, ['RECEIVED'])
-    expect(received).toHaveLength(1)
-    expect(received[0].total).toBe(400)
+  it('computes average correctly', () => {
+    expect(aggregateVendorRating([4, 5, 3])).toBe(4)
+  })
+
+  it('rounds to 1 decimal place', () => {
+    expect(aggregateVendorRating([4, 5])).toBe(4.5)
+  })
+
+  it('validates rating range 1-5', () => {
+    expect(isValidRating(1)).toBe(true)
+    expect(isValidRating(5)).toBe(true)
+    expect(isValidRating(0)).toBe(false)
+    expect(isValidRating(6)).toBe(false)
+  })
+})
+
+describe('PO total with tax', () => {
+  it('calculates 11% PPN correctly', () => {
+    const { taxAmt, total } = calcPOTotal(1_000_000, 0.11)
+    expect(taxAmt).toBe(110_000)
+    expect(total).toBe(1_110_000)
+  })
+
+  it('rounds tax amount to nearest integer', () => {
+    const { taxAmt } = calcPOTotal(100_001, 0.11)
+    expect(Number.isInteger(taxAmt)).toBe(true)
+  })
+
+  it('handles zero tax rate', () => {
+    const { taxAmt, total } = calcPOTotal(500_000, 0)
+    expect(taxAmt).toBe(0)
+    expect(total).toBe(500_000)
   })
 })
