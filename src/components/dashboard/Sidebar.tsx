@@ -26,6 +26,7 @@ import {
   Truck,
   Cog,
   Heart,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAtLeast } from '@/lib/permissions'
@@ -65,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Penjualan',
     items: [
       { label: 'Pesanan', href: '/dashboard/orders', icon: Receipt },
+      { label: 'Meja', href: '/dashboard/tables', icon: UtensilsCrossed },
       { label: 'Pelanggan', href: '/dashboard/customers', icon: Users },
       { label: 'Diskon', href: '/dashboard/discounts', icon: Percent },
       { label: 'Loyalitas', href: '/dashboard/loyalty', icon: Heart },

@@ -4737,27 +4737,52 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
     if (segs[0] === 'tables') {
       // Lazy migration — run once per cold start; idempotent
       await exec(`CREATE TABLE IF NOT EXISTS RestaurantTable (
-        id TEXT PRIMARY KEY,
-        storeId TEXT NOT NULL,
-        number INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'FREE',
-        currentOrderId TEXT,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL
+      id TEXT PRIMARY KEY,
+      storeId TEXT NOT NULL,
+      number INTEGER NOT NULL,
+      shape TEXT NOT NULL DEFAULT 'SQUARE',
+      seats INTEGER NOT NULL DEFAULT 4,
+      x INTEGER NOT NULL DEFAULT 0,
+      y INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'AVAILABLE',
+      currentOrderId TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
       )`)
+      // Migrate existing rows: add columns if absent (idempotent)
+      await exec(`ALTER TABLE RestaurantTable ADD COLUMN shape TEXT NOT NULL DEFAULT 'SQUARE'`).catch(() => {})
+      await exec(`ALTER TABLE RestaurantTable ADD COLUMN seats INTEGER NOT NULL DEFAULT 4`).catch(() => {})
+      await exec(`ALTER TABLE RestaurantTable ADD COLUMN x INTEGER NOT NULL DEFAULT 0`).catch(() => {})
+      await exec(`ALTER TABLE RestaurantTable ADD COLUMN y INTEGER NOT NULL DEFAULT 0`).catch(() => {})
+      // Normalise legacy FREE→AVAILABLE status
+      await exec(`UPDATE RestaurantTable SET status = 'AVAILABLE' WHERE status = 'FREE'`).catch(() => {})
 
       // GET /api/tables?storeId= — list tables with current order total
       if (segs.length === 1 && method === 'GET') {
         const rows = await query(
           `SELECT t.*,
-                  o.total as currentOrderTotal
-           FROM RestaurantTable t
-           LEFT JOIN "Order" o ON t.currentOrderId = o.id
-           WHERE t.storeId = ?
-           ORDER BY t.number`,
+          o.total as currentOrderTotal
+          FROM RestaurantTable t
+          LEFT JOIN "Order" o ON t.currentOrderId = o.id
+          WHERE t.storeId = ?
+          ORDER BY t.number`,
           [storeId],
         )
         return ok(rows)
+      }
+
+      // GET /api/tables/status?storeId= — real-time polling endpoint
+      if (segs.length === 2 && segs[1] === 'status' && method === 'GET') {
+        const rows = await query(
+          `SELECT t.*,
+          o.total as currentOrderTotal
+          FROM RestaurantTable t
+          LEFT JOIN "Order" o ON t.currentOrderId = o.id
+          WHERE t.storeId = ?
+          ORDER BY t.number`,
+          [storeId],
+        )
+        return okCached(rows, 'no-store, max-age=0')
       }
 
       // POST /api/tables — create table
@@ -4765,36 +4790,57 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
         const b: any = await req.json()
         if (b.number === undefined || b.number === null) return err('number is required')
         const tableNumber = Number(b.number)
-        if (!Number.isInteger(tableNumber) || tableNumber < 1)
-          return err('number must be a positive integer')
+        if (!Number.isInteger(tableNumber) || tableNumber < 1 || tableNumber > 999)
+          return err('number must be a positive integer between 1–999')
+        const shape: string = ['ROUND', 'SQUARE', 'RECTANGLE'].includes(b.shape) ? b.shape : 'SQUARE'
+        const seats = Number(b.seats ?? 4)
+        if (!Number.isInteger(seats) || seats < 1 || seats > 20)
+          return err('seats must be between 1 and 20')
         // Prevent duplicate table numbers in the same store
         const existing = await queryOne(
           `SELECT id FROM RestaurantTable WHERE storeId = ? AND number = ?`,
           [storeId, tableNumber],
         )
         if (existing) return err(`Meja nomor ${tableNumber} sudah ada`, 409)
+        // Auto-place: find lowest unused grid position
+        const allTables = await query<any>(`SELECT x, y FROM RestaurantTable WHERE storeId = ?`, [storeId])
+        const occupied = new Set(allTables.map((r: any) => `${r.x},${r.y}`))
+        let px = 0, py = 0
+        outer: for (let row = 0; row < 20; row++) {
+          for (let col = 0; col < 6; col++) {
+            if (!occupied.has(`${col},${row}`)) { px = col; py = row; break outer }
+          }
+        }
         const id = newId()
         const t = nowISO()
         await exec(
-          `INSERT INTO RestaurantTable (id, storeId, number, status, currentOrderId, createdAt, updatedAt)
-           VALUES (?, ?, ?, 'FREE', NULL, ?, ?)`,
-          [id, storeId, tableNumber, t, t],
+          `INSERT INTO RestaurantTable (id, storeId, number, shape, seats, x, y, status, currentOrderId, createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'AVAILABLE', NULL, ?, ?)`,
+          [id, storeId, tableNumber, shape, seats, px, py, t, t],
         )
-        return ok({ id, storeId, number: tableNumber, status: 'FREE', currentOrderId: null }, 201)
+        return ok({ id, storeId, number: tableNumber, shape, seats, x: px, y: py, status: 'AVAILABLE', currentOrderId: null }, 201)
       }
 
-      // PATCH /api/tables/:id — update status / currentOrderId
-      if (segs.length === 2 && method === 'PATCH') {
+      // PATCH /api/tables/:id — update status / currentOrderId / position
+      if (segs.length === 2 && segs[1] !== 'status' && method === 'PATCH') {
         const tableId = segs[1]
         const b: any = await req.json()
-        const validStatuses = new Set(['FREE', 'OCCUPIED', 'RESERVED'])
+        const validStatuses = new Set(['AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING', 'FREE'])
         const updates: Record<string, any> = {}
         if (b.status !== undefined) {
           if (!validStatuses.has(b.status)) return err('Invalid status')
-          updates.status = b.status
+          // Normalise legacy FREE → AVAILABLE
+          updates.status = b.status === 'FREE' ? 'AVAILABLE' : b.status
         }
         if ('currentOrderId' in b) {
           updates.currentOrderId = b.currentOrderId ?? null
+        }
+        if (b.x !== undefined) updates.x = Number(b.x)
+        if (b.y !== undefined) updates.y = Number(b.y)
+        if (b.seats !== undefined) {
+          const s = Number(b.seats)
+          if (!Number.isInteger(s) || s < 1 || s > 20) return err('seats must be between 1 and 20')
+          updates.seats = s
         }
         if (Object.keys(updates).length === 0) return err('No valid fields to update')
         const t = nowISO()
@@ -7498,6 +7544,201 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       )
 
       return ok({ id, storeId, name, type: genType, url, size: 0, uploadedBy, createdAt: now, expiresAt: null, tags, meta: extraMeta }, 201)
+    }
+
+    // ─── HR SHIFTS (employee schedule) ────────────────────────────────────────
+    if (segs[0] === 'hr' && segs[1] === 'shifts') {
+      // Lazy-init EmployeeShift table
+      await exec(`CREATE TABLE IF NOT EXISTS EmployeeShift (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        employeeId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'CASHIER',
+        status TEXT NOT NULL DEFAULT 'SCHEDULED',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )`)
+
+      // GET /api/hr/shifts?storeId=&from=&to= — list shifts optionally filtered by date range
+      if (segs.length === 2 && method === 'GET') {
+        const from = sp.get('from')
+        const to = sp.get('to')
+        let rows
+        if (from && to) {
+          rows = await query(
+            `SELECT es.*, e.name as employeeName
+             FROM EmployeeShift es
+             LEFT JOIN Employee e ON es.employeeId = e.id
+             WHERE es.storeId = ? AND es.date >= ? AND es.date <= ?
+             ORDER BY es.date, es.startTime`,
+            [storeId, from, to],
+          )
+        } else {
+          rows = await query(
+            `SELECT es.*, e.name as employeeName
+             FROM EmployeeShift es
+             LEFT JOIN Employee e ON es.employeeId = e.id
+             WHERE es.storeId = ?
+             ORDER BY es.date DESC, es.startTime`,
+            [storeId],
+          )
+        }
+        return ok(rows)
+      }
+
+      // POST /api/hr/shifts — create shift
+      if (segs.length === 2 && method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['employeeId', 'date', 'startTime', 'endTime'])
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return err('date must be YYYY-MM-DD')
+        if (!b.startTime || !b.endTime) return err('startTime and endTime are required')
+        if (b.startTime === b.endTime) return err('startTime and endTime must differ')
+        const validRoles = new Set(['CASHIER', 'WAITER', 'KITCHEN', 'MANAGER'])
+        const role = b.role ?? 'CASHIER'
+        if (!validRoles.has(role)) return err('Invalid role')
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO EmployeeShift (id, storeId, employeeId, date, startTime, endTime, role, status, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`,
+          [id, storeId, b.employeeId, b.date, b.startTime, b.endTime, role, t, t],
+        )
+        return ok(
+          {
+            id,
+            storeId,
+            employeeId: b.employeeId,
+            date: b.date,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            role,
+            status: 'SCHEDULED',
+          },
+          201,
+        )
+      }
+
+      // PATCH /api/hr/shifts/:id — update shift status/times
+      if (segs.length === 3 && method === 'PATCH') {
+        const shiftId = segs[2]
+        const b: any = await req.json()
+        const validStatuses = new Set(['SCHEDULED', 'CONFIRMED', 'CANCELLED'])
+        const validRoles = new Set(['CASHIER', 'WAITER', 'KITCHEN', 'MANAGER'])
+        const updates: Record<string, any> = {}
+        if (b.status !== undefined) {
+          if (!validStatuses.has(b.status)) return err('Invalid status')
+          updates.status = b.status
+        }
+        if (b.role !== undefined) {
+          if (!validRoles.has(b.role)) return err('Invalid role')
+          updates.role = b.role
+        }
+        if (b.startTime !== undefined) updates.startTime = b.startTime
+        if (b.endTime !== undefined) updates.endTime = b.endTime
+        if (b.date !== undefined) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return err('date must be YYYY-MM-DD')
+          updates.date = b.date
+        }
+        if (Object.keys(updates).length === 0) return err('No valid fields to update')
+        const t = nowISO()
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE EmployeeShift SET ${setClauses}, updatedAt = ? WHERE id = ? AND storeId = ?`,
+          [...values, t, shiftId, storeId],
+        )
+        return ok({ success: true })
+      }
+    }
+
+    // ─── HR / SHIFT SCHEDULER ────────────────────────────────────────────────
+    // GET  /api/hr/shifts?storeId=&weekStart=YYYY-MM-DD
+    // POST /api/hr/shifts { storeId, employeeId, date, startTime, endTime, role }
+    // PATCH /api/hr/shifts/:id { status? }
+    if (segs[0] === 'hr' && segs[1] === 'shifts') {
+      // Lazy schema migration
+      await exec(`CREATE TABLE IF NOT EXISTS EmployeeShift (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL,
+        employeeId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        role TEXT DEFAULT 'CASHIER',
+        status TEXT DEFAULT 'SCHEDULED',
+        notes TEXT,
+        createdAt TEXT
+      )`)
+
+      // GET /api/hr/shifts?storeId=&weekStart=
+      if (segs.length === 2 && method === 'GET') {
+        const weekStart = sp.get('weekStart')
+        let sql = `SELECT s.*, e.name as employeeName
+                   FROM EmployeeShift s
+                   LEFT JOIN Employee e ON s.employeeId = e.id
+                   WHERE s.storeId = ?`
+        const args: any[] = [storeId]
+        if (weekStart) {
+          // Calculate weekEnd = weekStart + 6 days
+          const ws = new Date(weekStart)
+          const we = new Date(ws)
+          we.setDate(ws.getDate() + 6)
+          const weekEnd = we.toISOString().slice(0, 10)
+          sql += ` AND s.date >= ? AND s.date <= ?`
+          args.push(weekStart, weekEnd)
+        }
+        sql += ` ORDER BY s.date, s.startTime`
+        const rows = await query(sql, args)
+        return ok(rows)
+      }
+
+      // POST /api/hr/shifts
+      if (segs.length === 2 && method === 'POST') {
+        const b: any = await req.json()
+        validateRequired(b, ['employeeId', 'date', 'startTime', 'endTime'])
+        const validRoles = new Set(['CASHIER', 'WAITER', 'KITCHEN', 'MANAGER'])
+        const role = b.role ?? 'CASHIER'
+        if (!validRoles.has(role)) return err('Invalid role', 400, 'VALIDATION_ERROR')
+        const id = newId()
+        const now = nowISO()
+        await exec(
+          `INSERT INTO EmployeeShift (id, storeId, employeeId, date, startTime, endTime, role, status, notes, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`,
+          [id, storeId, b.employeeId, b.date, b.startTime, b.endTime, role, b.notes ?? null, now],
+        )
+        return ok({ id, storeId, employeeId: b.employeeId, date: b.date, startTime: b.startTime, endTime: b.endTime, role, status: 'SCHEDULED', notes: b.notes ?? null, createdAt: now }, 201)
+      }
+
+      // PATCH /api/hr/shifts/:id
+      if (segs.length === 3 && method === 'PATCH') {
+        const shiftId = segs[2]
+        const b: any = await req.json()
+        const existing = await queryOne<any>(`SELECT id FROM EmployeeShift WHERE id = ? AND storeId = ?`, [shiftId, storeId])
+        if (!existing) return err('Shift not found', 404, 'NOT_FOUND')
+        const validStatuses = new Set(['SCHEDULED', 'CONFIRMED', 'CANCELLED'])
+        const updates: Record<string, any> = {}
+        if (b.status !== undefined) {
+          if (!validStatuses.has(b.status)) return err('Invalid status', 400, 'VALIDATION_ERROR')
+          updates.status = b.status
+        }
+        if (b.notes !== undefined) updates.notes = b.notes
+        if (b.startTime !== undefined) updates.startTime = b.startTime
+        if (b.endTime !== undefined) updates.endTime = b.endTime
+        if (b.role !== undefined) {
+          const validRoles = new Set(['CASHIER', 'WAITER', 'KITCHEN', 'MANAGER'])
+          if (!validRoles.has(b.role)) return err('Invalid role', 400, 'VALIDATION_ERROR')
+          updates.role = b.role
+        }
+        if (Object.keys(updates).length === 0) return err('No valid fields to update', 400)
+        const { setClauses, values } = buildUpdate(updates)
+        await exec(
+          `UPDATE EmployeeShift SET ${setClauses} WHERE id = ? AND storeId = ?`,
+          [...values, shiftId, storeId],
+        )
+        return ok({ success: true })
+      }
     }
 
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
