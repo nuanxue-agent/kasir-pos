@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Plus, Trash2, X, Loader2, Grid3X3, RefreshCw, Save } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Trash2, Loader2, Grid3X3, RefreshCw, Save, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
+import { toast } from '@/components/ui/Toaster'
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface ProductAttribute {
+interface VariantAttribute {
   id: string
   storeId: string
   productId: string
@@ -14,652 +15,592 @@ export interface ProductAttribute {
   values: string[]
 }
 
-export interface ProductVariant {
-  id?: string
-  storeId?: string
+interface ProductVariant {
+  id: string
+  storeId: string
   productId: string
-  attributes: Record<string, string>
   sku: string
+  attributes: Record<string, string>
   price: number
   stock: number
-  active?: boolean
+  active: boolean
 }
 
-export interface VariantMatrixClientProps {
+interface Product {
+  id: string
+  name: string
+  price: number
+}
+
+interface VariantMatrixClientProps {
   storeId: string
   currency: string
-  productId: string
-  productName: string
-  initialAttributes: ProductAttribute[]
+  products: Product[]
+  initialAttributes: VariantAttribute[]
   initialVariants: ProductVariant[]
 }
 
-// ── Pure helpers (also exported for tests) ─────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Generate all combinations of attribute values (cartesian product). */
-export function generateCombinations(
-  attributes: Array<{ name: string; values: string[] }>,
-): Record<string, string>[] {
-  if (attributes.length === 0) return []
-  const filtered = attributes.filter(a => a.values.length > 0)
-  if (filtered.length === 0) return []
-
-  return filtered.reduce<Record<string, string>[]>(
-    (acc, attr) => {
-      if (acc.length === 0) return attr.values.map(v => ({ [attr.name]: v }))
-      return acc.flatMap(combo => attr.values.map(v => ({ ...combo, [attr.name]: v })))
-    },
-    [],
-  )
-}
-
-/** Build a lookup key from an attributes object (sorted keys for consistency). */
-export function attrKey(attrs: Record<string, string>): string {
-  return Object.keys(attrs)
-    .sort()
-    .map(k => `${k}:${attrs[k]}`)
-    .join('|')
-}
-
-/** Find a variant by its attribute combination. */
-export function findVariant(
-  variants: ProductVariant[],
-  attrs: Record<string, string>,
-): ProductVariant | undefined {
-  const key = attrKey(attrs)
-  return variants.find(v => attrKey(v.attributes) === key)
-}
-
-/** Auto-generate a SKU from product prefix + attribute values. */
-export function generateSKU(productId: string, attrs: Record<string, string>): string {
-  const prefix = productId.slice(0, 6).toUpperCase()
-  const suffix = Object.values(attrs)
-    .map(v => v.slice(0, 3).toUpperCase().replace(/\s+/g, ''))
+export function generateSku(productName: string, attributes: Record<string, string>): string {
+  const base = productName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 6)
+  const attrPart = Object.values(attributes)
+    .map(v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3))
     .join('-')
-  return `${prefix}-${suffix}`
+  return attrPart ? `${base}-${attrPart}` : base
 }
 
-/** Apply bulk price update to all variants sharing a given attribute key=value. */
-export function bulkUpdatePrice(
-  variants: ProductVariant[],
-  attrName: string,
-  attrValue: string,
-  price: number,
-): ProductVariant[] {
-  return variants.map(v =>
-    v.attributes[attrName] === attrValue ? { ...v, price } : v,
+export function generateMatrix(
+  attributes: VariantAttribute[],
+): Array<Record<string, string>> {
+  if (attributes.length === 0) return []
+  const [first, ...rest] = attributes
+  if (rest.length === 0) {
+    return first.values.map(v => ({ [first.name]: v }))
+  }
+  const sub = generateMatrix(rest)
+  return first.values.flatMap(v =>
+    sub.map(combo => ({ [first.name]: v, ...combo }))
   )
 }
 
-/** Apply bulk stock update to all variants sharing a given attribute key=value. */
-export function bulkUpdateStock(
-  variants: ProductVariant[],
-  attrName: string,
-  attrValue: string,
-  stock: number,
-): ProductVariant[] {
-  return variants.map(v =>
-    v.attributes[attrName] === attrValue ? { ...v, stock } : v,
-  )
+export function applyPriceOverride(
+  basePrice: number,
+  overrides: Record<string, number>,
+  variantKey: string,
+): number {
+  return overrides[variantKey] ?? basePrice
 }
 
-// ── Attribute Editor ───────────────────────────────────────────────────────
+export function aggregateStock(variants: ProductVariant[]): number {
+  return variants.reduce((sum, v) => sum + (v.active ? v.stock : 0), 0)
+}
+
+export function validateBulkUpdate(
+  updates: Array<{ id: string; price?: number; stock?: number }>,
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+  for (const u of updates) {
+    if (!u.id) errors.push('Each update must have an id')
+    if (u.price !== undefined && u.price < 0) errors.push(`Price cannot be negative (id: ${u.id})`)
+    if (u.stock !== undefined && u.stock < 0) errors.push(`Stock cannot be negative (id: ${u.id})`)
+  }
+  return { valid: errors.length === 0, errors }
+}
+
+// ── Attribute Editor ──────────────────────────────────────────────────────────
 
 function AttributeEditor({
-  attributes,
-  onAdd,
-  onRemove,
-  onUpdateValues,
-  saving,
+  attribute,
+  onUpdate,
+  onDelete,
 }: {
-  attributes: ProductAttribute[]
-  onAdd: (name: string, values: string[]) => Promise<void>
-  onRemove: (id: string) => void
-  onUpdateValues: (id: string, values: string[]) => Promise<void>
-  saving: boolean
+  attribute: VariantAttribute
+  onUpdate: (id: string, values: string[]) => void
+  onDelete: (id: string) => void
 }) {
-  const [newName, setNewName] = useState('')
-  const [newValues, setNewValues] = useState('')
-  const [addError, setAddError] = useState('')
+  const [input, setInput] = useState('')
 
-  const handleAdd = async () => {
-    const name = newName.trim()
-    const values = newValues
-      .split(',')
-      .map(v => v.trim())
-      .filter(Boolean)
-    if (!name) { setAddError('Attribute name required'); return }
-    if (values.length === 0) { setAddError('At least one value required'); return }
-    if (attributes.some(a => a.name.toLowerCase() === name.toLowerCase())) {
-      setAddError('Attribute name already exists')
-      return
-    }
-    setAddError('')
-    await onAdd(name, values)
-    setNewName('')
-    setNewValues('')
+  const addValue = () => {
+    const v = input.trim()
+    if (!v || attribute.values.includes(v)) return
+    onUpdate(attribute.id, [...attribute.values, v])
+    setInput('')
+  }
+
+  const removeValue = (val: string) => {
+    onUpdate(attribute.id, attribute.values.filter(v => v !== val))
   }
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-stone-700">Atribut Produk</h3>
-
-      {attributes.map(attr => (
-        <div key={attr.id} className="flex items-start gap-2 p-3 rounded-xl border border-stone-200 bg-stone-50">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-stone-700 mb-1">{attr.name}</p>
-            <input
-              type="text"
-              defaultValue={attr.values.join(', ')}
-              onBlur={e => {
-                const vals = e.target.value.split(',').map(v => v.trim()).filter(Boolean)
-                if (vals.length > 0) onUpdateValues(attr.id, vals)
-              }}
-              className="w-full text-xs px-2 py-1 rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-stone-400"
-              placeholder="e.g. S, M, L, XL"
-            />
-          </div>
-          <button
-            onClick={() => onRemove(attr.id)}
-            className="mt-1 p-1 text-stone-400 hover:text-red-500 transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      ))}
-
-      {/* Add new attribute */}
-      <div className="p-3 rounded-xl border border-dashed border-stone-300 bg-white space-y-2">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Nama atribut (e.g. Ukuran)"
-            className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-400"
-          />
-        </div>
-        <input
-          type="text"
-          value={newValues}
-          onChange={e => setNewValues(e.target.value)}
-          placeholder="Nilai dipisah koma (e.g. S, M, L, XL)"
-          className="w-full text-xs px-2 py-1.5 rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-400"
-        />
-        {addError && <p className="text-xs text-red-500">{addError}</p>}
+    <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-gray-700 capitalize">{attribute.name}</span>
         <button
-          onClick={handleAdd}
-          disabled={saving}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-stone-800 text-white hover:bg-stone-700 disabled:opacity-50 transition-colors"
+          onClick={() => onDelete(attribute.id)}
+          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
         >
-          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-          Tambah Atribut
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-    </div>
-  )
-}
-
-// ── Bulk Update Bar ────────────────────────────────────────────────────────
-
-function BulkUpdateBar({
-  attributes,
-  onBulkPrice,
-  onBulkStock,
-}: {
-  attributes: ProductAttribute[]
-  onBulkPrice: (attrName: string, attrValue: string, price: number) => void
-  onBulkStock: (attrName: string, attrValue: string, stock: number) => void
-}) {
-  const [selectedAttr, setSelectedAttr] = useState('')
-  const [selectedValue, setSelectedValue] = useState('')
-  const [bulkPrice, setBulkPrice] = useState('')
-  const [bulkStock, setBulkStock] = useState('')
-
-  const currentAttr = attributes.find(a => a.name === selectedAttr)
-
-  return (
-    <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 space-y-2">
-      <p className="text-xs font-semibold text-amber-800 flex items-center gap-1">
-        <RefreshCw className="h-3 w-3" /> Update Massal
-      </p>
       <div className="flex flex-wrap gap-2">
-        <select
-          value={selectedAttr}
-          onChange={e => { setSelectedAttr(e.target.value); setSelectedValue('') }}
-          className="text-xs px-2 py-1 rounded-lg border border-amber-200 bg-white focus:outline-none"
-        >
-          <option value="">Pilih atribut</option>
-          {attributes.map(a => (
-            <option key={a.id} value={a.name}>{a.name}</option>
-          ))}
-        </select>
-
-        <select
-          value={selectedValue}
-          onChange={e => setSelectedValue(e.target.value)}
-          disabled={!currentAttr}
-          className="text-xs px-2 py-1 rounded-lg border border-amber-200 bg-white focus:outline-none disabled:opacity-50"
-        >
-          <option value="">Pilih nilai</option>
-          {currentAttr?.values.map(v => (
-            <option key={v} value={v}>{v}</option>
-          ))}
-        </select>
-
+        {attribute.values.map(v => (
+          <span
+            key={v}
+            className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium"
+          >
+            {v}
+            <button onClick={() => removeValue(v)} className="hover:text-blue-900">
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
         <input
-          type="number"
-          value={bulkPrice}
-          onChange={e => setBulkPrice(e.target.value)}
-          placeholder="Harga"
-          className="w-24 text-xs px-2 py-1 rounded-lg border border-amber-200 bg-white focus:outline-none"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="Add value…"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addValue()}
         />
         <button
-          onClick={() => {
-            if (selectedAttr && selectedValue && bulkPrice !== '') {
-              onBulkPrice(selectedAttr, selectedValue, Number(bulkPrice))
-              setBulkPrice('')
-            }
-          }}
-          disabled={!selectedAttr || !selectedValue || bulkPrice === ''}
-          className="text-xs px-2 py-1 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors"
+          onClick={addValue}
+          className="px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
-          Set Harga
-        </button>
-
-        <input
-          type="number"
-          value={bulkStock}
-          onChange={e => setBulkStock(e.target.value)}
-          placeholder="Stok"
-          className="w-20 text-xs px-2 py-1 rounded-lg border border-amber-200 bg-white focus:outline-none"
-        />
-        <button
-          onClick={() => {
-            if (selectedAttr && selectedValue && bulkStock !== '') {
-              onBulkStock(selectedAttr, selectedValue, Number(bulkStock))
-              setBulkStock('')
-            }
-          }}
-          disabled={!selectedAttr || !selectedValue || bulkStock === ''}
-          className="text-xs px-2 py-1 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors"
-        >
-          Set Stok
+          Add
         </button>
       </div>
     </div>
   )
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────
+// ── Matrix Cell ───────────────────────────────────────────────────────────────
+
+function MatrixCell({
+  variant,
+  currency,
+  onChange,
+}: {
+  variant: ProductVariant
+  currency: string
+  onChange: (id: string, patch: Partial<Pick<ProductVariant, 'price' | 'stock' | 'active'>>) => void
+}) {
+  return (
+    <div className={cn(
+      'p-2 rounded-lg border text-xs space-y-1.5 transition-all',
+      variant.active
+        ? 'border-gray-200 bg-white'
+        : 'border-gray-100 bg-gray-50 opacity-60',
+    )}>
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-mono text-gray-500 truncate text-[10px]">{variant.sku}</span>
+        <button
+          onClick={() => onChange(variant.id, { active: !variant.active })}
+          className={cn(
+            'relative w-8 h-4 rounded-full transition-colors flex-shrink-0',
+            variant.active ? 'bg-blue-500' : 'bg-gray-300',
+          )}
+          title={variant.active ? 'Deactivate' : 'Activate'}
+        >
+          <span className={cn(
+            'absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform',
+            variant.active && 'translate-x-4',
+          )} />
+        </button>
+      </div>
+      <div>
+        <label className="text-[10px] text-gray-400">Price</label>
+        <input
+          type="number"
+          min="0"
+          className="w-full border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+          value={variant.price}
+          onChange={e => onChange(variant.id, { price: Number(e.target.value) })}
+        />
+      </div>
+      <div>
+        <label className="text-[10px] text-gray-400">Stock</label>
+        <input
+          type="number"
+          min="0"
+          className="w-full border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+          value={variant.stock}
+          onChange={e => onChange(variant.id, { stock: Number(e.target.value) })}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function VariantMatrixClient({
   storeId,
   currency,
-  productId,
-  productName,
+  products,
   initialAttributes,
   initialVariants,
 }: VariantMatrixClientProps) {
-  const [attributes, setAttributes] = useState<ProductAttribute[]>(initialAttributes)
-  const [variants, setVariants] = useState<ProductVariant[]>(() => {
-    // Seed from initial or generate from combinations
-    const combos = generateCombinations(initialAttributes)
-    return combos.map(attrs => {
-      const existing = findVariant(initialVariants, attrs)
-      return existing ?? {
-        productId,
-        attributes: attrs,
-        sku: generateSKU(productId, attrs),
-        price: 0,
-        stock: 0,
-        active: true,
-      }
-    })
-  })
-  const [saving, setSaving] = useState(false)
-  const [attrSaving, setAttrSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-
-  // Re-generate matrix whenever attributes change
-  const rebuildMatrix = useCallback(
-    (attrs: ProductAttribute[], existingVariants: ProductVariant[]) => {
-      const combos = generateCombinations(attrs)
-      setVariants(
-        combos.map(combo => {
-          const existing = findVariant(existingVariants, combo)
-          return existing ?? {
-            productId,
-            attributes: combo,
-            sku: generateSKU(productId, combo),
-            price: 0,
-            stock: 0,
-            active: true,
-          }
-        }),
-      )
-    },
-    [productId],
+  const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id ?? '')
+  const [attributes, setAttributes] = useState<VariantAttribute[]>(
+    initialAttributes.filter(a => a.productId === (products[0]?.id ?? ''))
   )
+  const [variants, setVariants] = useState<ProductVariant[]>(
+    initialVariants.filter(v => v.productId === (products[0]?.id ?? ''))
+  )
+  const [newAttrName, setNewAttrName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [showAttrPanel, setShowAttrPanel] = useState(true)
+  const [dirty, setDirty] = useState(false)
 
-  // ── Attribute handlers ──────────────────────────────────────────────────
+  const selectedProduct = products.find(p => p.id === selectedProductId)
 
-  const handleAddAttribute = async (name: string, values: string[]) => {
-    setAttrSaving(true)
-    setError('')
+  // Load attributes and variants when product changes
+  const loadProductData = useCallback(async (productId: string) => {
+    if (!productId) return
+    setLoading(true)
     try {
-      const res = await fetch('/api/product-attributes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, productId, name, values }),
-      })
-      if (!res.ok) {
-        const j = (await res.json()) as any
-        throw new Error(j.error ?? 'Failed to add attribute')
-      }
-      const created = (await res.json()) as any
-      const newAttr: ProductAttribute = { id: created.id, storeId, productId, name, values }
-      const newAttrs = [...attributes, newAttr]
-      setAttributes(newAttrs)
-      rebuildMatrix(newAttrs, variants)
-    } catch (e: any) {
-      setError(e.message)
+      const [attrRes, varRes] = await Promise.all([
+        fetch(`/api/variant-attributes?storeId=${storeId}&productId=${productId}`),
+        fetch(`/api/product-variants?storeId=${storeId}&productId=${productId}`),
+      ])
+      const [attrData, varData] = await Promise.all([
+        attrRes.json() as Promise<any>,
+        varRes.json() as Promise<any>,
+      ])
+      setAttributes(Array.isArray(attrData) ? attrData : [])
+      setVariants(Array.isArray(varData) ? varData : [])
+      setDirty(false)
+    } catch {
+      toast.error('Failed to load variant data')
     } finally {
-      setAttrSaving(false)
+      setLoading(false)
     }
-  }
+  }, [storeId])
 
-  const handleRemoveAttribute = (id: string) => {
-    const newAttrs = attributes.filter(a => a.id !== id)
-    setAttributes(newAttrs)
-    rebuildMatrix(newAttrs, variants)
-  }
+  useEffect(() => {
+    if (selectedProductId) loadProductData(selectedProductId)
+  }, [selectedProductId, loadProductData])
 
-  const handleUpdateAttributeValues = async (id: string, values: string[]) => {
-    setAttrSaving(true)
-    try {
-      await fetch(`/api/product-attributes/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values }),
-      })
-      const newAttrs = attributes.map(a => (a.id === id ? { ...a, values } : a))
-      setAttributes(newAttrs)
-      rebuildMatrix(newAttrs, variants)
-    } finally {
-      setAttrSaving(false)
-    }
-  }
+  // Determine row/col axes (first two attributes)
+  const rowAttr = attributes[0]
+  const colAttr = attributes[1]
 
-  // ── Variant cell handlers ───────────────────────────────────────────────
+  // Generate or get variants for the matrix
+  const matrixCombos = generateMatrix(attributes)
 
-  const updateVariantCell = (
-    attrs: Record<string, string>,
-    field: 'price' | 'stock' | 'sku',
-    value: string,
-  ) => {
-    const key = attrKey(attrs)
-    setVariants(prev =>
-      prev.map(v =>
-        attrKey(v.attributes) === key
-          ? { ...v, [field]: field === 'sku' ? value : Number(value) }
-          : v,
-      ),
+  const getVariant = (combo: Record<string, string>): ProductVariant | undefined => {
+    return variants.find(v =>
+      Object.entries(combo).every(([k, val]) => v.attributes[k] === val)
     )
   }
 
-  // ── Bulk handlers ───────────────────────────────────────────────────────
-
-  const handleBulkPrice = (attrName: string, attrValue: string, price: number) => {
-    setVariants(prev => bulkUpdatePrice(prev, attrName, attrValue, price))
-  }
-
-  const handleBulkStock = (attrName: string, attrValue: string, stock: number) => {
-    setVariants(prev => bulkUpdateStock(prev, attrName, attrValue, stock))
-  }
-
-  // ── Save all variants ───────────────────────────────────────────────────
-
-  const handleSave = async () => {
-    setSaving(true)
-    setError('')
-    setSuccess('')
+  const handleAddAttribute = async () => {
+    const name = newAttrName.trim().toLowerCase()
+    if (!name || !selectedProductId) return
+    if (attributes.some(a => a.name === name)) {
+      toast.error(`Attribute "${name}" already exists`)
+      return
+    }
     try {
-      const res = await fetch('/api/product-variants', {
+      const res = await fetch('/api/variant-attributes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, productId, variants }),
+        body: JSON.stringify({ storeId, productId: selectedProductId, name, values: [] }),
       })
-      if (!res.ok) {
-        const j = (await res.json()) as any
-        throw new Error(j.error ?? 'Failed to save variants')
-      }
-      const j = (await res.json()) as any
-      setSuccess(`${j.created} varian tersimpan`)
-      setTimeout(() => setSuccess(''), 3000)
+      if (!res.ok) { const d = await res.json() as any; throw new Error(d.error ?? 'Failed') }
+      const created = await res.json() as any
+      setAttributes(prev => [...prev, created])
+      setNewAttrName('')
     } catch (e: any) {
-      setError(e.message)
+      toast.error(e.message ?? 'Failed to add attribute')
+    }
+  }
+
+  const handleUpdateAttributeValues = async (attrId: string, values: string[]) => {
+    setAttributes(prev => prev.map(a => a.id === attrId ? { ...a, values } : a))
+    try {
+      await fetch(`/api/variant-attributes?id=${attrId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, action: 'updateValues', id: attrId, values }),
+      })
+    } catch {
+      toast.error('Failed to save attribute values')
+    }
+  }
+
+  const handleDeleteAttribute = async (attrId: string) => {
+    setAttributes(prev => prev.filter(a => a.id !== attrId))
+  }
+
+  const handleGenerateVariants = async () => {
+    if (!selectedProduct || matrixCombos.length === 0) return
+    setSaving(true)
+    try {
+      const toCreate = matrixCombos.filter(combo => !getVariant(combo))
+      if (toCreate.length === 0) { toast.success('All variants already exist'); return }
+
+      const created: ProductVariant[] = []
+      for (const combo of toCreate) {
+        const sku = generateSku(selectedProduct.name, combo)
+        const res = await fetch('/api/product-variants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storeId,
+            productId: selectedProductId,
+            sku,
+            attributes: combo,
+            price: selectedProduct.price,
+            stock: 0,
+            active: true,
+          }),
+        })
+        if (res.ok) {
+          const v = await res.json() as any
+          created.push(v)
+        }
+      }
+      setVariants(prev => [...prev, ...created])
+      toast.success(`Generated ${created.length} variants`)
+      setDirty(false)
+    } catch (e: any) {
+      toast.error(e.message ?? 'Failed to generate variants')
     } finally {
       setSaving(false)
     }
   }
 
-  // ── Render matrix ───────────────────────────────────────────────────────
+  const handleVariantChange = (id: string, patch: Partial<Pick<ProductVariant, 'price' | 'stock' | 'active'>>) => {
+    setVariants(prev => prev.map(v => v.id === id ? { ...v, ...patch } : v))
+    setDirty(true)
+  }
 
-  const [rowAttr, colAttr] = attributes.slice(0, 2)
-  const hasMatrix = rowAttr && colAttr
-  const rowValues = rowAttr?.values ?? []
-  const colValues = colAttr?.values ?? []
-  const extraAttrs = attributes.slice(2)
+  const handleSaveAll = async () => {
+    if (!dirty) return
+    setSaving(true)
+    const { valid, errors } = validateBulkUpdate(variants.map(v => ({ id: v.id, price: v.price, stock: v.stock })))
+    if (!valid) { toast.error(errors[0]); setSaving(false); return }
+    try {
+      const res = await fetch('/api/product-variants/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId,
+          updates: variants.map(v => ({ id: v.id, price: v.price, stock: v.stock, active: v.active })),
+        }),
+      })
+      if (!res.ok) { const d = await res.json() as any; throw new Error(d.error ?? 'Failed') }
+      toast.success('All variants saved')
+      setDirty(false)
+    } catch (e: any) {
+      toast.error(e.message ?? 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const totalStock = aggregateStock(variants)
+  const activeCount = variants.filter(v => v.active).length
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-stone-800 flex items-center gap-2">
-            <Grid3X3 className="h-5 w-5 text-stone-500" />
-            Matriks Varian
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Grid3X3 className="w-6 h-6 text-blue-500" />
+            Product Variants
           </h1>
-          <p className="text-sm text-stone-500 mt-0.5">{productName}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage size, color, and other attribute combinations with a visual pricing grid</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || variants.length === 0}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-800 text-white text-sm font-medium hover:bg-stone-700 disabled:opacity-50 transition-colors"
+        <div className="flex items-center gap-2">
+          {dirty && (
+            <button
+              onClick={handleSaveAll}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-xl hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Changes
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Product Selector */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Select Product</label>
+        <select
+          className="w-full max-w-sm border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={selectedProductId}
+          onChange={e => setSelectedProductId(e.target.value)}
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Simpan Semua Varian
-        </button>
+          {products.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        {selectedProduct && (
+          <div className="mt-3 flex gap-4 text-sm text-gray-500">
+            <span>Base price: <strong className="text-gray-800">{formatCurrency(selectedProduct.price, currency)}</strong></span>
+            <span>Active variants: <strong className="text-gray-800">{activeCount}</strong></span>
+            <span>Total stock: <strong className="text-gray-800">{totalStock}</strong></span>
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-          <X className="h-4 w-4 shrink-0" />
-          {error}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
         </div>
-      )}
-      {success && (
-        <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">
-          ✓ {success}
-        </div>
-      )}
+      ) : (
+        <>
+          {/* Attribute Panel */}
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => setShowAttrPanel(v => !v)}
+              className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-sm font-semibold text-gray-800">Attributes ({attributes.length})</span>
+              {showAttrPanel ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Attribute editor */}
-        <div className="lg:col-span-1 space-y-4">
-          <AttributeEditor
-            attributes={attributes}
-            onAdd={handleAddAttribute}
-            onRemove={handleRemoveAttribute}
-            onUpdateValues={handleUpdateAttributeValues}
-            saving={attrSaving}
-          />
-          {attributes.length >= 2 && (
-            <BulkUpdateBar
-              attributes={attributes}
-              onBulkPrice={handleBulkPrice}
-              onBulkStock={handleBulkStock}
-            />
-          )}
-        </div>
+            {showAttrPanel && (
+              <div className="p-4 pt-0 space-y-3 border-t border-gray-100">
+                {attributes.length === 0 && (
+                  <p className="text-sm text-gray-400 italic py-2">No attributes yet. Add size, color, or other dimensions.</p>
+                )}
+                {attributes.map(attr => (
+                  <AttributeEditor
+                    key={attr.id}
+                    attribute={attr}
+                    onUpdate={handleUpdateAttributeValues}
+                    onDelete={handleDeleteAttribute}
+                  />
+                ))}
 
-        {/* Right: Matrix grid */}
-        <div className="lg:col-span-2">
-          {variants.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed border-stone-200 text-stone-400">
-              <Grid3X3 className="h-8 w-8 mb-2 opacity-40" />
-              <p className="text-sm">Tambahkan atribut untuk membuat matriks varian</p>
-            </div>
-          ) : hasMatrix ? (
-            // 2D matrix view
-            <div className="overflow-x-auto rounded-2xl border border-stone-200">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-stone-100">
-                    <th className="px-3 py-2 text-left font-semibold text-stone-600 border-b border-stone-200">
-                      {rowAttr.name} \ {colAttr.name}
-                    </th>
-                    {colValues.map(cv => (
-                      <th
-                        key={cv}
-                        className="px-3 py-2 text-center font-semibold text-stone-600 border-b border-l border-stone-200 min-w-[140px]"
-                      >
-                        {cv}
+                {/* Add new attribute */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="New attribute name (e.g. size, color, weight)…"
+                    value={newAttrName}
+                    onChange={e => setNewAttrName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddAttribute()}
+                  />
+                  <button
+                    onClick={handleAddAttribute}
+                    disabled={!newAttrName.trim()}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" /> Add
+                  </button>
+                </div>
+
+                {/* Generate button */}
+                {matrixCombos.length > 0 && (
+                  <div className="pt-2">
+                    <button
+                      onClick={handleGenerateVariants}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      Generate {matrixCombos.length} Variants
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Matrix Grid */}
+          {variants.length > 0 && rowAttr && colAttr && (
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">
+                  Pricing Grid — {rowAttr.name} × {colAttr.name}
+                </h2>
+                {dirty && (
+                  <button
+                    onClick={handleSaveAll}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                  >
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    Save
+                  </button>
+                )}
+              </div>
+              <div className="overflow-x-auto p-4">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-2 font-semibold text-gray-600 capitalize bg-gray-50 rounded-tl-lg">
+                        {rowAttr.name} \ {colAttr.name}
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rowValues.map((rv, ri) => (
-                    <tr key={rv} className={ri % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
-                      <td className="px-3 py-2 font-semibold text-stone-700 border-b border-stone-100 whitespace-nowrap">
-                        {rv}
-                      </td>
-                      {colValues.map(cv => {
-                        const baseAttrs: Record<string, string> = {
-                          [rowAttr.name]: rv,
-                          [colAttr.name]: cv,
-                        }
-                        // For extra attrs beyond 2, we render the first combination
-                        const variant = findVariant(variants, baseAttrs) ??
-                          variants.find(v =>
-                            v.attributes[rowAttr.name] === rv &&
-                            v.attributes[colAttr.name] === cv,
-                          )
-
-                        if (!variant) return <td key={cv} className="border-b border-l border-stone-100" />
-
-                        const cellKey = attrKey(variant.attributes)
-                        return (
-                          <td
-                            key={cv}
-                            className="px-2 py-2 border-b border-l border-stone-100"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1">
-                                <span className="text-stone-400 text-[10px] w-8">Harga</span>
-                                <input
-                                  type="number"
-                                  value={variant.price}
-                                  onChange={e =>
-                                    updateVariantCell(variant.attributes, 'price', e.target.value)
-                                  }
-                                  className="w-full px-1.5 py-0.5 rounded border border-stone-200 bg-white text-[11px] focus:outline-none focus:ring-1 focus:ring-stone-400"
-                                />
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="text-stone-400 text-[10px] w-8">Stok</span>
-                                <input
-                                  type="number"
-                                  value={variant.stock}
-                                  onChange={e =>
-                                    updateVariantCell(variant.attributes, 'stock', e.target.value)
-                                  }
-                                  className="w-full px-1.5 py-0.5 rounded border border-stone-200 bg-white text-[11px] focus:outline-none focus:ring-1 focus:ring-stone-400"
-                                />
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="text-stone-400 text-[10px] w-8">SKU</span>
-                                <input
-                                  type="text"
-                                  value={variant.sku}
-                                  onChange={e =>
-                                    updateVariantCell(variant.attributes, 'sku', e.target.value)
-                                  }
-                                  className="w-full px-1.5 py-0.5 rounded border border-stone-200 bg-white text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-stone-400"
-                                />
-                              </div>
-                            </div>
-                          </td>
-                        )
-                      })}
+                      {colAttr.values.map(col => (
+                        <th key={col} className="p-2 text-center font-semibold text-gray-700 bg-gray-50 capitalize min-w-[120px]">
+                          {col}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            // 1D list view (only one attribute)
-            <div className="rounded-2xl border border-stone-200 overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-stone-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-semibold text-stone-600 border-b border-stone-200">
-                      {attributes[0]?.name}
-                    </th>
-                    <th className="px-4 py-2 text-left font-semibold text-stone-600 border-b border-stone-200">Harga</th>
-                    <th className="px-4 py-2 text-left font-semibold text-stone-600 border-b border-stone-200">Stok</th>
-                    <th className="px-4 py-2 text-left font-semibold text-stone-600 border-b border-stone-200">SKU</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {variants.map((v, i) => {
-                    const label = Object.values(v.attributes).join(' / ')
-                    return (
-                      <tr key={attrKey(v.attributes)} className={i % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
-                        <td className="px-4 py-2 font-medium text-stone-700 border-b border-stone-100">{label}</td>
-                        <td className="px-2 py-2 border-b border-stone-100">
-                          <input
-                            type="number"
-                            value={v.price}
-                            onChange={e => updateVariantCell(v.attributes, 'price', e.target.value)}
-                            className="w-24 px-2 py-1 rounded border border-stone-200 bg-white focus:outline-none focus:ring-1 focus:ring-stone-400"
-                          />
+                  </thead>
+                  <tbody>
+                    {rowAttr.values.map(row => (
+                      <tr key={row} className="border-t border-gray-100">
+                        <td className="p-2 font-semibold text-gray-700 capitalize bg-gray-50 whitespace-nowrap">
+                          {row}
                         </td>
-                        <td className="px-2 py-2 border-b border-stone-100">
-                          <input
-                            type="number"
-                            value={v.stock}
-                            onChange={e => updateVariantCell(v.attributes, 'stock', e.target.value)}
-                            className="w-20 px-2 py-1 rounded border border-stone-200 bg-white focus:outline-none focus:ring-1 focus:ring-stone-400"
-                          />
-                        </td>
-                        <td className="px-2 py-2 border-b border-stone-100">
-                          <input
-                            type="text"
-                            value={v.sku}
-                            onChange={e => updateVariantCell(v.attributes, 'sku', e.target.value)}
-                            className="w-32 px-2 py-1 rounded border border-stone-200 bg-white font-mono focus:outline-none focus:ring-1 focus:ring-stone-400"
-                          />
-                        </td>
+                        {colAttr.values.map(col => {
+                          const combo = { [rowAttr.name]: row, [colAttr.name]: col }
+                          const variant = getVariant(combo)
+                          return (
+                            <td key={col} className="p-1.5 align-top">
+                              {variant ? (
+                                <MatrixCell
+                                  variant={variant}
+                                  currency={currency}
+                                  onChange={handleVariantChange}
+                                />
+                              ) : (
+                                <div className="p-2 rounded-lg border border-dashed border-gray-200 text-center text-gray-300 text-[10px] h-full min-h-[80px] flex items-center justify-center">
+                                  —
+                                </div>
+                              )}
+                            </td>
+                          )
+                        })}
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {variants.length > 0 && (
-            <p className="text-xs text-stone-400 mt-2">
-              {variants.length} kombinasi varian
-              {attributes.length > 0 && ` dari ${attributes.map(a => `${a.name} (${a.values.length})`).join(' × ')}`}
-            </p>
+          {/* Single-axis list (only one attribute) */}
+          {variants.length > 0 && rowAttr && !colAttr && (
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-800">Variants — {rowAttr.name}</h2>
+              </div>
+              <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {variants.map(v => (
+                  <MatrixCell
+                    key={v.id}
+                    variant={v}
+                    currency={currency}
+                    onChange={handleVariantChange}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-        </div>
-      </div>
+
+          {variants.length === 0 && attributes.length > 0 && matrixCombos.length > 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center bg-white border border-gray-200 rounded-2xl">
+              <Grid3X3 className="w-10 h-10 text-gray-200 mb-3" />
+              <p className="text-gray-500 font-medium">No variants yet</p>
+              <p className="text-sm text-gray-400 mt-1">Click "Generate Variants" to create the full matrix</p>
+            </div>
+          )}
+
+          {attributes.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center bg-white border border-gray-200 rounded-2xl">
+              <Grid3X3 className="w-10 h-10 text-gray-200 mb-3" />
+              <p className="text-gray-500 font-medium">Add attributes to get started</p>
+              <p className="text-sm text-gray-400 mt-1">Create size, color, or other dimensions in the panel above</p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

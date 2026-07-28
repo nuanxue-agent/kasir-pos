@@ -1,49 +1,44 @@
-// PATCH /api/referral-programs/:id
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { queryOne, exec } from '@/lib/db'
+import { exec, queryOne, nowISO } from '@/lib/db'
+import { ensureReferralProgramTables } from '../route'
 
-function err(msg: string, status = 400, code = 'ERROR') {
-  return NextResponse.json({ error: msg, code }, { status })
+function err(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status })
 }
 
-function buildUpdate(cols: Record<string, any>): { setClauses: string; values: any[] } {
-  const setClauses = Object.keys(cols)
-    .map(k => `${k} = ?`)
-    .join(', ')
-  const values = Object.values(cols)
-  return { setClauses, values }
-}
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await ensureReferralProgramTables()
+    const { id } = await params
+    const b = await req.json() as any
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
-  const user = session.user as any
+    const existing = await queryOne(
+      `SELECT * FROM ReferralProgram WHERE id = ?`,
+      [id],
+    )
+    if (!existing) return err('Program not found', 404)
 
-  const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
+    const name            = b.name            ?? existing.name
+    const rewardType      = b.rewardType      ?? existing.rewardType
+    const rewardValue     = b.rewardValue     ?? existing.rewardValue
+    const referrerReward  = b.referrerReward  ?? existing.referrerReward
+    const refereeReward   = b.refereeReward   ?? existing.refereeReward
+    const active          = b.active          !== undefined ? (b.active ? 1 : 0) : existing.active
+    const minPurchaseAmount = b.minPurchaseAmount ?? existing.minPurchaseAmount
+    const now = nowISO()
 
-  const { id: progId } = await params
-
-  const existing = await queryOne(`SELECT * FROM ReferralProgram WHERE id=? AND storeId=?`, [
-    progId,
-    storeId,
-  ])
-  if (!existing) return err('Program not found', 404, 'NOT_FOUND')
-
-  const b = (await req.json()) as any
-  const updates: Record<string, any> = {}
-  if (b.active !== undefined) updates.active = b.active ? 1 : 0
-  if (b.name !== undefined) updates.name = b.name
-  if (b.rewardType !== undefined) updates.rewardType = b.rewardType
-  if (b.rewardAmount !== undefined) updates.rewardAmount = Number(b.rewardAmount)
-  if (Object.keys(updates).length === 0) return err('Nothing to update', 400, 'VALIDATION_ERROR')
-
-  const { setClauses, values } = buildUpdate(updates)
-  await exec(`UPDATE ReferralProgram SET ${setClauses} WHERE id=? AND storeId=?`, [
-    ...values,
-    progId,
-    storeId,
-  ])
-  return NextResponse.json({ updated: true })
+    await exec(
+      `UPDATE ReferralProgram
+       SET name = ?, rewardType = ?, rewardValue = ?, referrerReward = ?, refereeReward = ?,
+           active = ?, minPurchaseAmount = ?, updatedAt = ?
+       WHERE id = ?`,
+      [name, rewardType, rewardValue, referrerReward, refereeReward, active, minPurchaseAmount, now, id],
+    )
+    return NextResponse.json({ id })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
