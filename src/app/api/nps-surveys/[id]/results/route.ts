@@ -1,78 +1,79 @@
-// GET /api/nps-surveys/:id/results
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { queryOne, query } from '@/lib/db'
+import { query } from '@/lib/db'
+import { ensureNPSTables } from '../../route'
+import { calcNPS, calcSegmentBreakdown, calcAverageScore, calcTrend } from '@/lib/nps-surveys'
 
 function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status })
 }
 
-function calcNps(responses: { score: number }[]): number | null {
-  if (responses.length === 0) return null
-  const promoters = responses.filter(r => r.score >= 9).length
-  const detractors = responses.filter(r => r.score <= 6).length
-  return Math.round(((promoters - detractors) / responses.length) * 100)
-}
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await ensureNPSTables()
+    const { id: surveyId } = await params
+    const { searchParams } = new URL(req.url)
+    const storeId = searchParams.get('storeId')
+    if (!storeId) return err('storeId required')
 
-function getWeekKey(iso: string): string {
-  const d = new Date(iso)
-  const day = d.getUTCDay() // 0=Sun
-  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1) // Monday
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff))
-  return monday.toISOString().slice(0, 10)
-}
+    const from = searchParams.get('from')
+    const to   = searchParams.get('to')
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user) return err('Unauthorized', 401)
-  const user = session.user as any
+    const [survey] = await query(`SELECT * FROM NPSSurvey WHERE id = ?`, [surveyId])
+    if (!survey) return err('Survey not found', 404)
 
-  const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
-  if (!storeId) return err('storeId required', 400)
+    // Current period responses
+    let sql = `SELECT score, channel, respondedAt FROM NPSResponse WHERE surveyId = ? AND storeId = ?`
+    const p: any[] = [surveyId, storeId]
+    if (from) { sql += ' AND respondedAt >= ?'; p.push(from) }
+    if (to)   { sql += ' AND respondedAt <= ?'; p.push(to) }
 
-  const { id: surveyId } = await params
+    const current = await query(sql, p)
 
-  const survey = await queryOne(`SELECT * FROM NpsSurvey WHERE id=? AND storeId=?`, [surveyId, storeId])
-  if (!survey) return err('Survey not found', 404)
+    // Previous period (same length, shifted back) for trend
+    let trend = null
+    if (from && to) {
+      const fromDate  = new Date(from)
+      const toDate    = new Date(to)
+      const periodMs  = toDate.getTime() - fromDate.getTime()
+      const prevTo    = new Date(fromDate.getTime() - 1).toISOString()
+      const prevFrom  = new Date(fromDate.getTime() - periodMs - 1).toISOString()
 
-  const responses = await query(
-    `SELECT score, createdAt FROM NpsResponse WHERE surveyId=? ORDER BY createdAt ASC`,
-    [surveyId],
-  ) as { score: number; createdAt: string }[]
+      const prevRows = await query(
+        `SELECT score FROM NPSResponse WHERE surveyId = ? AND storeId = ?
+         AND respondedAt >= ? AND respondedAt <= ?`,
+        [surveyId, storeId, prevFrom, prevTo],
+      )
+      trend = calcTrend(current as any[], prevRows as any[])
+    }
 
-  // Segment breakdown
-  const promoters = responses.filter(r => r.score >= 9).length
-  const passives = responses.filter(r => r.score >= 7 && r.score <= 8).length
-  const detractors = responses.filter(r => r.score <= 6).length
-  const total = responses.length
-  const npsScore = calcNps(responses)
+    const breakdown  = calcNPS(current as any[])
+    const segments   = calcSegmentBreakdown(current as any[])
+    const avgScore   = calcAverageScore(current as any[])
 
-  // Weekly trend — last 12 weeks
-  const now = new Date()
-  const weeks: { week: string; nps: number | null; count: number }[] = []
-  for (let i = 11; i >= 0; i--) {
-    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay() + 1 - i * 7))
-    const sunday = new Date(monday.getTime() + 6 * 86400000)
-    const weekKey = monday.toISOString().slice(0, 10)
-    const weekResponses = responses.filter(r => {
-      const d = r.createdAt.slice(0, 10)
-      return d >= weekKey && d <= sunday.toISOString().slice(0, 10)
+    // Channel breakdown
+    const channelMap: Record<string, number> = {}
+    for (const r of current as any[]) {
+      channelMap[r.channel] = (channelMap[r.channel] ?? 0) + 1
+    }
+
+    return NextResponse.json({
+      data: {
+        survey,
+        npsScore:    breakdown.npsScore,
+        promoters:   breakdown.promoters,
+        passives:    breakdown.passives,
+        detractors:  breakdown.detractors,
+        total:       breakdown.total,
+        avgScore,
+        segments,
+        channelBreakdown: channelMap,
+        trend,
+      },
     })
-    weeks.push({ week: weekKey, nps: calcNps(weekResponses), count: weekResponses.length })
+  } catch (e: any) {
+    return err(e.message, 500)
   }
-
-  return NextResponse.json({
-    surveyId,
-    npsScore,
-    total,
-    breakdown: {
-      promoters,
-      passives,
-      detractors,
-      promoterPct: total > 0 ? Math.round((promoters / total) * 100) : 0,
-      passivePct: total > 0 ? Math.round((passives / total) * 100) : 0,
-      detractorPct: total > 0 ? Math.round((detractors / total) * 100) : 0,
-    },
-    weeklyTrend: weeks,
-  })
 }
