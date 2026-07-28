@@ -1,3 +1,12 @@
+/**
+ * @module db
+ * Cloudflare D1 query helpers.
+ * Automatically selects the D1 binding (when on Cloudflare Pages) or falls back
+ * to the HTTP API (when running on Vercel / Node.js).
+ *
+ * All functions throw on DB errors — callers should handle or let the route
+ * error boundary catch them.
+ */
 // D1 via Cloudflare HTTP API — works from Vercel, Node.js, or edge
 // Falls back to direct D1 binding when running on Cloudflare Pages
 
@@ -18,13 +27,13 @@ async function d1Fetch(sql: string, params: any[] = []): Promise<any[]> {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${CF_TOKEN}`,
+      Authorization: `Bearer ${CF_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ sql, params }),
   })
 
-  const data = await res.json() as D1Response
+  const data = (await res.json()) as D1Response
   if (!data.success) {
     throw new Error(`D1 error: ${JSON.stringify(data.errors)}`)
   }
@@ -45,6 +54,12 @@ function getD1Binding(): D1Database | null {
   }
 }
 
+/**
+ * Run a SELECT (or any statement that returns rows) against D1.
+ * @param sql   Parameterised SQL string using `?` placeholders.
+ * @param params Positional bind values.
+ * @returns Array of typed row objects (empty array when no rows match).
+ */
 export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   const db = getD1Binding()
   if (db) {
@@ -55,11 +70,19 @@ export async function query<T = any>(sql: string, params: any[] = []): Promise<T
   return d1Fetch(sql, params) as Promise<T[]>
 }
 
+/**
+ * Run a query and return only the first row, or `null` when no rows match.
+ * Convenience wrapper around `query` for single-row lookups.
+ */
 export async function queryOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
   const results = await query<T>(sql, params)
   return results[0] ?? null
 }
 
+/**
+ * Execute a write statement (INSERT / UPDATE / DELETE / DDL).
+ * Discards the result set — use `query` when you need RETURNING rows.
+ */
 export async function exec(sql: string, params: any[] = []): Promise<void> {
   await query(sql, params)
 }
@@ -67,9 +90,11 @@ export async function exec(sql: string, params: any[] = []): Promise<void> {
 export async function batchExec(statements: Array<{ sql: string; params?: any[] }>): Promise<void> {
   const db = getD1Binding()
   if (db) {
-    await db.batch(statements.map(s =>
-      s.params?.length ? db.prepare(s.sql).bind(...s.params) : db.prepare(s.sql)
-    ))
+    await db.batch(
+      statements.map(s =>
+        s.params?.length ? db.prepare(s.sql).bind(...s.params) : db.prepare(s.sql),
+      ),
+    )
     return
   }
   // HTTP API batch
@@ -77,17 +102,26 @@ export async function batchExec(statements: Array<{ sql: string; params?: any[] 
   await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${CF_TOKEN}`,
+      Authorization: `Bearer ${CF_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(statements.map(s => ({ sql: s.sql, params: s.params ?? [] }))),
   })
 }
 
+/**
+ * Generate a collision-resistant, URL-safe unique ID.
+ * Format: `c<timestamp-base36><random>` — sortable and ~globally unique.
+ */
 export function newId(): string {
   return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * Return the current UTC timestamp as an ISO 8601 string.
+ * Use this for all `createdAt` / `updatedAt` DB columns so timestamps are
+ * consistently formatted and timezone-free.
+ */
 export function nowISO(): string {
   return new Date().toISOString()
 }

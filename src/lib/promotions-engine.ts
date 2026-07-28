@@ -1,13 +1,23 @@
 /**
+ * @module promotions-engine
+ * Pure promotion calculation functions — no I/O, no side effects.
+ *
+ * Call `applyPromotions(promotions, items, subtotal)` to get the list of
+ * applicable discounts. All other exports are lower-level helpers exposed
+ * for unit testing.
+ *
+ * Supported promotion types:
+ *   - `PERCENTAGE_OFF`   — percentage off the order subtotal
+ *   - `FIXED_AMOUNT`     — fixed IDR/currency amount off
+ *   - `BUY_X_GET_Y`      — buy X qty, get Y qty free (cheapest items)
+ *   - `CATEGORY_DISCOUNT`— percentage off items in a specific category
+ */
+/**
  * Promotion engine — pure functions, no I/O.
  * Used by the API route and importable in tests.
  */
 
-export type PromotionType =
-  | 'PERCENTAGE_OFF'
-  | 'FIXED_AMOUNT'
-  | 'BUY_X_GET_Y'
-  | 'CATEGORY_DISCOUNT'
+export type PromotionType = 'PERCENTAGE_OFF' | 'FIXED_AMOUNT' | 'BUY_X_GET_Y' | 'CATEGORY_DISCOUNT'
 
 export type PromotionStatus = 'ACTIVE' | 'INACTIVE' | 'EXPIRED'
 
@@ -130,6 +140,19 @@ export function calcCategoryDiscount(promo: Promotion, items: CartItem[]): numbe
   return Math.round((eligible * pct) / 100)
 }
 
+/**
+ * Apply a list of promotions to a cart and return all that produce a non-zero discount.
+ *
+ * Promotions with a `code` are only applied when `promoCode` matches (case-insensitive).
+ * Promotions without a `code` are auto-applied when the cart meets their conditions.
+ * Multiple promotions can stack — sum with `totalDiscount(applied)`.
+ *
+ * @param promotions All active promotions for the store.
+ * @param items      Cart line items (must include `subtotal`, `categoryId`, `qty`).
+ * @param promoCode  Optional coupon code entered by the customer.
+ * @param now        Override the current time (useful in tests).
+ * @returns Array of applied promotions, each with a calculated `discountAmount`.
+ */
 export function applyPromotions(
   promotions: Promotion[],
   items: CartItem[],

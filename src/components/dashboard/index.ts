@@ -1,0 +1,6 @@
+export { DashboardStats } from './DashboardStats'
+export { DashboardCharts } from './DashboardCharts'
+export type { HourlySlot, PaymentSlice } from './DashboardCharts'
+export { DashboardQuickActions } from './DashboardQuickActions'
+export { DashboardShiftWidget } from './DashboardShiftWidget'
+export { default as DashboardClientPage } from './DashboardClientPage'

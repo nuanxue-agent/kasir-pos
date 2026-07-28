@@ -3,29 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import {
-  ShoppingCart,
-  DollarSign,
-  TrendingUp,
-  Users,
-  Plus,
-  Package,
-  BarChart3,
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Boxes,
-  Sparkles,
-  ShoppingBag,
-  Star,
-  ChevronRight,
-  UserCheck,
-  TrendingDown,
-  Minus,
-  Rocket,
-} from 'lucide-react'
+import { Sparkles, Plus, Rocket, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import OnboardingChecklist, {
   CHECKLIST_ITEMS,
   ONBOARDING_DISMISSED_KEY,
@@ -33,23 +11,17 @@ import OnboardingChecklist, {
   countCompleted,
   shouldAutoShow,
 } from '@/components/dashboard/OnboardingChecklist'
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip as RechartsTooltip,
-  Legend as RechartsLegend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { StatsCard } from '@/components/dashboard/StatsCard'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import ActivityFeedClient from '@/components/dashboard/ActivityFeedClient'
-import { KpiGoalRow } from '@/components/dashboard/KpiGoalRow'
 import AIInsightsClient from '@/components/reports/AIInsightsClient'
+import { DashboardStats } from '@/components/dashboard/DashboardStats'
+import {
+  DashboardCharts,
+  type HourlySlot,
+  type PaymentSlice,
+} from '@/components/dashboard/DashboardCharts'
+import { DashboardQuickActions } from '@/components/dashboard/DashboardQuickActions'
+import { DashboardShiftWidget } from '@/components/dashboard/DashboardShiftWidget'
 
 interface DashboardClientPageProps {
   storeId: string
@@ -99,218 +71,6 @@ const STATUS_STYLES: Record<string, { icon: React.ReactNode; pill: string; label
   },
 }
 
-// ─── Hourly Heatmap ───────────────────────────────────────────────────────────
-
-interface HourlySlot {
-  hour: number
-  revenue: number
-  count: number
-}
-
-function HourlyHeatmap({ data }: { data: HourlySlot[] }) {
-  if (!data.length) return null
-  const maxRevenue = Math.max(...data.map(d => d.revenue), 1)
-  const hourLabels = [
-    '12a',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    '11',
-    '12p',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    '11',
-  ]
-  return (
-    <div>
-      <div className="flex gap-0.5">
-        {data.map(slot => {
-          const intensity = slot.revenue / maxRevenue
-          const opacity = slot.revenue === 0 ? 0.07 : 0.15 + intensity * 0.85
-          return (
-            <div
-              key={slot.hour}
-              className="group relative flex-1"
-              title={`${hourLabels[slot.hour]}:00 — ${slot.count} order(s)`}
-            >
-              <div
-                  className="h-8 rounded-sm transition-opacity"
-                  style={{ backgroundColor: `rgba(99, 102, 241, ${opacity})` }}
-                />
-              {/* Tooltip on hover */}
-              <div className="pointer-events-none absolute -top-8 left-1/2 z-10 hidden -translate-x-1/2 rounded bg-stone-800 px-1.5 py-0.5 text-[9px] whitespace-nowrap text-white group-hover:block">
-                {hourLabels[slot.hour]}h · {slot.count}x
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      <div className="mt-1 flex justify-between text-[9px] text-[var(--text-3)]">
-        <span>12a</span>
-        <span>6a</span>
-        <span>12p</span>
-        <span>6p</span>
-        <span>11p</span>
-      </div>
-    </div>
-  )
-}
-
-// ─── Payment Method Donut ─────────────────────────────────────────────────────
-
-const PAYMENT_COLORS: Record<string, string> = {
-  CASH: '#10b981',
-  CARD: '#6366f1',
-  TRANSFER: '#f59e0b',
-  QRIS: '#ec4899',
-  OTHER: '#94a3b8',
-}
-
-interface PaymentSlice {
-  method: string
-  total: number
-  count: number
-}
-
-function PaymentDonut({ data, currency }: { data: PaymentSlice[]; currency: string }) {
-  if (!data.length) return <p className="py-4 text-center text-xs text-[var(--text-3)]">No data</p>
-  const pieData = data.map(d => ({ name: d.method, value: d.total }))
-  return (
-    <ResponsiveContainer width="100%" height={160}>
-      <PieChart>
-        <Pie
-          data={pieData}
-          cx="50%"
-          cy="50%"
-          innerRadius={42}
-          outerRadius={64}
-          paddingAngle={2}
-          dataKey="value"
-        >
-          {pieData.map((entry, i) => (
-            <Cell key={i} fill={PAYMENT_COLORS[entry.name] ?? '#94a3b8'} />
-          ))}
-        </Pie>
-        <RechartsTooltip
-          formatter={value => formatCurrency(value as number, currency)}
-          contentStyle={{ borderRadius: 8, fontSize: 11, border: '1px solid #e5e7eb' }}
-        />
-        <RechartsLegend
-          iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
-  )
-}
-
-// ─── Today vs Yesterday Sparkline ─────────────────────────────────────────────
-
-interface HourlyCompareProps {
-  today: HourlySlot[]
-  yesterday: HourlySlot[]
-  currency: string
-}
-
-function TodayVsYesterdaySparkline({ today, yesterday, currency }: HourlyCompareProps) {
-  if (!today.length && !yesterday.length) return null
-  // Build cumulative hourly data for the current hour range
-  const now = new Date().getHours()
-  const points = Array.from({ length: now + 1 }, (_, h) => ({
-    hour: h,
-    today: today.find(s => s.hour === h)?.revenue ?? 0,
-    yesterday: yesterday.find(s => s.hour === h)?.revenue ?? 0,
-  }))
-  return (
-    <ResponsiveContainer width="100%" height={80}>
-      <LineChart data={points} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-        <XAxis
-          dataKey="hour"
-          tick={{ fontSize: 9, fill: '#9ca3af' }}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={h => (h % 6 === 0 ? `${h}h` : '')}
-        />
-        <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} hide />
-        <RechartsTooltip
-          formatter={value => formatCurrency(value as number, currency)}
-          labelFormatter={h => `${h}:00`}
-          contentStyle={{ borderRadius: 8, fontSize: 11, border: '1px solid #e5e7eb' }}
-        />
-        <Line
-          type="monotone"
-          dataKey="today"
-          stroke="#6366f1"
-          strokeWidth={2}
-          dot={false}
-          name="Today"
-        />
-        <Line
-          type="monotone"
-          dataKey="yesterday"
-          stroke="#d1d5db"
-          strokeWidth={1.5}
-          strokeDasharray="4 2"
-          dot={false}
-          name="Yesterday"
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  )
-}
-
-// Simple SVG sparkline
-function Sparkline({ data, color = '#6366f1' }: { data: number[]; color?: string }) {
-  if (!data || data.length < 2) return null
-  const max = Math.max(...data, 1)
-  const min = Math.min(...data)
-  const range = max - min || 1
-  const w = 80,
-    h = 32,
-    pad = 2
-  const pts = data
-    .map((v, i) => {
-      const x = pad + (i / (data.length - 1)) * (w - pad * 2)
-      const y = h - pad - ((v - min) / range) * (h - pad * 2)
-      return `${x},${y}`
-    })
-    .join(' ')
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" className="shrink-0">
-      <polyline
-        points={pts}
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <polyline
-        points={`${pts} ${w - pad},${h} ${pad},${h}`}
-        stroke="none"
-        fill={color}
-        fillOpacity="0.1"
-      />
-    </svg>
-  )
-}
-
 export default function DashboardClientPage({
   storeId,
   session,
@@ -319,9 +79,6 @@ export default function DashboardClientPage({
   const currency = session?.user?.stores?.[0]?.currency ?? 'IDR'
   const userName = session?.user?.name ?? ''
   const enabledModules = modules ?? ['pos', 'inventory', 'customers', 'discounts', 'reports']
-  const hasPOS = enabledModules.includes('pos')
-  const hasInventory = enabledModules.includes('inventory')
-  const hasCustomers = enabledModules.includes('customers')
 
   // ── Onboarding checklist state ───────────────────────────────────────────
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -329,7 +86,6 @@ export default function DashboardClientPage({
   const [onboardingDismissed, setOnboardingDismissed] = useState(true)
 
   useEffect(() => {
-    // Read state from localStorage on client
     const dismissed = localStorage.getItem(ONBOARDING_DISMISSED_KEY) === 'true'
     setOnboardingDismissed(dismissed)
     setOnboardingCompleted(countCompleted(readCompletionFromStorage()))
@@ -342,18 +98,14 @@ export default function DashboardClientPage({
   const allDone = remainingCount <= 0
 
   // Active shift
-  const {
-    data: shiftData,
-    isLoading: shiftLoading,
-    refetch: refetchShift,
-  } = useQuery({
+  const { data: shiftData, isLoading: shiftLoading } = useQuery({
     queryKey: ['shift-current', storeId],
     queryFn: () => fetch(`/api/shifts?storeId=${storeId}&active=true`).then(r => r.json()),
     refetchInterval: 30_000,
   })
   const activeShift = (shiftData as any) ?? null
 
-  // Live indicator: track seconds since last successful refetch
+  // Live indicator
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [secondsAgo, setSecondsAgo] = useState(0)
 
@@ -365,7 +117,7 @@ export default function DashboardClientPage({
     return () => clearInterval(id)
   }, [lastUpdated])
 
-  // NPS — current month average from surveys
+  // NPS — current month average
   const currentMonthStart = (() => {
     const d = new Date()
     d.setDate(1)
@@ -385,7 +137,9 @@ export default function DashboardClientPage({
               fetch(`/api/surveys/${s.id}/analytics?storeId=${storeId}`).then(r => r.json()),
             ),
           )
-          let npsSum = 0, npsCount = 0, totalResponses = 0
+          let npsSum = 0,
+            npsCount = 0,
+            totalResponses = 0
           for (const r of analyticsResults) {
             if (r.status === 'fulfilled') {
               const a = r.value as any
@@ -414,14 +168,14 @@ export default function DashboardClientPage({
     refetchInterval: 30_000,
   })
 
-  // Track last-updated timestamp whenever summary data changes
   useEffect(() => {
     if (data !== undefined) {
       setLastUpdated(new Date())
       setSecondsAgo(0)
     }
   }, [data])
-  // Yesterday for comparison
+
+  // Yesterday
   const { data: yesterday } = useQuery({
     queryKey: ['dashboard-summary-yesterday', storeId],
     queryFn: () => {
@@ -458,11 +212,7 @@ export default function DashboardClientPage({
     queryFn: () => fetch(`/api/inventory?storeId=${storeId}&lowStockOnly=true`).then(r => r.json()),
   })
 
-  // Top products today (from today's summary)
-  const topProducts = (data as any)?.topProducts ?? []
-  const paymentBreakdown: PaymentSlice[] = (data as any)?.paymentBreakdown ?? []
-
-  // Hourly data for today
+  // Hourly today
   const todayDate = new Date().toISOString().slice(0, 10)
   const { data: hourlyToday = [] } = useQuery<HourlySlot[]>({
     queryKey: ['hourly-today', storeId, todayDate],
@@ -470,7 +220,7 @@ export default function DashboardClientPage({
       fetch(`/api/reports/hourly?storeId=${storeId}&date=${todayDate}`).then(r => r.json()),
   })
 
-  // Hourly data for yesterday (for sparkline comparison)
+  // Hourly yesterday
   const yesterdayDate = (() => {
     const d = new Date()
     d.setDate(d.getDate() - 1)
@@ -485,12 +235,9 @@ export default function DashboardClientPage({
   const stats = (data as any) ?? {}
   const yStats = (yesterday as any) ?? {}
 
-  function pctChange(today: number, yest: number) {
-    if (!yest) return undefined
-    return ((today - yest) / yest) * 100
-  }
+  const topProducts = (data as any)?.topProducts ?? []
+  const paymentBreakdown: PaymentSlice[] = (data as any)?.paymentBreakdown ?? []
 
-  // Sparkline from weekly dailySales
   const sparkRevenue: number[] = Array.isArray((weekData as any)?.dailySales)
     ? (weekData as any).dailySales.map((d: any) => d.total ?? 0)
     : []
@@ -509,10 +256,9 @@ export default function DashboardClientPage({
         <div>
           <div className="mb-1 flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-            <span className="text-[11px] font-semibold tracking-widest text-indigo-600 dark:text-indigo-400 capitalize uppercase">
+            <span className="text-[11px] font-semibold tracking-widest text-indigo-600 capitalize uppercase dark:text-indigo-400">
               {dateLabel}
             </span>
-            {/* Live badge */}
             <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -532,623 +278,62 @@ export default function DashboardClientPage({
         </div>
         <Link
           href="/dashboard/pos"
-          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:-translate-y-0.5 active:scale-95 dark:shadow-indigo-900/40"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:-translate-y-0.5 hover:shadow-indigo-300 active:scale-95 dark:shadow-indigo-900/40"
         >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Catat Penjualan</span>
           <span className="sm:hidden">Jual</span>
         </Link>
-        {/* Getting Started button — only show when not all done and not dismissed */}
         {!allDone && !onboardingDismissed && (
           <button
             onClick={() => setShowOnboarding(true)}
             className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-700 transition-all hover:bg-indigo-100 active:scale-95 dark:border-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400"
           >
             <Rocket className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              Getting Started ({remainingCount} left)
-            </span>
+            <span className="hidden sm:inline">Getting Started ({remainingCount} left)</span>
             <span className="sm:hidden">{remainingCount}</span>
           </button>
         )}
       </div>
 
       {/* ── Shift status widget ── */}
-      <div className="rounded-xl border border-indigo-200/60 bg-gradient-to-r from-indigo-50 to-purple-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/40 dark:to-purple-950/30">
-        {shiftLoading ? (
-          <div className="h-10 animate-pulse rounded-xl bg-indigo-100 dark:bg-indigo-900/30" />
-        ) : activeShift ? (
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 shadow-sm shadow-indigo-200 dark:shadow-indigo-900/40">
-                <UserCheck className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold tracking-widest text-indigo-700 uppercase dark:text-indigo-400">
-                  Shift Aktif
-                </p>
-                <p className="mt-0.5 text-sm font-bold text-[var(--text-1)]">
-                  {activeShift.userName ?? 'Kasir'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden items-center gap-6 text-center sm:flex">
-              <div>
-                <p className="text-[10px] tracking-widest text-[var(--text-3)] uppercase">Dibuka</p>
-                <p className="mt-0.5 text-xs font-semibold text-[var(--text-1)]">
-                  {new Date(activeShift.openedAt).toLocaleTimeString('id-ID', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] tracking-widest text-[var(--text-3)] uppercase">
-                  Kas Awal
-                </p>
-                <p className="mt-0.5 text-xs font-semibold text-[var(--text-1)]">
-                  {formatCurrency(activeShift.openingCash ?? 0, currency)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] tracking-widest text-[var(--text-3)] uppercase">
-                  Omzet Shift
-                </p>
-                <p className="mt-0.5 text-xs font-semibold text-indigo-700 dark:text-indigo-400">
-                  {formatCurrency(stats.totalRevenue ?? 0, currency)}
-                </p>
-              </div>
-            </div>
-            <a
-              href="/dashboard/shifts"
-              className="shrink-0 rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200 hover:text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-900/60"
-            >
-              Detail
-            </a>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-subtle)]">
-                <Clock className="h-4 w-4 text-[var(--text-3)]" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold tracking-widest text-[var(--text-2)] uppercase">
-                  Tidak ada shift aktif
-                </p>
-                <p className="mt-0.5 text-sm text-[var(--text-3)]">
-                  Buka shift untuk mulai mencatat penjualan
-                </p>
-              </div>
-            </div>
-            <a
-              href="/dashboard/shifts"
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Buka Shift
-            </a>
-          </div>
-        )}
-      </div>
+      <DashboardShiftWidget
+        shiftLoading={shiftLoading}
+        activeShift={activeShift}
+        currency={currency}
+        totalRevenue={stats.totalRevenue ?? 0}
+      />
 
-      {/* ── Stats grid ── */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Link href="/dashboard/reports" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
-          <StatsCard
-            icon={DollarSign}
-            label="Omzet Hari Ini"
-            value={formatCurrency(stats.totalRevenue ?? 0, currency)}
-            color="green"
-            change={pctChange(stats.totalRevenue ?? 0, yStats.totalRevenue ?? 0)}
-            loading={isLoading}
-            sub={sparkRevenue.length > 1 ? '7 hari terakhir ↗' : undefined}
-          />
-        </Link>
-        <Link href="/dashboard/orders" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
-          <StatsCard
-            icon={ShoppingCart}
-            label={`Pesanan${stats.totalOrders ? ` — ${stats.totalOrders} transaksi hari ini` : ''}`}
-            value={String(stats.totalOrders ?? 0)}
-            color="blue"
-            change={pctChange(stats.totalOrders ?? 0, yStats.totalOrders ?? 0)}
-            loading={isLoading}
-          />
-        </Link>
-        <Link href="/dashboard/reports" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
-          <StatsCard
-            icon={TrendingUp}
-            label="Rata-rata Pesanan"
-            value={formatCurrency(stats.avgOrderValue ?? 0, currency)}
-            color="purple"
-            loading={isLoading}
-          />
-        </Link>
-        <Link href="/dashboard/customers" className="block transition-all duration-200 hover:-translate-y-0.5 active:scale-95">
-          <StatsCard
-            icon={Users}
-            label="Pelanggan Baru"
-            value={String(stats.newCustomers ?? 0)}
-            color="blue"
-            change={pctChange(stats.newCustomers ?? 0, yStats.newCustomers ?? 0)}
-            loading={isLoading}
-          />
-        </Link>
-      </div>
+      {/* ── Stats + KPI + NPS ── */}
+      <DashboardStats
+        storeId={storeId}
+        currency={currency}
+        stats={stats}
+        yStats={yStats}
+        isLoading={isLoading}
+        topProducts={topProducts}
+        sparkRevenue={sparkRevenue}
+        npsData={npsData}
+      />
 
-      {/* ── KPI Goal Row ── */}
-      <KpiGoalRow storeId={storeId} currency={currency} />
+      {/* ── Quick actions ── */}
+      <DashboardQuickActions />
 
-      {/* ── NPS Score Card ── */}
-      {(() => {
-        const score = npsData?.avgNps ?? null
-        const responses = npsData?.totalResponses ?? 0
-        const scoreColor =
-          score === null
-            ? 'text-[var(--text-3)]'
-            : score < 6
-              ? 'text-red-500'
-              : score < 9
-                ? 'text-indigo-500'
-                : 'text-emerald-500'
-        const bgColor =
-          score === null
-            ? 'bg-[var(--bg-subtle)]'
-            : score < 6
-              ? 'bg-red-50'
-              : score < 9
-                ? 'bg-[var(--bg-subtle)]'
-                : 'bg-emerald-50'
-        const borderColor =
-          score === null
-            ? 'border-[var(--border)]'
-            : score < 6
-              ? 'border-red-200'
-              : score < 9
-                ? 'border-indigo-200'
-                : 'border-emerald-200'
-        const label =
-          score === null ? '—' : score < 6 ? 'Detractor' : score < 9 ? 'Passive' : 'Promoter'
-        return (
-          <Link href="/dashboard/crm/feedback" className="block">
-            <div
-              className={`flex items-center justify-between rounded-xl border ${borderColor} ${bgColor} px-5 py-4 shadow-sm transition-shadow hover:shadow-md`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${score === null ? 'bg-[var(--bg-muted)]' : score < 6 ? 'bg-red-100' : score < 9 ? 'bg-indigo-100' : 'bg-emerald-100'}`}
-                >
-                  <Star
-                    className={`h-5 w-5 ${score === null ? 'text-[var(--text-3)]' : score < 6 ? 'text-red-500' : score < 9 ? 'text-indigo-500' : 'text-emerald-500'}`}
-                  />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-3)]">
-                    NPS Bulan Ini
-                  </p>
-                  <p className={`mt-0.5 text-xl font-bold ${scoreColor}`}>
-                    {score !== null ? score.toFixed(1) : '—'}
-                    <span className="ml-1.5 text-xs font-medium opacity-70">{label}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-[var(--text-1)]">{responses}</p>
-                <p className="text-xs text-[var(--text-3)]">respons survei</p>
-                <p className="mt-1 flex items-center justify-end gap-0.5 text-[10px] font-medium text-[var(--text-3)] hover:text-indigo-600">
-                  Lihat detail <ChevronRight className="h-3 w-3" />
-                </p>
-              </div>
-            </div>
-          </Link>
-        )
-      })()}
-
-      {/* ── Today's Performance summary bar ── */}
-      {!isLoading && (
-        <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
-          <div className="border-b border-[var(--border)] px-4 py-3">
-            <p className="text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
-              Performa Hari Ini
-            </p>
-          </div>
-          <div className="grid grid-cols-3 divide-x divide-[var(--border)]">
-            {/* Revenue vs yesterday */}
-            {(() => {
-              const today = stats.totalRevenue ?? 0
-              const yest = yStats.totalRevenue ?? 0
-              const pct = yest > 0 ? ((today - yest) / yest) * 100 : undefined
-              const up = pct !== undefined && pct >= 0
-              return (
-                <div className="flex flex-col gap-1 px-4 py-3">
-                  <p className="truncate text-[10px] font-semibold tracking-widest text-[var(--text-3)] uppercase">
-                    Omzet
-                  </p>
-                  <p className="truncate text-sm font-bold text-[var(--text-1)] sm:text-base">
-                    {formatCurrency(today, currency)}
-                  </p>
-                  {pct !== undefined ? (
-                    <span
-                      className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}
-                    >
-                      {up ? (
-                        <TrendingUp className="h-3 w-3" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3" />
-                      )}
-                      {Math.abs(pct).toFixed(1)}% vs kemarin
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-0.5 text-[10px] text-stone-300">
-                      <Minus className="h-3 w-3" /> belum ada data kemarin
-                    </span>
-                  )}
-                </div>
-              )
-            })()}
-
-            {/* Orders vs yesterday */}
-            {(() => {
-              const today = stats.totalOrders ?? 0
-              const yest = yStats.totalOrders ?? 0
-              const pct = yest > 0 ? ((today - yest) / yest) * 100 : undefined
-              const up = pct !== undefined && pct >= 0
-              return (
-                <div className="flex flex-col gap-1 px-4 py-3">
-                  <p className="truncate text-[10px] font-semibold tracking-widest text-[var(--text-3)] uppercase">
-                    Pesanan
-                  </p>
-                  <p className="text-sm font-bold text-[var(--text-1)] sm:text-base">{today}</p>
-                  {pct !== undefined ? (
-                    <span
-                      className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}
-                    >
-                      {up ? (
-                        <TrendingUp className="h-3 w-3" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3" />
-                      )}
-                      {Math.abs(pct).toFixed(1)}% vs kemarin
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-0.5 text-[10px] text-stone-300">
-                      <Minus className="h-3 w-3" /> belum ada data kemarin
-                    </span>
-                  )}
-                </div>
-              )
-            })()}
-
-            {/* Top selling product */}
-            {(() => {
-              const top = (topProducts as any[])[0]
-              return (
-                <div className="flex flex-col gap-1 px-4 py-3">
-                  <p className="truncate text-[10px] font-semibold tracking-widest text-[var(--text-3)] uppercase">
-                    Produk Terlaris
-                  </p>
-                  {top ? (
-                    <>
-                      <p className="truncate text-sm font-bold text-[var(--text-1)]">{top.name}</p>
-                      <span className="flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-                        <Star className="h-3 w-3 fill-indigo-400 text-indigo-400" />
-                        {top.qty ?? 0}x terjual
-                      </span>
-                    </>
-                  ) : (
-                    <p className="text-sm text-stone-300">—</p>
-                  )}
-                </div>
-              )
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* ── 7-day revenue sparkline card ── */}
-      {sparkRevenue.length > 1 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-subtle)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
-                Tren 7 Hari
-              </p>
-              <p className="mt-0.5 text-sm font-semibold text-[var(--text-1)]">Omzet minggu ini</p>
-            </div>
-            <Link
-              href="/dashboard/reports"
-              className="flex items-center gap-1 text-xs text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
-            >
-              Detail <ChevronRight className="h-3 w-3" />
-            </Link>
-          </div>
-          <div className="flex h-16 items-end gap-1">
-            {sparkRevenue.map((v, i) => {
-              const max = Math.max(...sparkRevenue, 1)
-              const pct = (v / max) * 100
-              const isToday = i === sparkRevenue.length - 1
-              const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
-              const d = new Date()
-              d.setDate(d.getDate() - (sparkRevenue.length - 1 - i))
-              return (
-                <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                  <div className="flex w-full flex-col justify-end" style={{ height: 44 }}>
-                    <div
-                      className={`w-full rounded-t-md transition-all ${isToday ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-900/50'}`}
-                      style={{ height: `${Math.max(pct, 4)}%` }}
-                      title={formatCurrency(v, currency)}
-                    />
-                  </div>
-                  <span
-                    className={`text-[9px] font-medium ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-[var(--text-3)]'}`}
-                  >
-                    {dayNames[d.getDay()]}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Analytics row: Hourly Heatmap + Payment Donut + Today vs Yesterday ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Hourly heatmap */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-          <p className="mb-3 text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
-            Penjualan per Jam — Hari Ini
-          </p>
-          {(hourlyToday as HourlySlot[]).length > 0 ? (
-            <HourlyHeatmap data={hourlyToday as HourlySlot[]} />
-          ) : (
-            <div className="flex h-10 items-center justify-center text-xs text-[var(--text-3)]">
-              Belum ada data hari ini
-            </div>
-          )}
-        </div>
-
-        {/* Payment method donut */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-          <p className="mb-1 text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
-            Metode Pembayaran
-          </p>
-          <PaymentDonut data={paymentBreakdown} currency={currency} />
-        </div>
-
-        {/* Today vs Yesterday sparkline */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold tracking-widest text-[var(--text-3)] uppercase">
-              Hari Ini vs Kemarin
-            </p>
-            <div className="flex items-center gap-3 text-[10px]">
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-4 rounded-sm bg-indigo-500" />
-                Hari Ini
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-px w-4 border border-dashed border-slate-400" />
-                Kemarin
-              </span>
-            </div>
-          </div>
-          <TodayVsYesterdaySparkline
-            today={hourlyToday as HourlySlot[]}
-            yesterday={hourlyYesterday as HourlySlot[]}
-            currency={currency}
-          />
-        </div>
-      </div>
-
-      {/* ── Quick actions (mobile-friendly pill row) ── */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
-        <Link
-          href="/dashboard/pos"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-3 text-center text-xs font-medium text-indigo-700 transition-all hover:bg-indigo-100 active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-        >
-          <ShoppingBag className="h-4 w-4 shrink-0" />
-          <span>Kasir</span>
-        </Link>
-        <Link
-          href="/dashboard/products"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-3 text-center text-xs font-medium text-[var(--text-2)] transition-all hover:bg-[var(--bg-muted)] active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
-        >
-          <Package className="h-4 w-4 shrink-0" />
-          <span>Produk</span>
-        </Link>
-        <Link
-          href="/dashboard/orders"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-3 text-center text-xs font-medium text-[var(--text-2)] transition-all hover:bg-[var(--bg-muted)] active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
-        >
-          <ShoppingCart className="h-4 w-4 shrink-0" />
-          <span>Pesanan</span>
-        </Link>
-        <Link
-          href="/dashboard/customers"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-3 text-center text-xs font-medium text-[var(--text-2)] transition-all hover:bg-[var(--bg-muted)] active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
-        >
-          <Users className="h-4 w-4 shrink-0" />
-          <span>Pelanggan</span>
-        </Link>
-        <Link
-          href="/dashboard/inventory"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-3 text-center text-xs font-medium text-[var(--text-2)] transition-all hover:bg-[var(--bg-muted)] active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
-        >
-          <Boxes className="h-4 w-4 shrink-0" />
-          <span>Stok</span>
-        </Link>
-        <Link
-          href="/dashboard/reports"
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-3 text-center text-xs font-medium text-[var(--text-2)] transition-all hover:bg-[var(--bg-muted)] active:scale-95 sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
-        >
-          <BarChart3 className="h-4 w-4 shrink-0" />
-          <span>Laporan</span>
-        </Link>
-      </div>
-
-      {/* ── Main content grid ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Recent orders */}
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
-            <h2 className="text-sm font-semibold text-[var(--text-1)]">Pesanan Terbaru</h2>
-            <Link
-              href="/dashboard/orders"
-              className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
-            >
-              Lihat semua <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-
-          {ordersLoading ? (
-            <div className="space-y-2 p-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-12 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
-              ))}
-            </div>
-          ) : (recentOrders as any[]).length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-              <ShoppingCart className="h-8 w-8 text-slate-200" />
-              <p className="text-sm text-[var(--text-3)]">Belum ada pesanan hari ini</p>
-              <Link
-                href="/dashboard/pos"
-                className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                Mulai catat penjualan →
-              </Link>
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {(recentOrders as any[]).slice(0, 7).map((order: any) => {
-                const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.PENDING
-                return (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--bg-subtle)]"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text-1)]">#{order.number}</p>
-                      <p className="mt-0.5 text-xs text-[var(--text-3)]">
-                        {formatDate(order.createdAt)}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <p className="text-sm font-bold text-[var(--text-1)]">
-                        {formatCurrency(order.total, currency)}
-                      </p>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${style.pill}`}
-                      >
-                        {style.icon}
-                        {style.label}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Low stock + top products stacked */}
-        <div className="space-y-4">
-          {/* Low stock alerts */}
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
-                <AlertTriangle className="h-3.5 w-3.5 text-indigo-500" />
-                Stok Menipis
-                {(lowStock as any[]).length > 0 && (
-                  <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
-                    {(lowStock as any[]).length}
-                  </span>
-                )}
-              </h2>
-              <Link
-                href="/dashboard/inventory"
-                className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
-              >
-                Kelola <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-
-            {stockLoading ? (
-              <div className="space-y-2 p-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-10 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
-                ))}
-              </div>
-            ) : (lowStock as any[]).length === 0 ? (
-              <div className="flex items-center gap-3 px-4 py-4">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                </div>
-                <p className="text-sm text-[var(--text-2)]">Semua stok aman ✓</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--border)]">
-                {(lowStock as any[]).slice(0, 5).map((p: any) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]"
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-subtle)] dark:bg-indigo-900/20">
-                        <Package className="h-3.5 w-3.5 text-indigo-500" />
-                      </div>
-                      <p className="truncate text-sm text-[var(--text-1)]">{p.name}</p>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold ${
-                        p.stock === 0
-                          ? 'border border-red-100 bg-red-50 text-red-500 dark:border-red-900/50 dark:bg-red-900/20'
-                          : 'border border-[var(--border)] bg-[var(--bg-subtle)] text-indigo-600 dark:border-indigo-900/50 dark:bg-indigo-900/20'
-                      }`}
-                    >
-                      {p.stock === 0 ? 'Habis' : `${p.stock} sisa`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Top products today */}
-          {(topProducts as any[]).length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-lg transition-all duration-200 hover:shadow-xl">
-              <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-1)]">
-                  <Star className="h-3.5 w-3.5 fill-indigo-400 text-indigo-500" />
-                  Produk Terlaris Hari Ini
-                </h2>
-                <Link
-                  href="/dashboard/reports"
-                  className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  Laporan <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-              <div className="divide-y divide-[var(--border)]">
-                {(topProducts as any[]).slice(0, 5).map((p: any, i: number) => (
-                  <div
-                    key={p.name}
-                    className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]"
-                  >
-                    <span className="w-4 shrink-0 text-xs font-bold text-[var(--text-3)]">{i + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-[var(--text-1)]">{p.name}</p>
-                      <p className="text-xs text-[var(--text-3)]">{p.qty ?? 0}x terjual</p>
-                    </div>
-                    <p className="shrink-0 text-sm font-bold text-[var(--text-1)]">
-                      {formatCurrency(p.revenue ?? 0, currency)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Charts, orders, stock ── */}
+      <DashboardCharts
+        currency={currency}
+        sparkRevenue={sparkRevenue}
+        hourlyToday={hourlyToday as HourlySlot[]}
+        hourlyYesterday={hourlyYesterday as HourlySlot[]}
+        paymentBreakdown={paymentBreakdown}
+        topProducts={topProducts}
+        recentOrders={recentOrders as any[]}
+        lowStock={lowStock as any[]}
+        ordersLoading={ordersLoading}
+        stockLoading={stockLoading}
+        statusStyles={STATUS_STYLES}
+        formatDate={formatDate}
+      />
 
       {/* ── Smart Insights ── */}
       <AIInsightsClient storeId={storeId} compact />
@@ -1164,7 +349,6 @@ export default function DashboardClientPage({
         open={showOnboarding}
         onClose={() => {
           setShowOnboarding(false)
-          // Re-read completion & dismissed state after closing
           setOnboardingCompleted(countCompleted(readCompletionFromStorage()))
           setOnboardingDismissed(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === 'true')
         }}
