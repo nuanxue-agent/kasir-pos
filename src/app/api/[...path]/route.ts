@@ -7741,6 +7741,403 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
+    // ─── PURCHASING / GOODS RECEIPT ──────────────────────────────────────────
+    if (segs[0] === 'purchasing') {
+
+      // GET /api/purchasing/pending-pos?storeId=
+      if (segs[1] === 'pending-pos' && method === 'GET') {
+        // Lazy-create GoodsReceipt table if needed
+        await exec(`CREATE TABLE IF NOT EXISTS GoodsReceipt (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          poId TEXT NOT NULL,
+          receivedBy TEXT NOT NULL,
+          receivedAt TEXT NOT NULL,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT 'RECEIVED',
+          number TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )`)
+        await exec(`CREATE TABLE IF NOT EXISTS GoodsReceiptItem (
+          id TEXT PRIMARY KEY,
+          receiptId TEXT NOT NULL,
+          productId TEXT NOT NULL,
+          orderedQty REAL NOT NULL DEFAULT 0,
+          receivedQty REAL NOT NULL DEFAULT 0,
+          unitCost REAL NOT NULL DEFAULT 0,
+          batchNumber TEXT,
+          expiryDate TEXT,
+          createdAt TEXT NOT NULL
+        )`)
+
+        const rows = await query(
+          `SELECT po.id, po.number, po.status, po.orderDate, po.expectedDate, po.total,
+                  s.name as supplierName
+           FROM PurchaseOrder po
+           JOIN Supplier s ON po.supplierId = s.id
+           WHERE po.storeId = ? AND po.status IN ('SENT','CONFIRMED')
+           ORDER BY po.createdAt DESC`,
+          [storeId],
+        )
+        return ok({ orders: rows })
+      }
+
+      // POST /api/purchasing/receive
+      // Body: { poId, notes?, items: [{ productId, lineId?, receivedQty, unitCost, batchNumber?, expiryDate? }] }
+      if (segs[1] === 'receive' && method === 'POST') {
+        await exec(`CREATE TABLE IF NOT EXISTS GoodsReceipt (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          poId TEXT NOT NULL,
+          receivedBy TEXT NOT NULL,
+          receivedAt TEXT NOT NULL,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT 'RECEIVED',
+          number TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )`)
+        await exec(`CREATE TABLE IF NOT EXISTS GoodsReceiptItem (
+          id TEXT PRIMARY KEY,
+          receiptId TEXT NOT NULL,
+          productId TEXT NOT NULL,
+          orderedQty REAL NOT NULL DEFAULT 0,
+          receivedQty REAL NOT NULL DEFAULT 0,
+          unitCost REAL NOT NULL DEFAULT 0,
+          batchNumber TEXT,
+          expiryDate TEXT,
+          createdAt TEXT NOT NULL
+        )`)
+
+        const b = (await req.json()) as any
+        if (!b.poId) return err('poId required')
+        if (!Array.isArray(b.items) || b.items.length === 0)
+          return err('items required')
+
+        const po = await queryOne<any>(
+          `SELECT * FROM PurchaseOrder WHERE id=? AND storeId=?`,
+          [b.poId, storeId],
+        )
+        if (!po) return err('PO not found', 404)
+        if (!['SENT', 'CONFIRMED'].includes(po.status))
+          return err('PO tidak bisa diterima dalam status ini')
+
+        // Validate items
+        for (const item of b.items) {
+          if (!item.productId) return err('productId diperlukan di setiap item')
+          const qty = Number(item.receivedQty ?? 0)
+          if (isNaN(qty) || qty <= 0)
+            return err(`receivedQty harus > 0 untuk produk ${item.productId}`)
+          if (Number(item.unitCost ?? 0) < 0)
+            return err(`unitCost tidak boleh negatif untuk produk ${item.productId}`)
+        }
+
+        const t = nowISO()
+        const receiptId = newId()
+        const grNum = `GR-${Date.now().toString(36).toUpperCase()}`
+
+        await exec(
+          `INSERT INTO GoodsReceipt (id,storeId,poId,receivedBy,receivedAt,notes,status,number,createdAt)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [receiptId, storeId, b.poId, user.id, t, b.notes ?? null, 'RECEIVED', grNum, t],
+        )
+
+        for (const item of b.items) {
+          const receivedQty = Number(item.receivedQty)
+          const unitCost = Number(item.unitCost ?? 0)
+
+          // Get ordered qty from PO line if lineId provided
+          let orderedQty = 0
+          if (item.lineId) {
+            const line = await queryOne<any>(
+              `SELECT qty, receivedQty as alreadyReceived FROM PurchaseOrderLine WHERE id=? AND orderId=?`,
+              [item.lineId, b.poId],
+            )
+            if (line) {
+              orderedQty = Number(line.qty)
+              const newReceived = Number(line.alreadyReceived) + receivedQty
+              await exec(
+                `UPDATE PurchaseOrderLine SET receivedQty=? WHERE id=?`,
+                [newReceived, item.lineId],
+              )
+            }
+          }
+
+          await exec(
+            `INSERT INTO GoodsReceiptItem (id,receiptId,productId,orderedQty,receivedQty,unitCost,batchNumber,expiryDate,createdAt)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [
+              newId(), receiptId, item.productId,
+              orderedQty, receivedQty, unitCost,
+              item.batchNumber ?? null,
+              item.expiryDate ?? null,
+              t,
+            ],
+          )
+
+          // Update product stock
+          await exec(
+            `UPDATE Product SET stock = stock + ?, updatedAt=? WHERE id=? AND storeId=?`,
+            [receivedQty, t, item.productId, storeId],
+          )
+
+          // Create StockLog entry
+          await exec(
+            `INSERT INTO StockLog (id,storeId,productId,userId,type,qty,note,createdAt)
+             VALUES (?,?,?,?,?,?,?,?)`,
+            [
+              newId(), storeId, item.productId, user.id,
+              'PURCHASE', receivedQty,
+              `GR: ${grNum}`,
+              t,
+            ],
+          )
+        }
+
+        // Check if all PO lines are fully received → mark RECEIVED
+        const allLines = await query<any>(
+          `SELECT qty, receivedQty FROM PurchaseOrderLine WHERE orderId=?`,
+          [b.poId],
+        )
+        const fullyReceived = allLines.length > 0 && allLines.every(
+          (l: any) => Number(l.receivedQty) >= Number(l.qty),
+        )
+        const newPoStatus = fullyReceived ? 'RECEIVED' : po.status
+        if (fullyReceived) {
+          await exec(
+            `UPDATE PurchaseOrder SET status='RECEIVED', updatedAt=? WHERE id=?`,
+            [t, b.poId],
+          )
+        }
+
+        await logAudit({ storeId, userId: user.id, action: 'goods_receipt.create', resourceType: 'GoodsReceipt', resourceId: receiptId, meta: {
+          grNumber: grNum, poId: b.poId, itemCount: b.items.length,
+        } })
+
+        return ok({ id: receiptId, number: grNum, status: newPoStatus }, 201)
+      }
+
+      // GET /api/purchasing/receipts?storeId=
+      if (segs[1] === 'receipts' && method === 'GET') {
+        await exec(`CREATE TABLE IF NOT EXISTS GoodsReceipt (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          poId TEXT NOT NULL,
+          receivedBy TEXT NOT NULL,
+          receivedAt TEXT NOT NULL,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT 'RECEIVED',
+          number TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )`)
+        await exec(`CREATE TABLE IF NOT EXISTS GoodsReceiptItem (
+          id TEXT PRIMARY KEY,
+          receiptId TEXT NOT NULL,
+          productId TEXT NOT NULL,
+          orderedQty REAL NOT NULL DEFAULT 0,
+          receivedQty REAL NOT NULL DEFAULT 0,
+          unitCost REAL NOT NULL DEFAULT 0,
+          batchNumber TEXT,
+          expiryDate TEXT,
+          createdAt TEXT NOT NULL
+        )`)
+
+        const limit = parseInt(url.searchParams.get('limit') ?? '50')
+        const offset = parseInt(url.searchParams.get('offset') ?? '0')
+
+        const rows = await query(
+          `SELECT gr.id, gr.number, gr.receivedAt, gr.status, gr.notes,
+                  gr.poId, po.number as poNumber,
+                  s.name as supplierName,
+                  u.name as receivedBy,
+                  COUNT(gri.id) as itemCount
+           FROM GoodsReceipt gr
+           JOIN PurchaseOrder po ON gr.poId = po.id
+           JOIN Supplier s ON po.supplierId = s.id
+           LEFT JOIN User u ON gr.receivedBy = u.id
+           LEFT JOIN GoodsReceiptItem gri ON gri.receiptId = gr.id
+           WHERE gr.storeId = ?
+           GROUP BY gr.id
+           ORDER BY gr.receivedAt DESC
+           LIMIT ? OFFSET ?`,
+          [storeId, limit, offset],
+        )
+        const total = await queryOne<any>(
+          `SELECT COUNT(*) as count FROM GoodsReceipt WHERE storeId=?`,
+          [storeId],
+        )
+        return ok({ receipts: rows, total: total?.count ?? 0 })
+      }
+    }
+
+    // ── SURVEYS ──────────────────────────────────────────────────────────────
+    if (segs[0] === 'surveys') {
+      // Lazy-init tables
+      const initSurveyTables = async () => {
+        await exec(`CREATE TABLE IF NOT EXISTS Survey (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          active INTEGER NOT NULL DEFAULT 1,
+          createdAt TEXT NOT NULL
+        )`)
+        await exec(`CREATE TABLE IF NOT EXISTS SurveyQuestion (
+          id TEXT PRIMARY KEY,
+          surveyId TEXT NOT NULL,
+          text TEXT NOT NULL,
+          type TEXT NOT NULL,
+          options TEXT,
+          \`order\` INTEGER NOT NULL DEFAULT 0
+        )`)
+        await exec(`CREATE TABLE IF NOT EXISTS SurveyResponse (
+          id TEXT PRIMARY KEY,
+          surveyId TEXT NOT NULL,
+          customerId TEXT,
+          answers TEXT NOT NULL,
+          submittedAt TEXT NOT NULL
+        )`)
+      }
+
+      // GET /api/surveys — list surveys for store
+      if (!segs[1] && method === 'GET') {
+        await initSurveyTables()
+        const rows = await query<any>(
+          `SELECT s.*,
+            (SELECT COUNT(*) FROM SurveyQuestion sq WHERE sq.surveyId = s.id) as questionCount,
+            (SELECT COUNT(*) FROM SurveyResponse sr WHERE sr.surveyId = s.id) as responseCount
+           FROM Survey s WHERE s.storeId = ? ORDER BY s.createdAt DESC`,
+          [storeId],
+        )
+        return ok(rows.map(r => ({ ...r, active: r.active === 1 || r.active === true })))
+      }
+
+      // POST /api/surveys — create survey with questions
+      if (!segs[1] && method === 'POST') {
+        await initSurveyTables()
+        const b = (await req.json()) as any
+        if (!b.name || String(b.name).trim().length < 2)
+          return err('Nama survei minimal 2 karakter', 400)
+        if (!Array.isArray(b.questions) || b.questions.length === 0)
+          return err('Minimal 1 pertanyaan', 400)
+        const validTypes = new Set(['RATING', 'NPS', 'TEXT', 'MULTIPLE_CHOICE'])
+        for (const q of b.questions) {
+          if (!q.text || String(q.text).trim().length === 0) return err('Teks pertanyaan kosong', 400)
+          if (!validTypes.has(q.type)) return err(`Tipe tidak valid: ${q.type}`, 400)
+        }
+        const id = newId()
+        const t = nowISO()
+        await exec(
+          `INSERT INTO Survey (id, storeId, name, description, active, createdAt) VALUES (?,?,?,?,1,?)`,
+          [id, storeId, b.name.trim(), b.description ?? null, t],
+        )
+        for (const q of b.questions as any[]) {
+          await exec(
+            `INSERT INTO SurveyQuestion (id, surveyId, text, type, options, \`order\`) VALUES (?,?,?,?,?,?)`,
+            [
+              newId(),
+              id,
+              String(q.text).trim(),
+              q.type,
+              q.options && q.options.length > 0 ? JSON.stringify(q.options) : null,
+              q.order ?? 0,
+            ],
+          )
+        }
+        return ok({ id }, 201)
+      }
+
+      // PATCH /api/surveys/:id — toggle active
+      if (segs[1] && !segs[2] && method === 'PATCH') {
+        await initSurveyTables()
+        const survey = await queryOne<any>(`SELECT id FROM Survey WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!survey) return err('Survei tidak ditemukan', 404)
+        const b = (await req.json()) as any
+        if (b.active !== undefined) {
+          await exec(`UPDATE Survey SET active=? WHERE id=? AND storeId=?`, [
+            b.active ? 1 : 0, segs[1], storeId,
+          ])
+        }
+        return ok({ success: true })
+      }
+
+      // GET /api/surveys/:id/responses
+      if (segs[1] && segs[2] === 'responses' && method === 'GET') {
+        await initSurveyTables()
+        const survey = await queryOne<any>(`SELECT id FROM Survey WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!survey) return err('Survei tidak ditemukan', 404)
+        const responses = await query<any>(
+          `SELECT * FROM SurveyResponse WHERE surveyId=? ORDER BY submittedAt DESC`,
+          [segs[1]],
+        )
+        return ok(responses.map(r => ({ ...r, answers: JSON.parse(r.answers ?? '{}') })))
+      }
+
+      // POST /api/surveys/:id/respond — submit a response
+      if (segs[1] && segs[2] === 'respond' && method === 'POST') {
+        await initSurveyTables()
+        const survey = await queryOne<any>(`SELECT id, active FROM Survey WHERE id=?`, [segs[1]])
+        if (!survey) return err('Survei tidak ditemukan', 404)
+        if (!survey.active && survey.active !== 1) return err('Survei tidak aktif', 400)
+        const b = (await req.json()) as any
+        if (!b.answers || typeof b.answers !== 'object') return err('answers diperlukan', 400)
+        const id = newId()
+        await exec(
+          `INSERT INTO SurveyResponse (id, surveyId, customerId, answers, submittedAt) VALUES (?,?,?,?,?)`,
+          [id, segs[1], b.customerId ?? null, JSON.stringify(b.answers), nowISO()],
+        )
+        return ok({ id }, 201)
+      }
+
+      // GET /api/surveys/:id/analytics
+      if (segs[1] && segs[2] === 'analytics' && method === 'GET') {
+        await initSurveyTables()
+        const survey = await queryOne<any>(`SELECT id FROM Survey WHERE id=? AND storeId=?`, [segs[1], storeId])
+        if (!survey) return err('Survei tidak ditemukan', 404)
+
+        const questions = await query<any>(
+          `SELECT * FROM SurveyQuestion WHERE surveyId=? ORDER BY \`order\` ASC`,
+          [segs[1]],
+        )
+        const responses = await query<any>(
+          `SELECT * FROM SurveyResponse WHERE surveyId=?`,
+          [segs[1]],
+        )
+
+        const totalResponses = responses.length
+        let npsSum = 0, npsCount = 0
+        let ratingSum = 0, ratingCount = 0
+        let promoters = 0, passives = 0, detractors = 0
+
+        const npsQIds = new Set(questions.filter((q: any) => q.type === 'NPS').map((q: any) => q.id))
+        const ratingQIds = new Set(questions.filter((q: any) => q.type === 'RATING').map((q: any) => q.id))
+
+        for (const r of responses) {
+          let answers: Record<string, any> = {}
+          try { answers = JSON.parse(r.answers ?? '{}') } catch { /* skip */ }
+          for (const [qId, val] of Object.entries(answers)) {
+            const num = Number(val)
+            if (npsQIds.has(qId) && !isNaN(num)) {
+              npsSum += num; npsCount++
+              if (num >= 9) promoters++
+              else if (num >= 7) passives++
+              else detractors++
+            }
+            if (ratingQIds.has(qId) && !isNaN(num)) {
+              ratingSum += num; ratingCount++
+            }
+          }
+        }
+
+        return ok({
+          totalResponses,
+          avgNps: npsCount > 0 ? Math.round((npsSum / npsCount) * 10) / 10 : null,
+          avgRating: ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 10) / 10 : null,
+          responseRate: 0, // requires sent count tracking
+          npsBreakdown: { promoters, passives, detractors },
+        })
+      }
+    }
+
     return err('Not found', 404, 'NOT_FOUND', requestId, startMs)
   } catch (e: any) {
     console.error('API error:', e)
