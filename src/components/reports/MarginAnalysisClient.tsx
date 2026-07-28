@@ -202,7 +202,9 @@ export default function MarginAnalysisClient({ storeId, currency }: MarginAnalys
         <div className="flex gap-2">
           <PrintButton />
           <ExportButton
-            data={filteredMargins}
+            type="csv"
+            label="Export CSV"
+            data={filteredMargins as any}
             filename={`margin-analysis-${storeId}`}
             columns={exportColumns}
           />
