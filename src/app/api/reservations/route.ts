@@ -1,55 +1,54 @@
-// GET /api/reservations?storeId=&date=
-// POST /api/reservations
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { query, queryOne, exec, newId, nowISO } from '@/lib/db'
+import { query, exec, newId, nowISO } from '@/lib/db'
 
 function err(msg: string, status = 400, code = 'ERROR') {
   return NextResponse.json({ error: msg, code }, { status })
 }
 
-async function ensureTables() {
-  await exec(`
-    CREATE TABLE IF NOT EXISTS Reservation (
-      id            TEXT PRIMARY KEY,
-      storeId       TEXT NOT NULL,
-      tableId       TEXT NOT NULL,
-      customerName  TEXT NOT NULL,
-      customerPhone TEXT NOT NULL,
-      partySize     INTEGER NOT NULL,
-      date          TEXT NOT NULL,
-      time          TEXT NOT NULL,
-      duration      INTEGER NOT NULL DEFAULT 90,
-      status        TEXT NOT NULL DEFAULT 'PENDING',
-      notes         TEXT,
-      createdAt     TEXT NOT NULL,
-      updatedAt     TEXT NOT NULL
-    )
-  `)
+export async function ensureReservationTables() {
+  await exec(`CREATE TABLE IF NOT EXISTS Reservation (
+    id            TEXT PRIMARY KEY,
+    storeId       TEXT NOT NULL,
+    customerId    TEXT,
+    customerName  TEXT NOT NULL,
+    customerPhone TEXT NOT NULL,
+    tableId       TEXT NOT NULL,
+    partySize     INTEGER NOT NULL,
+    date          TEXT NOT NULL,
+    timeSlot      TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'PENDING',
+    notes         TEXT,
+    createdAt     TEXT NOT NULL
+  )`)
+  await exec(`CREATE TABLE IF NOT EXISTS TableLayout (
+    id       TEXT PRIMARY KEY,
+    storeId  TEXT NOT NULL,
+    number   TEXT NOT NULL,
+    capacity INTEGER NOT NULL DEFAULT 2,
+    section  TEXT NOT NULL DEFAULT '',
+    active   INTEGER NOT NULL DEFAULT 1,
+    createdAt TEXT NOT NULL
+  )`)
 }
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
   const user = session.user as any
-
   const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
   if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
 
-  await ensureTables()
+  await ensureReservationTables()
 
   const date = req.nextUrl.searchParams.get('date')
-  const tableId = req.nextUrl.searchParams.get('tableId')
   const status = req.nextUrl.searchParams.get('status')
 
-  let sql = `SELECT * FROM Reservation WHERE storeId=?`
+  let sql = `SELECT * FROM Reservation WHERE storeId = ?`
   const params: any[] = [storeId]
-
-  if (date) { sql += ` AND date=?`; params.push(date) }
-  if (tableId) { sql += ` AND tableId=?`; params.push(tableId) }
-  if (status) { sql += ` AND status=?`; params.push(status) }
-
-  sql += ` ORDER BY date ASC, time ASC`
+  if (date) { sql += ` AND date = ?`; params.push(date) }
+  if (status) { sql += ` AND status = ?`; params.push(status) }
+  sql += ` ORDER BY date, timeSlot`
 
   const rows = await query(sql, params)
   return NextResponse.json(rows)
@@ -59,64 +58,45 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED')
   const user = session.user as any
-
   const storeId = req.nextUrl.searchParams.get('storeId') ?? user.stores?.[0]?.id
   if (!storeId) return err('storeId required', 400, 'MISSING_FIELD')
 
-  await ensureTables()
+  const body = await req.json() as any
+  const { customerId, customerName, customerPhone, tableId, partySize, date, timeSlot, notes } = body
 
-  const b = (await req.json()) as any
-
-  const required = ['tableId', 'customerName', 'customerPhone', 'partySize', 'date', 'time']
-  for (const f of required) {
-    if (!b[f] && b[f] !== 0) return err(`Field '${f}' is required`, 400, 'MISSING_FIELD')
+  if (!customerName || !customerPhone || !tableId || !partySize || !date || !timeSlot) {
+    return err('customerName, customerPhone, tableId, partySize, date, timeSlot required', 400, 'MISSING_FIELD')
   }
 
-  const partySize = Number(b.partySize)
-  if (!Number.isInteger(partySize) || partySize < 1) {
-    return err('partySize must be a positive integer', 400, 'INVALID_VALUE')
-  }
+  await ensureReservationTables()
 
-  const duration = Number(b.duration ?? 90)
-  if (isNaN(duration) || duration < 1) {
-    return err('duration must be a positive number (minutes)', 400, 'INVALID_VALUE')
-  }
-
-  // Conflict check: same table, overlapping datetime
-  const datetime = `${b.date}T${b.time}`
-  const start = new Date(datetime).getTime()
-  const end = start + duration * 60_000
-
-  const existing = await query<any>(
-    `SELECT id, date, time, duration, status FROM Reservation
-     WHERE storeId=? AND tableId=? AND date=? AND status NOT IN ('CANCELLED','NO_SHOW')`,
-    [storeId, b.tableId, b.date],
+  // Conflict check
+  const conflicts = await query(
+    `SELECT id FROM Reservation WHERE storeId = ? AND tableId = ? AND date = ? AND timeSlot = ? AND status NOT IN ('CANCELLED','NO_SHOW','COMPLETED')`,
+    [storeId, tableId, date, timeSlot],
   )
+  if ((conflicts as any[]).length > 0) {
+    return err('Table already reserved for that date and time slot', 409, 'CONFLICT')
+  }
 
-  for (const r of existing) {
-    const rStart = new Date(`${r.date}T${r.time}`).getTime()
-    const rEnd = rStart + r.duration * 60_000
-    if (start < rEnd && end > rStart) {
-      return err('Table already has a reservation at that time', 409, 'CONFLICT')
+  // Capacity check
+  const tables = await query(`SELECT capacity FROM TableLayout WHERE id = ? AND storeId = ?`, [tableId, storeId])
+  if ((tables as any[]).length > 0) {
+    const cap = (tables as any[])[0].capacity
+    if (Number(partySize) > cap) {
+      return err(`Party size ${partySize} exceeds table capacity ${cap}`, 400, 'CAPACITY_EXCEEDED')
     }
   }
 
   const id = newId()
-  const now = nowISO()
-  const validStatuses = ['PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
-  const status = validStatuses.includes(b.status) ? b.status : 'PENDING'
+  const createdAt = nowISO()
 
   await exec(
-    `INSERT INTO Reservation
-       (id,storeId,tableId,customerName,customerPhone,partySize,date,time,duration,status,notes,createdAt,updatedAt)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, storeId, b.tableId, b.customerName, b.customerPhone, partySize,
-     b.date, b.time, duration, status, b.notes ?? null, now, now],
+    `INSERT INTO Reservation (id, storeId, customerId, customerName, customerPhone, tableId, partySize, date, timeSlot, status, notes, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+    [id, storeId, customerId ?? null, customerName, customerPhone, tableId, partySize, date, timeSlot, notes ?? null, createdAt],
   )
 
-  // SMS/notification stub
-  console.log(`[NOTIFICATION] Reservation ${id} created for ${b.customerName} (${b.customerPhone}) on ${b.date} ${b.time}`)
-
-  const row = await queryOne(`SELECT * FROM Reservation WHERE id=?`, [id])
-  return NextResponse.json(row, { status: 201 })
+  const row = await query(`SELECT * FROM Reservation WHERE id = ?`, [id])
+  return NextResponse.json((row as any[])[0], { status: 201 })
 }
