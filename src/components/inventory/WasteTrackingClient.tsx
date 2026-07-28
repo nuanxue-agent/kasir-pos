@@ -17,7 +17,8 @@ import { toast } from '@/components/ui/Toaster'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type WasteReason = 'EXPIRED' | 'DAMAGED' | 'SPOILED' | 'RETURNED' | 'OTHER'
+type WasteReason = 'EXPIRED' | 'SPOILED' | 'DAMAGED' | 'OVERPRODUCTION' | 'OTHER'
+type WasteShift = 'MORNING' | 'AFTERNOON' | 'EVENING'
 
 interface WasteLog {
   id: string
@@ -25,10 +26,12 @@ interface WasteLog {
   productId: string
   productName: string
   qty: number
+  unit: string
   reason: WasteReason
   cost: number
   recordedBy: string
   recordedAt: string
+  shift: WasteShift
   notes: string | null
 }
 
@@ -67,14 +70,14 @@ function reasonBadge(reason: WasteReason) {
     EXPIRED: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
     DAMAGED: 'bg-red-500/10 text-red-600 border-red-500/20',
     SPOILED: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
-    RETURNED: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    OVERPRODUCTION: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
     OTHER: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
   }
   const labels: Record<WasteReason, string> = {
     EXPIRED: 'Kadaluwarsa',
     DAMAGED: 'Rusak',
     SPOILED: 'Busuk',
-    RETURNED: 'Retur',
+    OVERPRODUCTION: 'Overproduksi',
     OTHER: 'Lainnya',
   }
   return (
@@ -100,7 +103,7 @@ export function calcWasteSummary(logs: WasteLog[]): WasteSummary {
       EXPIRED: { qty: 0, cost: 0 },
       DAMAGED: { qty: 0, cost: 0 },
       SPOILED: { qty: 0, cost: 0 },
-      RETURNED: { qty: 0, cost: 0 },
+      OVERPRODUCTION: { qty: 0, cost: 0 },
       OTHER: { qty: 0, cost: 0 },
     },
     byCategory: {},
@@ -163,11 +166,12 @@ export default function WasteTrackingClient({
     productId: '',
     qty: '',
     reason: 'EXPIRED' as WasteReason,
+    shift: 'MORNING' as WasteShift,
     notes: '',
   })
 
   const fetchLogs = useCallback(async () => {
-    const res = await fetch(`/api/waste-logs?storeId=${storeId}`)
+    const res = await fetch(`/api/waste-entries?storeId=${storeId}`)
     if (!res.ok) return
     const data = await res.json() as WasteLog[]
     setLogs(data)
@@ -187,13 +191,18 @@ export default function WasteTrackingClient({
     if (!product) return
 
     setLoading(true)
-    const res = await fetch(`/api/waste-logs?storeId=${storeId}`, {
+    const res = await fetch(`/api/waste-entries?storeId=${storeId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         productId: formData.productId,
+        productName: product.name,
         qty: parseFloat(formData.qty),
+        unit: 'pcs',
         reason: formData.reason,
+        cost: product.cost * parseFloat(formData.qty),
+        recordedBy: 'staff',
+        shift: formData.shift,
         notes: formData.notes || null,
       }),
     })
@@ -207,7 +216,7 @@ export default function WasteTrackingClient({
 
     toast.success('Waste log dicatat')
     setShowAddForm(false)
-    setFormData({ productId: '', qty: '', reason: 'EXPIRED', notes: '' })
+    setFormData({ productId: '', qty: '', reason: 'EXPIRED', shift: 'MORNING', notes: '' })
     await fetchLogs()
     setLoading(false)
   }
@@ -348,7 +357,7 @@ export default function WasteTrackingClient({
                       reason === 'EXPIRED' && 'bg-orange-500',
                       reason === 'DAMAGED' && 'bg-red-500',
                       reason === 'SPOILED' && 'bg-purple-500',
-                      reason === 'RETURNED' && 'bg-blue-500',
+                      reason === 'OVERPRODUCTION' && 'bg-yellow-500',
                       reason === 'OTHER' && 'bg-gray-500'
                     )}
                     style={{ width: `${pct}%` }}
@@ -537,8 +546,21 @@ export default function WasteTrackingClient({
                   <option value="EXPIRED">Kadaluwarsa</option>
                   <option value="DAMAGED">Rusak</option>
                   <option value="SPOILED">Busuk</option>
-                  <option value="RETURNED">Retur</option>
+                  <option value="OVERPRODUCTION">Overproduksi</option>
                   <option value="OTHER">Lainnya</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--text-2)]">Shift</label>
+                <select
+                  value={formData.shift}
+                  onChange={e => setFormData(prev => ({ ...prev, shift: e.target.value as WasteShift }))}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-1)] px-3 py-2 text-sm text-[var(--text-1)] focus:border-[var(--primary)] focus:outline-none"
+                >
+                  <option value="MORNING">Pagi</option>
+                  <option value="AFTERNOON">Siang</option>
+                  <option value="EVENING">Malam</option>
                 </select>
               </div>
 
