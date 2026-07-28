@@ -226,6 +226,71 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
   if (rateLimitResponse) return rateLimitResponse
 
   try {
+    // ─── PUBLIC ENDPOINTS (no auth required) ─────────────────────────────────
+    if (segs[0] === 'track' && segs.length === 2 && method === 'GET') {
+      const publicToken = segs[1]
+
+      // Lazy-init in case table doesn't exist yet
+      try {
+        await exec(
+          `CREATE TABLE IF NOT EXISTS OrderTracking (
+            id TEXT PRIMARY KEY,
+            orderId TEXT NOT NULL,
+            publicToken TEXT NOT NULL UNIQUE,
+            storeId TEXT NOT NULL,
+            createdAt TEXT NOT NULL
+          )`,
+        )
+      } catch { /* ignore */ }
+
+      const tracking = await queryOne<any>(
+        `SELECT * FROM OrderTracking WHERE publicToken = ?`,
+        [publicToken],
+      )
+      if (!tracking) return err('Tracking token not found', 404, 'NOT_FOUND', requestId, startMs)
+
+      const order = await queryOne<any>(
+        `SELECT o.*, s.name as storeName FROM "Order" o
+         LEFT JOIN Store s ON o.storeId = s.id
+         WHERE o.id = ?`,
+        [tracking.orderId],
+      )
+      if (!order) return err('Order not found', 404, 'NOT_FOUND', requestId, startMs)
+
+      const items = await query<any>(
+        `SELECT oi.*, p.name as productName FROM OrderItem oi
+         LEFT JOIN Product p ON oi.productId = p.id
+         WHERE oi.orderId = ?`,
+        [tracking.orderId],
+      )
+
+      const statusMap: Record<string, string> = {
+        PENDING: 'PENDING',
+        PREPARING: 'PREPARING',
+        READY: 'READY',
+        DELIVERED: 'DELIVERED',
+        PAID: 'DELIVERED',
+        VOIDED: 'PENDING',
+        REFUNDED: 'DELIVERED',
+      }
+      const trackingStatus = statusMap[order.status] ?? 'PENDING'
+
+      return NextResponse.json({
+        orderId: order.id,
+        orderNumber: order.number,
+        status: trackingStatus,
+        storeName: order.storeName ?? null,
+        estimatedMinutes: null,
+        createdAt: order.createdAt,
+        items: items.map((i: any) => ({
+          id: i.id,
+          name: i.productName ?? i.name ?? 'Item',
+          qty: i.qty,
+          price: i.price,
+        })),
+      })
+    }
+
     const session = await auth()
     if (!session?.user) return err('Unauthorized', 401, 'UNAUTHORIZED', requestId, startMs)
     const user = session.user as any
@@ -1129,7 +1194,59 @@ async function handle(req: NextRequest, method: string, segs: string[]) {
       }
     }
 
-    // ─── CUSTOMERS ────────────────────────────────────────────────────────────
+    // ─── ORDER TRACKING TOKEN ─────────────────────────────────────────────────
+    // POST /api/orders/:id/tracking-token — generate a public shareable token
+    if (
+      segs[0] === 'orders' &&
+      segs.length === 3 &&
+      segs[2] === 'tracking-token' &&
+      method === 'POST'
+    ) {
+      const oid = segs[1]
+      const order = await queryOne(
+        `SELECT * FROM "Order" WHERE id = ? AND storeId = ?`,
+        [oid, storeId],
+      )
+      if (!order) return err('Order not found', 404)
+
+      // Lazy-init OrderTracking table
+      await exec(
+        `CREATE TABLE IF NOT EXISTS OrderTracking (
+          id TEXT PRIMARY KEY,
+          orderId TEXT NOT NULL,
+          publicToken TEXT NOT NULL UNIQUE,
+          storeId TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )`,
+      )
+
+      // Return existing token if present
+      const existing = await queryOne<any>(
+        `SELECT * FROM OrderTracking WHERE orderId = ? AND storeId = ?`,
+        [oid, storeId],
+      )
+      if (existing) {
+        return ok({ token: existing.publicToken, orderId: oid })
+      }
+
+      // Generate a cryptographically random token
+      const tokenBytes = new Uint8Array(24)
+      crypto.getRandomValues(tokenBytes)
+      const publicToken = btoa(String.fromCharCode(...tokenBytes))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '')
+
+      const tid = newId()
+      const t = nowISO()
+      await exec(
+        `INSERT INTO OrderTracking (id, orderId, publicToken, storeId, createdAt) VALUES (?,?,?,?,?)`,
+        [tid, oid, publicToken, storeId, t],
+      )
+      return ok({ token: publicToken, orderId: oid })
+    }
+
+        // ─── CUSTOMERS ────────────────────────────────────────────────────────────
     if (segs[0] === 'customers') {
       if (segs.length === 1) {
         if (method === 'GET') {
