@@ -55,7 +55,7 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.0",
@@ -64,14 +64,14 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.4",
+    "@vitejs/plugin-react": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "fast-check": "^4.9.0",
     "husky": "^9.1.7",
-    "jsdom": "^30.0.0",
-    "lint-staged": "^17.2.0",
+    "jsdom": "^30.0.1",
+    "lint-staged": "^17.3.0",
     "playwright": "^1.62.0",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -80,7 +80,7 @@
     "vercel": "^57.0.0",
     "vitest": "^4.1.10",
     "wait-on": "^9.1.0",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.116.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
